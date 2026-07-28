@@ -1,9 +1,8 @@
+import 'dotenv/config'
 import path from 'path'
-import { PrismaClient } from '@prisma/client'
 import { parseAllVocabulary } from '../scripts/parse-vocabulary'
 import { ACHIEVEMENTS } from '../lib/achievements'
-
-const db = new PrismaClient()
+import { db } from '../lib/db'
 
 async function main() {
   console.log('🌱 Seeding achievements...')
@@ -13,7 +12,7 @@ async function main() {
   })
 
   console.log('🌱 Parsing vocabulary files...')
-  const dataDir = path.join(__dirname, '..', '..', '..', 'Desktop', 'pro')
+  const dataDir = path.join(__dirname, '..', '..', '..', '..', 'Desktop', 'pro')
   const words = parseAllVocabulary(dataDir)
 
   console.log(`🌱 Inserting ${words.length} words...`)

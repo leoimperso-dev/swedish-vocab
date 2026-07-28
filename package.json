@@ -25,18 +25,22 @@
   },
   "dependencies": {
     "@auth/prisma-adapter": "^2.11.3",
+    "@prisma/adapter-pg": "^6.19.3",
     "@prisma/client": "^6.19.3",
     "framer-motion": "^12.42.2",
     "next": "16.1.6",
     "next-auth": "5.0.0-beta.32",
+    "pg": "^8.22.0",
     "react": "19.2.3",
     "react-dom": "19.2.3"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
     "@types/node": "^20",
+    "@types/pg": "^8.20.0",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "dotenv": "^17.4.2",
     "eslint": "^9",
     "eslint-config-next": "16.1.6",
     "prisma": "^6.19.3",
