@@ -89,6 +89,8 @@ model Word {
   createdAt DateTime @default(now())
 
   userProgress UserWord[]
+
+  @@unique([swedish, wordType, source])
 }
 
 model UserWord {
