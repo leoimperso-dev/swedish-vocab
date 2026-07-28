@@ -7,9 +7,8 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "db:push": "NODE_OPTIONS=--use-system-ca prisma db push",
+    "db:apply": "NODE_OPTIONS=--use-system-ca tsx scripts/db-apply.ts",
     "db:seed": "NODE_OPTIONS=--use-system-ca tsx prisma/seed.ts",
-    "db:studio": "NODE_OPTIONS=--use-system-ca prisma studio",
     "parse": "NODE_OPTIONS=--use-system-ca tsx scripts/parse-vocabulary.ts"
   },
   "prisma": {

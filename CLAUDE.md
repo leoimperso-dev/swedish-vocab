@@ -24,14 +24,26 @@ Next.js app for learning Swedish vocabulary with spaced repetition.
 
 ## Commands
 ```
-pnpm dev          # dev server
-pnpm db:push      # push schema to Supabase (needs --use-system-ca for TLS)
-pnpm db:seed      # parse .txt files and seed DB
-pnpm parse        # test vocabulary parser
+pnpm dev                      # dev server
+pnpm db:apply <file.sql>      # apply SQL to Supabase via node-postgres
+pnpm db:seed                  # parse .txt files and seed DB
+pnpm parse                    # test vocabulary parser
 ```
 
+## DB connectivity (critical on this machine)
+The Prisma Rust engine **cannot** reach Supabase from this machine (P1001 on direct
+host and poolers), while node-postgres connects fine. Consequences:
+- `prisma db push` / `prisma studio` / `prisma migrate dev` DO NOT work here
+- Runtime uses the `driverAdapters` preview feature: `lib/db.ts` builds PrismaClient
+  with `@prisma/adapter-pg` and pins the Supabase root CA (`certs/supabase-ca.pem`)
+- Schema changes: edit `schema.prisma`, then generate SQL offline with
+  `prisma migrate diff --from-empty --to-schema-datamodel prisma/schema.prisma --script`
+  (or write the ALTER by hand for incremental changes) and apply with `pnpm db:apply`
+- Supabase direct host is IPv6-only; node reaches it, and the pooler hostnames
+  answered "tenant not found" for this project — use the direct URL locally
+
 ## TLS note
-This machine requires `NODE_OPTIONS=--use-system-ca` for Prisma binary downloads and DB connections. All `db:*` scripts already include it. `next.config.ts` sets `experimental.turbopackUseSystemTlsCerts` for the same reason (Google Fonts fetch at build time).
+This machine requires `NODE_OPTIONS=--use-system-ca` for Prisma binary downloads. All `db:*` scripts already include it. `next.config.ts` sets `experimental.turbopackUseSystemTlsCerts` for the same reason (Google Fonts fetch at build time).
 
 ## Answer evaluation
 - `evaluateAnswer(input, expected)` returns 'correct' | 'approximate' | 'incorrect'
