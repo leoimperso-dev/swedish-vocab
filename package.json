@@ -3,9 +3,9 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev",
-    "build": "next build",
-    "start": "next start",
+    "dev": "NODE_OPTIONS=--use-system-ca next dev",
+    "build": "NODE_OPTIONS=--use-system-ca next build",
+    "start": "NODE_OPTIONS=--use-system-ca next start",
     "lint": "eslint",
     "db:apply": "NODE_OPTIONS=--use-system-ca tsx scripts/db-apply.ts",
     "db:seed": "NODE_OPTIONS=--use-system-ca tsx prisma/seed.ts",
