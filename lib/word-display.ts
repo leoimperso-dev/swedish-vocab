@@ -1,4 +1,24 @@
 // Shared formatting for word forms and enrichment details
+import type { Lang } from '@/lib/i18n'
+
+interface BilingualWord {
+  swedish: string
+  french: string
+}
+
+// Exercises always prompt in the language being learned and answer in the native one
+export function promptText(word: BilingualWord, lang: Lang): string {
+  return lang === 'fr' ? word.swedish : word.french
+}
+
+export function answerText(word: BilingualWord, lang: Lang): string {
+  return lang === 'fr' ? word.french : word.swedish
+}
+
+// TTS locale of the language being learned
+export function learnedLocale(lang: Lang): string {
+  return lang === 'fr' ? 'sv-SE' : 'fr-FR'
+}
 
 // Display order: verb tenses, then noun plural, then adjective forms
 const FORM_ORDER = ['present', 'preterit', 'supine', 'plural', 'ett', 'comparative', 'superlative']

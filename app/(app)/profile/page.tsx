@@ -3,6 +3,7 @@ import { db } from '@/lib/db'
 import { getLevelForXp, xpToNextLevel, LEVELS } from '@/lib/xp'
 import { ACHIEVEMENTS } from '@/lib/achievements'
 import { MAX_FREEZES, FREEZE_EARN_EVERY } from '@/lib/streak'
+import { asLang, getStrings } from '@/lib/i18n'
 import { revalidatePath } from 'next/cache'
 import Image from 'next/image'
 
@@ -32,6 +33,7 @@ export default async function ProfilePage() {
 
   if (!user) return null
 
+  const t = getStrings(asLang(user.nativeLanguage))
   const level = getLevelForXp(user.xp)
   const { current, needed, progress } = xpToNextLevel(user.xp)
   const unlockedSlugs = unlockedAchievements.map(ua => ua.achievement.slug)
@@ -46,13 +48,13 @@ export default async function ProfilePage() {
         <div className="flex-1">
           <p className="text-xl font-bold">{user.name}</p>
           <p className="text-slate-400 text-sm">{user.email}</p>
-          <p className="text-blue-400 text-sm mt-1">{level.title} · Niveau {level.level}</p>
+          <p className="text-blue-400 text-sm mt-1">{level.title} · {t.level} {level.level}</p>
         </div>
       </div>
 
       {/* XP & level progress */}
       <div className="bg-slate-900 rounded-2xl p-4 space-y-4">
-        <h2 className="font-semibold text-slate-300">Progression</h2>
+        <h2 className="font-semibold text-slate-300">{t.progression}</h2>
         <div className="space-y-2">
           <div className="flex justify-between text-sm">
             <span>{level.title}</span>
@@ -88,14 +90,14 @@ export default async function ProfilePage() {
 
       {/* Stats résumé */}
       <div className="grid grid-cols-3 gap-3">
-        <MiniStat label="XP total" value={user.xp} />
-        <MiniStat label="Série" value={`🔥 ${user.streakCurrent}`} />
-        <MiniStat label="Record" value={`${user.streakBest}j`} />
+        <MiniStat label={t.totalXp} value={user.xp} />
+        <MiniStat label={t.streak} value={`🔥 ${user.streakCurrent}`} />
+        <MiniStat label={t.record} value={`${user.streakBest}`} />
       </div>
 
       {/* Daily goal setting */}
       <div className="bg-slate-900 rounded-2xl p-4 space-y-4">
-        <h2 className="font-semibold text-slate-300">Objectif quotidien</h2>
+        <h2 className="font-semibold text-slate-300">{t.dailyGoalSetting}</h2>
         <form action={setDailyGoal} className="grid grid-cols-4 gap-2">
           {DAILY_GOAL_OPTIONS.map(goal => (
             <button
@@ -114,15 +116,14 @@ export default async function ProfilePage() {
           ))}
         </form>
         <p className="text-slate-500 text-xs">
-          🧊 Streak freezes : {user.freezeCount} / {MAX_FREEZES} — un freeze protège ta série si tu
-          rates un jour ; tu en regagnes un tous les {FREEZE_EARN_EVERY} jours de suite.
+          {t.freezeInfo(user.freezeCount, MAX_FREEZES, FREEZE_EARN_EVERY)}
         </p>
       </div>
 
       {/* Achievements */}
       <div className="bg-slate-900 rounded-2xl p-4 space-y-4">
         <div className="flex items-center justify-between">
-          <h2 className="font-semibold text-slate-300">Badges</h2>
+          <h2 className="font-semibold text-slate-300">{t.badges}</h2>
           <span className="text-slate-500 text-sm">{unlockedSlugs.length} / {ACHIEVEMENTS.length}</span>
         </div>
         <div className="grid grid-cols-4 gap-4">
@@ -153,7 +154,7 @@ export default async function ProfilePage() {
           type="submit"
           className="w-full py-4 rounded-2xl border border-red-900 text-red-400 hover:bg-red-950 active:scale-95 transition-all cursor-pointer font-semibold"
         >
-          Se déconnecter
+          {t.signOut}
         </button>
       </form>
     </main>

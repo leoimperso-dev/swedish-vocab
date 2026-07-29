@@ -9,6 +9,8 @@ export async function GET(req: NextRequest) {
 
   const wordId = req.nextUrl.searchParams.get('wordId')
   const wordType = req.nextUrl.searchParams.get('wordType') as WordType | null
+  // Distractor options are in the user's native language (same as the correct answer)
+  const field = req.nextUrl.searchParams.get('lang') === 'sv' ? 'swedish' : 'french'
 
   if (!wordId) return NextResponse.json({ error: 'Missing wordId' }, { status: 400 })
 
@@ -24,7 +26,7 @@ export async function GET(req: NextRequest) {
       id: { not: wordId, in: seenWordIds.map(uw => uw.wordId) },
       ...(wordType ? { wordType } : {}),
     },
-    select: { french: true },
+    select: { swedish: true, french: true },
     take: 50,
     orderBy: { createdAt: 'asc' },
   })
@@ -36,16 +38,16 @@ export async function GET(req: NextRequest) {
   if (shuffled.length < 3) {
     const fallback = await db.word.findMany({
       where: { id: { not: wordId }, ...(wordType ? { wordType } : {}) },
-      select: { french: true },
+      select: { swedish: true, french: true },
       take: 20,
       skip: Math.floor(Math.random() * 50),
     })
     const extra = fallback
-      .map(w => w.french)
-      .filter(f => !shuffled.some(s => s.french === f))
+      .map(w => w[field])
+      .filter(f => !shuffled.some(s => s[field] === f))
       .slice(0, 3 - shuffled.length)
-    return NextResponse.json({ distractors: [...shuffled.map(w => w.french), ...extra] })
+    return NextResponse.json({ distractors: [...shuffled.map(w => w[field]), ...extra] })
   }
 
-  return NextResponse.json({ distractors: shuffled.map(w => w.french) })
+  return NextResponse.json({ distractors: shuffled.map(w => w[field]) })
 }

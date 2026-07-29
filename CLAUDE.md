@@ -18,6 +18,15 @@ Next.js app for learning Swedish vocabulary with spaced repetition.
 - `scripts/parse-vocabulary.ts` — Parser for Swedish.txt and Swedish_core_5000.txt
 - `scripts/merge-core.ts` — Merges agent-generated vocab chunks into Swedish_core_5000.txt (dedup by headword)
 
+## Bilingual mode
+`User.nativeLanguage` (`fr` default | `sv`) drives everything: UI strings (`lib/i18n.ts` via
+`LangProvider`/`useLang` for client components, `getStrings(asLang(...))` server-side), exercise
+direction (`promptText`/`answerText`/`learnedLocale` in `lib/word-display.ts` — prompt is always
+the learned language), TTS locale, QCM distractor language (`?lang=` param), and exercise selection
+(no CONJUGATION for `sv` natives). Flag button on dashboard toggles via `app/(app)/actions.ts`.
+`Word.details` (JSONB `{translations[], context?, usage[{sv,fr}]}`) is written in French —
+translations/context only shown in `fr` mode; usage pairs shown in both.
+
 ## Data sources
 - `C:\Users\Arnau\Desktop\pro\Swedish.txt` — Personal vocab list (~930 entries, mixed format)
 - `C:\Users\Arnau\Desktop\pro\Swedish_core_5000.txt` — Core ~5000 most common Swedish words (generated in themed chunks, merged via merge-core.ts)

@@ -2,6 +2,8 @@
 
 import { useEffect, useState } from 'react'
 import Image from 'next/image'
+import { getStrings } from '@/lib/i18n'
+import { useLang } from '@/components/LangProvider'
 
 interface RankedUser {
   rank: number
@@ -22,6 +24,7 @@ export default function LeaderboardPage() {
   const [users, setUsers] = useState<RankedUser[]>([])
   const [period, setPeriod] = useState<Period>('week')
   const [loading, setLoading] = useState(true)
+  const t = getStrings(useLang())
 
   useEffect(() => {
     setLoading(true)
@@ -35,19 +38,19 @@ export default function LeaderboardPage() {
 
   return (
     <main className="px-4 pt-12 pb-6 max-w-lg mx-auto space-y-6">
-      <h1 className="text-2xl font-bold">Classement</h1>
+      <h1 className="text-2xl font-bold">{t.leaderboardTitle}</h1>
 
       {/* Period tabs */}
       <div className="flex bg-slate-900 rounded-2xl p-1">
-        <PeriodTab label="Cette semaine" active={period === 'week'} onClick={() => setPeriod('week')} />
-        <PeriodTab label="Général" active={period === 'all'} onClick={() => setPeriod('all')} />
+        <PeriodTab label={t.thisWeek} active={period === 'week'} onClick={() => setPeriod('week')} />
+        <PeriodTab label={t.allTime} active={period === 'all'} onClick={() => setPeriod('all')} />
       </div>
       {period === 'week' && (
-        <p className="text-slate-500 text-xs -mt-3">XP gagnés depuis lundi — remise à zéro chaque semaine</p>
+        <p className="text-slate-500 text-xs -mt-3">{t.weeklyReset}</p>
       )}
 
       {loading ? (
-        <div className="py-16 text-center text-slate-400">Chargement...</div>
+        <div className="py-16 text-center text-slate-400">{t.loading}</div>
       ) : (
         <>
 
@@ -73,9 +76,9 @@ export default function LeaderboardPage() {
             <Avatar user={user} size={36} />
             <div className="flex-1 min-w-0">
               <p className="font-medium truncate">
-                {user.name}{user.isCurrentUser && <span className="text-blue-400 text-xs ml-2">(toi)</span>}
+                {user.name}{user.isCurrentUser && <span className="text-blue-400 text-xs ml-2">{t.you}</span>}
               </p>
-              <p className="text-slate-500 text-xs">{user.levelTitle} · {user.wordsStudied} mots</p>
+              <p className="text-slate-500 text-xs">{user.levelTitle} · {user.wordsStudied} {t.words}</p>
             </div>
             <div className="text-right">
               <p className="font-bold text-blue-400">{user.xp} XP</p>
@@ -87,7 +90,7 @@ export default function LeaderboardPage() {
 
       {users.length === 0 && (
         <div className="text-center py-12 text-slate-500">
-          Sois le premier à étudier !
+          {t.beFirst}
         </div>
       )}
         </>

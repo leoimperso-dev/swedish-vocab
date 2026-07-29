@@ -3,6 +3,8 @@
 import { useSearchParams, useRouter } from 'next/navigation'
 import { motion } from 'framer-motion'
 import { Suspense } from 'react'
+import { getStrings } from '@/lib/i18n'
+import { useLang } from '@/components/LangProvider'
 
 interface SessionData {
   xpGained: number
@@ -18,6 +20,7 @@ interface SessionData {
 function ResultsContent() {
   const searchParams = useSearchParams()
   const router = useRouter()
+  const t = getStrings(useLang())
   const data: SessionData = JSON.parse(decodeURIComponent(searchParams.get('data') ?? '{}'))
 
   const correct = data.results?.filter(r => r === 'correct').length ?? 0
@@ -36,22 +39,22 @@ function ResultsContent() {
         {/* Score circle */}
         <div className="space-y-2">
           <div className="text-6xl font-black text-blue-400">{score}%</div>
-          <p className="text-slate-400">Session terminée 🎉</p>
+          <p className="text-slate-400">{t.sessionDone}</p>
         </div>
 
         {/* Breakdown */}
         <div className="grid grid-cols-3 gap-3">
           <div className="bg-green-950 border border-green-800 rounded-2xl p-3">
             <div className="text-2xl font-bold text-green-400">{correct}</div>
-            <div className="text-xs text-green-600 mt-1">Correct</div>
+            <div className="text-xs text-green-600 mt-1">{t.correct}</div>
           </div>
           <div className="bg-yellow-950 border border-yellow-800 rounded-2xl p-3">
             <div className="text-2xl font-bold text-yellow-400">{approx}</div>
-            <div className="text-xs text-yellow-600 mt-1">Presque</div>
+            <div className="text-xs text-yellow-600 mt-1">{t.almost}</div>
           </div>
           <div className="bg-red-950 border border-red-800 rounded-2xl p-3">
             <div className="text-2xl font-bold text-red-400">{incorrect}</div>
-            <div className="text-xs text-red-600 mt-1">Incorrect</div>
+            <div className="text-xs text-red-600 mt-1">{t.incorrect}</div>
           </div>
         </div>
 
@@ -59,11 +62,11 @@ function ResultsContent() {
         <div className="bg-slate-900 rounded-2xl p-4 space-y-2">
           <div className="text-2xl font-bold text-yellow-400">+{data.xpGained} XP</div>
           {data.leveledUp && (
-            <div className="text-green-400 font-semibold">🆙 Niveau {data.newLevel} débloqué !</div>
+            <div className="text-green-400 font-semibold">{t.levelUnlocked(data.newLevel)}</div>
           )}
-          <div className="text-slate-500 text-sm">Série : {data.streakCurrent} jour{data.streakCurrent > 1 ? 's' : ''} 🔥</div>
+          <div className="text-slate-500 text-sm">{t.streakLine(data.streakCurrent)}</div>
           {(data.freezesUsed ?? 0) > 0 && (
-            <div className="text-cyan-400 text-sm">🧊 Série sauvée par un streak freeze !</div>
+            <div className="text-cyan-400 text-sm">{t.freezeSaved}</div>
           )}
         </div>
 
@@ -75,15 +78,15 @@ function ResultsContent() {
               : 'bg-slate-900 text-slate-400'
           }`}>
             {data.dailyGoal.reached
-              ? `🎯 Objectif du jour atteint — ${data.dailyGoal.xpToday} / ${data.dailyGoal.goal} XP`
-              : `🎯 Objectif du jour : ${data.dailyGoal.xpToday} / ${data.dailyGoal.goal} XP`}
+              ? t.goalReachedLine(data.dailyGoal.xpToday, data.dailyGoal.goal)
+              : t.goalProgressLine(data.dailyGoal.xpToday, data.dailyGoal.goal)}
           </div>
         )}
 
         {/* New achievements */}
         {data.newAchievements?.length > 0 && (
           <div className="space-y-2">
-            <p className="text-slate-400 text-sm">Nouveaux badges !</p>
+            <p className="text-slate-400 text-sm">{t.newBadges}</p>
             {data.newAchievements.map(a => (
               <div key={a.slug} className="bg-slate-900 rounded-xl p-3 flex items-center gap-3">
                 <span className="text-2xl">{a.icon}</span>
@@ -99,13 +102,13 @@ function ResultsContent() {
             onClick={() => router.push('/study')}
             className="w-full py-4 rounded-2xl bg-blue-600 hover:bg-blue-500 font-semibold active:scale-95 transition-all cursor-pointer"
           >
-            Nouvelle session
+            {t.newSession}
           </button>
           <button
             onClick={() => router.push('/dashboard')}
             className="w-full py-4 rounded-2xl bg-slate-900 hover:bg-slate-800 font-semibold active:scale-95 transition-all cursor-pointer"
           >
-            Retour à l'accueil
+            {t.backHome}
           </button>
         </div>
       </motion.div>

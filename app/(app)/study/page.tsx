@@ -7,6 +7,8 @@ import MultipleChoice from '@/components/study/MultipleChoice'
 import TypingExercise from '@/components/study/TypingExercise'
 import ConjugationExercise from '@/components/study/ConjugationExercise'
 import SessionProgress from '@/components/study/SessionProgress'
+import { getStrings } from '@/lib/i18n'
+import { useLang } from '@/components/LangProvider'
 import type { ExerciseWord, AnswerResult } from '@/types'
 
 export default function StudyPage() {
@@ -69,13 +71,7 @@ export default function StudyPage() {
   if (loading) return <LoadingScreen />
 
   if (exercises.length === 0) {
-    return (
-      <main className="min-h-dvh flex flex-col items-center justify-center px-4 text-center">
-        <div className="text-5xl mb-4">🎉</div>
-        <h1 className="text-2xl font-bold mb-2">Aucun mot à réviser</h1>
-        <p className="text-slate-400">Reviens demain pour ta prochaine session !</p>
-      </main>
-    )
+    return <EmptyState />
   }
 
   const current = exercises[currentIndex]
@@ -108,12 +104,24 @@ export default function StudyPage() {
 }
 
 function LoadingScreen() {
+  const t = getStrings(useLang())
   return (
     <main className="min-h-dvh flex items-center justify-center">
       <div className="text-center space-y-4">
         <div className="text-4xl animate-spin">⚙️</div>
-        <p className="text-slate-400">Préparation de ta session...</p>
+        <p className="text-slate-400">{t.preparingSession}</p>
       </div>
+    </main>
+  )
+}
+
+function EmptyState() {
+  const t = getStrings(useLang())
+  return (
+    <main className="min-h-dvh flex flex-col items-center justify-center px-4 text-center">
+      <div className="text-5xl mb-4">🎉</div>
+      <h1 className="text-2xl font-bold mb-2">{t.noWordsDue}</h1>
+      <p className="text-slate-400">{t.comeBackTomorrow}</p>
     </main>
   )
 }

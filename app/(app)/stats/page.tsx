@@ -1,6 +1,7 @@
 import { auth } from '@/auth'
 import { db } from '@/lib/db'
 import { getLevelForXp, xpToNextLevel } from '@/lib/xp'
+import { asLang, getStrings } from '@/lib/i18n'
 
 const MASTERY_MILESTONES = [50, 100, 250, 500, 1000, 2000, 5000]
 
@@ -36,6 +37,8 @@ export default async function StatsPage() {
 
   if (!user) return null
 
+  const lang = asLang(user.nativeLanguage)
+  const t = getStrings(lang)
   const level = getLevelForXp(user.xp)
   const { progress } = xpToNextLevel(user.xp)
 
@@ -43,7 +46,7 @@ export default async function StatsPage() {
   const weekActivity = Array.from({ length: 7 }, (_, i) => {
     const day = new Date(now.getTime() - (6 - i) * 86400000)
     const dayStr = day.toISOString().split('T')[0]
-    const label = day.toLocaleDateString('fr-FR', { weekday: 'short' })
+    const label = day.toLocaleDateString(lang === 'sv' ? 'sv-SE' : 'fr-FR', { weekday: 'short' })
     const sessions = recentSessions.filter(s => s.startedAt.toISOString().startsWith(dayStr))
     return {
       label,
@@ -62,22 +65,22 @@ export default async function StatsPage() {
 
   return (
     <main className="px-4 pt-12 pb-6 max-w-lg mx-auto space-y-6">
-      <h1 className="text-2xl font-bold">Statistiques</h1>
+      <h1 className="text-2xl font-bold">{t.statsTitle}</h1>
 
       {/* Overview cards */}
       <div className="grid grid-cols-2 gap-3">
-        <StatCard label="Mots vus" value={totalWords} sub={`${dueCount} à revoir`} color="text-blue-400" />
-        <StatCard label="Maîtrisés" value={`${masteredPct}%`} sub={`${masteredCount} mots`} color="text-green-400" />
-        <StatCard label="Précision 30j" value={`${accuracy}%`} sub={`${totalAnswers} réponses`} color="text-yellow-400" />
-        <StatCard label="Série actuelle" value={`🔥 ${user.streakCurrent}`} sub={`record : ${user.streakBest}`} color="text-orange-400" />
+        <StatCard label={t.wordsSeen} value={totalWords} sub={t.toReviewSub(dueCount)} color="text-blue-400" />
+        <StatCard label={t.mastered} value={`${masteredPct}%`} sub={t.wordsSub(masteredCount)} color="text-green-400" />
+        <StatCard label={t.accuracy30d} value={`${accuracy}%`} sub={t.answersSub(totalAnswers)} color="text-yellow-400" />
+        <StatCard label={t.currentStreak} value={`🔥 ${user.streakCurrent}`} sub={t.recordSub(user.streakBest)} color="text-orange-400" />
       </div>
 
       {/* Mastery milestone */}
       {nextMilestone && (
         <div className="bg-slate-900 rounded-2xl p-4 space-y-3">
           <div className="flex justify-between items-center">
-            <span className="font-semibold text-slate-300">Prochain palier de maîtrise</span>
-            <span className="text-green-400 text-sm font-bold">{masteredCount} / {nextMilestone} mots</span>
+            <span className="font-semibold text-slate-300">{t.nextMilestone}</span>
+            <span className="text-green-400 text-sm font-bold">{t.milestoneWords(masteredCount, nextMilestone)}</span>
           </div>
           <div className="h-2 bg-slate-800 rounded-full overflow-hidden">
             <div
@@ -85,7 +88,7 @@ export default async function StatsPage() {
               style={{ width: `${Math.min((masteredCount / nextMilestone) * 100, 100)}%` }}
             />
           </div>
-          <p className="text-slate-500 text-xs">Un mot est maîtrisé quand son intervalle SM-2 dépasse 21 jours</p>
+          <p className="text-slate-500 text-xs">{t.masteredDef}</p>
         </div>
       )}
 
@@ -102,7 +105,7 @@ export default async function StatsPage() {
 
       {/* 7-day activity chart */}
       <div className="bg-slate-900 rounded-2xl p-4 space-y-4">
-        <h2 className="font-semibold text-slate-300">Activité — 7 derniers jours</h2>
+        <h2 className="font-semibold text-slate-300">{t.activity7d}</h2>
         <div className="flex items-end gap-2 h-24">
           {weekActivity.map((day, i) => (
             <div key={i} className="flex-1 flex flex-col items-center gap-1">
@@ -117,14 +120,14 @@ export default async function StatsPage() {
           ))}
         </div>
         <div className="flex justify-between text-xs text-slate-500">
-          <span>mots/jour</span>
-          <span>max : {maxWords}</span>
+          <span>{t.wordsPerDay}</span>
+          <span>{t.max} : {maxWords}</span>
         </div>
       </div>
 
       {/* Streak calendar — last 30 days */}
       <div className="bg-slate-900 rounded-2xl p-4 space-y-3">
-        <h2 className="font-semibold text-slate-300">Série — 30 jours</h2>
+        <h2 className="font-semibold text-slate-300">{t.streak30d}</h2>
         <div className="flex gap-1 flex-wrap">
           {Array.from({ length: 30 }).map((_, i) => {
             const dayOffset = 29 - i
@@ -141,15 +144,15 @@ export default async function StatsPage() {
           })}
         </div>
         <div className="flex gap-3 text-xs text-slate-500">
-          <span className="flex items-center gap-1"><span className="w-3 h-3 bg-orange-500 rounded" /> Étudié</span>
-          <span className="flex items-center gap-1"><span className="w-3 h-3 bg-slate-800 rounded" /> Non étudié</span>
+          <span className="flex items-center gap-1"><span className="w-3 h-3 bg-orange-500 rounded" /> {t.studied}</span>
+          <span className="flex items-center gap-1"><span className="w-3 h-3 bg-slate-800 rounded" /> {t.notStudied}</span>
         </div>
       </div>
 
       {/* Hardest words */}
       {hardestWords.length > 0 && (
         <div className="bg-slate-900 rounded-2xl p-4 space-y-3">
-          <h2 className="font-semibold text-slate-300">Mots les plus difficiles</h2>
+          <h2 className="font-semibold text-slate-300">{t.hardestWords}</h2>
           <div className="space-y-2">
             {hardestWords.map((uw, i) => (
               <div key={uw.id} className="flex items-center gap-3 py-2 border-b border-slate-800 last:border-0">
@@ -171,7 +174,7 @@ export default async function StatsPage() {
       {/* Achievements */}
       {achievements.length > 0 && (
         <div className="bg-slate-900 rounded-2xl p-4 space-y-3">
-          <h2 className="font-semibold text-slate-300">Badges obtenus ({achievements.length})</h2>
+          <h2 className="font-semibold text-slate-300">{t.badgesEarned(achievements.length)}</h2>
           <div className="grid grid-cols-4 gap-3">
             {achievements.map(ua => (
               <div key={ua.id} className="flex flex-col items-center gap-1 text-center">

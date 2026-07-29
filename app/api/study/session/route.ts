@@ -7,10 +7,11 @@ import type { Word, UserWord } from '@prisma/client'
 const SESSION_SIZE = 15
 const NEW_WORDS_PER_SESSION = 5
 
-function selectExerciseType(userWord: UserWord | null, word: Word): ExerciseType {
+function selectExerciseType(userWord: UserWord | null, word: Word, canConjugate: boolean): ExerciseType {
   if (!userWord || userWord.repetitions === 0) return 'FLASHCARD'
   if (userWord.repetitions <= 2) return 'QCM'
-  if (word.wordType === 'VERB' && word.forms) return Math.random() > 0.5 ? 'CONJUGATION' : 'TYPING'
+  // Conjugation drills Swedish verb forms — only for French speakers learning Swedish
+  if (canConjugate && word.wordType === 'VERB' && word.forms) return Math.random() > 0.5 ? 'CONJUGATION' : 'TYPING'
   return 'TYPING'
 }
 
@@ -19,6 +20,8 @@ export async function GET() {
   if (!session?.user?.id) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   const userId = session.user.id
+  const user = await db.user.findUnique({ where: { id: userId }, select: { nativeLanguage: true } })
+  const canConjugate = user?.nativeLanguage !== 'sv'
 
   // 1. Due words (SM-2 scheduled for today)
   const dueUserWords = await db.userWord.findMany({
@@ -52,7 +55,7 @@ export async function GET() {
     ...dueUserWords.map(uw => ({
       word: uw.word,
       userWord: uw,
-      exerciseType: selectExerciseType(uw, uw.word),
+      exerciseType: selectExerciseType(uw, uw.word, canConjugate),
     })),
     ...newWords.map(w => ({
       word: w,

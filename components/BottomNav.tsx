@@ -2,23 +2,26 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-
-const NAV_ITEMS = [
-  { href: '/dashboard', label: 'Accueil', icon: '🏠' },
-  { href: '/study', label: 'Étudier', icon: '📖' },
-  { href: '/words', label: 'Liste', icon: '📚' },
-  { href: '/stats', label: 'Stats', icon: '📊' },
-  { href: '/leaderboard', label: 'Classement', icon: '🏆' },
-  { href: '/profile', label: 'Profil', icon: '👤' },
-]
+import { getStrings } from '@/lib/i18n'
+import { useLang } from '@/components/LangProvider'
 
 export default function BottomNav() {
   const pathname = usePathname()
+  const t = getStrings(useLang())
+
+  const navItems = [
+    { href: '/dashboard', label: t.navHome, icon: '🏠' },
+    { href: '/study', label: t.navStudy, icon: '📖' },
+    { href: '/words', label: t.navWords, icon: '📚' },
+    { href: '/stats', label: t.navStats, icon: '📊' },
+    { href: '/leaderboard', label: t.navLeaderboard, icon: '🏆' },
+    { href: '/profile', label: t.navProfile, icon: '👤' },
+  ]
 
   return (
     <nav className="fixed bottom-0 left-0 right-0 z-50 bg-slate-900 border-t border-slate-800 safe-area-pb">
       <div className="flex">
-        {NAV_ITEMS.map(item => {
+        {navItems.map(item => {
           const active = pathname.startsWith(item.href)
           return (
             <Link

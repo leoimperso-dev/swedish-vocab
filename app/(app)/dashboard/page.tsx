@@ -2,6 +2,8 @@ import { auth } from '@/auth'
 import { db } from '@/lib/db'
 import { getLevelForXp, getNextLevel, xpToNextLevel } from '@/lib/xp'
 import { toLocalDateString } from '@/lib/streak'
+import { asLang, getStrings } from '@/lib/i18n'
+import { toggleLanguage } from '../actions'
 import Link from 'next/link'
 
 export default async function DashboardPage() {
@@ -27,6 +29,8 @@ export default async function DashboardPage() {
 
   if (!user) return null
 
+  const lang = asLang(user.nativeLanguage)
+  const t = getStrings(lang)
   const level = getLevelForXp(user.xp)
   const nextLevel = getNextLevel(level.level)
   const { current, needed, progress } = xpToNextLevel(user.xp)
@@ -43,21 +47,32 @@ export default async function DashboardPage() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <p className="text-slate-400 text-sm">Bonjour,</p>
+          <p className="text-slate-400 text-sm">{t.hello}</p>
           <h1 className="text-2xl font-bold">{user.name?.split(' ')[0]}</h1>
         </div>
-        <div className="text-right">
-          <div className="text-2xl font-bold text-orange-400">🔥 {user.streakCurrent}</div>
-          <p className="text-slate-500 text-xs">
-            jours de suite{user.freezeCount > 0 && <span className="text-cyan-400 ml-1">🧊×{user.freezeCount}</span>}
-          </p>
+        <div className="flex items-center gap-3">
+          <form action={toggleLanguage}>
+            <button
+              type="submit"
+              title={t.switchMode}
+              className="text-3xl cursor-pointer hover:scale-110 active:scale-95 transition-transform leading-none"
+            >
+              {lang === 'fr' ? '🇸🇪' : '🇫🇷'}
+            </button>
+          </form>
+          <div className="text-right">
+            <div className="text-2xl font-bold text-orange-400">🔥 {user.streakCurrent}</div>
+            <p className="text-slate-500 text-xs">
+              {t.streakDays}{user.freezeCount > 0 && <span className="text-cyan-400 ml-1">🧊×{user.freezeCount}</span>}
+            </p>
+          </div>
         </div>
       </div>
 
       {/* Daily goal */}
       <div className={`rounded-2xl p-4 space-y-3 ${goalReached ? 'bg-green-950 border border-green-800' : 'bg-slate-900'}`}>
         <div className="flex items-center justify-between">
-          <span className="font-semibold">{goalReached ? 'Objectif atteint ✅' : 'Objectif du jour'}</span>
+          <span className="font-semibold">{goalReached ? t.goalReached : t.dailyGoal}</span>
           <span className={`text-sm ${goalReached ? 'text-green-400' : 'text-slate-400'}`}>
             {xpToday} / {user.dailyGoalXp} XP
           </span>
@@ -74,7 +89,7 @@ export default async function DashboardPage() {
       <div className="bg-slate-900 rounded-2xl p-4 space-y-3">
         <div className="flex items-center justify-between">
           <span className="font-semibold">{level.title}</span>
-          <span className="text-slate-400 text-sm">Niveau {level.level}</span>
+          <span className="text-slate-400 text-sm">{t.level} {level.level}</span>
         </div>
         <div className="h-2 bg-slate-800 rounded-full overflow-hidden">
           <div
@@ -85,19 +100,17 @@ export default async function DashboardPage() {
         <p className="text-slate-500 text-xs">
           {current} / {needed || '∞'} XP
           {nextLevel && (
-            <span className="text-blue-400 ml-2">
-              Plus que {needed - current} XP avant « {nextLevel.title} »
-            </span>
+            <span className="text-blue-400 ml-2">{t.xpBeforeLevel(needed - current, nextLevel.title)}</span>
           )}
         </p>
       </div>
 
       {/* Quick stats */}
       <div className="grid grid-cols-2 gap-3">
-        <StatCard label="À revoir" value={dueCount} color="text-yellow-400" />
-        <StatCard label="Mots maîtrisés" value={masteredCount} color="text-green-400" />
-        <StatCard label="XP total" value={user.xp} color="text-blue-400" />
-        <StatCard label="Meilleure série" value={user.streakBest} color="text-orange-400" />
+        <StatCard label={t.toReview} value={dueCount} color="text-yellow-400" />
+        <StatCard label={t.masteredWords} value={masteredCount} color="text-green-400" />
+        <StatCard label={t.totalXp} value={user.xp} color="text-blue-400" />
+        <StatCard label={t.bestStreak} value={user.streakBest} color="text-orange-400" />
       </div>
 
       {/* CTA */}
@@ -105,12 +118,12 @@ export default async function DashboardPage() {
         href="/study"
         className="block w-full text-center bg-blue-600 hover:bg-blue-500 active:scale-95 transition-all rounded-2xl py-5 text-lg font-bold cursor-pointer"
       >
-        {dueCount > 0 ? `Étudier (${dueCount} mots dus)` : 'Apprendre de nouveaux mots'}
+        {dueCount > 0 ? t.studyDue(dueCount) : t.studyNew}
       </Link>
 
       {/* Streak calendar placeholder */}
       <div className="bg-slate-900 rounded-2xl p-4">
-        <h2 className="font-semibold mb-3 text-slate-300">Activité récente</h2>
+        <h2 className="font-semibold mb-3 text-slate-300">{t.recentActivity}</h2>
         <StreakDots streak={user.streakCurrent} />
       </div>
     </main>

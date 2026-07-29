@@ -1,41 +1,47 @@
+import { auth } from '@/auth'
 import { db } from '@/lib/db'
 import { formatForms, parseDetails } from '@/lib/word-display'
+import { asLang, getStrings } from '@/lib/i18n'
 
-const PERSONAL_LIST_LABEL = 'Ma liste personnelle'
-const NO_CATEGORY_LABEL = 'Divers'
-
-function displayCategory(category: string | null, source: string | null): string {
-  if (source === 'Swedish.txt') return PERSONAL_LIST_LABEL
+function displayCategory(category: string | null, source: string | null, labels: { personal: string; misc: string }): string {
+  if (source === 'Swedish.txt') return labels.personal
   // Merge generation-chunk suffixes ("VERBES 2" → "VERBES")
-  return (category ?? NO_CATEGORY_LABEL).replace(/\s+2$/, '')
+  return (category ?? labels.misc).replace(/\s+2$/, '')
 }
 
 export default async function WordsPage() {
-  const words = await db.word.findMany({
-    select: { id: true, swedish: true, french: true, category: true, source: true, forms: true, details: true },
-    orderBy: { swedish: 'asc' },
-  })
+  const session = await auth()
+  const [user, words] = await Promise.all([
+    db.user.findUnique({ where: { id: session!.user!.id }, select: { nativeLanguage: true } }),
+    db.word.findMany({
+      select: { id: true, swedish: true, french: true, category: true, source: true, forms: true, details: true },
+      orderBy: { swedish: 'asc' },
+    }),
+  ])
+  const lang = asLang(user?.nativeLanguage)
+  const t = getStrings(lang)
+  const labels = { personal: t.personalList, misc: t.misc }
 
   const groups = new Map<string, typeof words>()
   for (const word of words) {
-    const label = displayCategory(word.category, word.source)
+    const label = displayCategory(word.category, word.source, labels)
     const group = groups.get(label)
     if (group) group.push(word)
     else groups.set(label, [word])
   }
 
   const sortedGroups = [...groups.entries()].sort(([a], [b]) => {
-    if (a === PERSONAL_LIST_LABEL) return -1
-    if (b === PERSONAL_LIST_LABEL) return 1
+    if (a === labels.personal) return -1
+    if (b === labels.personal) return 1
     return a.localeCompare(b, 'fr')
   })
 
   return (
     <main className="px-4 pt-12 pb-6 max-w-lg mx-auto space-y-4">
       <div>
-        <h1 className="text-2xl font-bold">Vocabulaire</h1>
+        <h1 className="text-2xl font-bold">{t.vocabularyTitle}</h1>
         <p className="text-slate-400 text-sm mt-1">
-          {words.length} mots · {sortedGroups.length} catégories
+          {t.wordsAndCategories(words.length, sortedGroups.length)}
         </p>
       </div>
 
@@ -58,10 +64,10 @@ export default async function WordsPage() {
                         {forms && <span className="text-slate-500 font-normal text-xs"> ({forms})</span>}
                       </span>
                       <span className="flex-1 text-slate-400">
-                        {details?.translations ? details.translations.join(', ') : word.french}
+                        {lang === 'fr' && details?.translations ? details.translations.join(', ') : word.french}
                       </span>
                     </div>
-                    {details?.context && (
+                    {lang === 'fr' && details?.context && (
                       <p className="text-slate-600 text-xs italic mt-0.5">{details.context}</p>
                     )}
                     {details?.usage?.map(u => (
