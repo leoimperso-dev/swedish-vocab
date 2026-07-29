@@ -2,6 +2,8 @@ import { auth } from '@/auth'
 import { db } from '@/lib/db'
 import { getLevelForXp, xpToNextLevel } from '@/lib/xp'
 
+const MASTERY_MILESTONES = [50, 100, 250, 500, 1000, 2000, 5000]
+
 export default async function StatsPage() {
   const session = await auth()
   const userId = session!.user!.id
@@ -56,6 +58,7 @@ export default async function StatsPage() {
   const correctAnswers = recentSessions.reduce((sum, s) => sum + s.wordsCorrect, 0)
   const accuracy = totalAnswers > 0 ? Math.round((correctAnswers / totalAnswers) * 100) : 0
   const masteredPct = totalWords > 0 ? Math.round((masteredCount / totalWords) * 100) : 0
+  const nextMilestone = MASTERY_MILESTONES.find(m => m > masteredCount) ?? null
 
   return (
     <main className="px-4 pt-12 pb-6 max-w-lg mx-auto space-y-6">
@@ -68,6 +71,23 @@ export default async function StatsPage() {
         <StatCard label="Précision 30j" value={`${accuracy}%`} sub={`${totalAnswers} réponses`} color="text-yellow-400" />
         <StatCard label="Série actuelle" value={`🔥 ${user.streakCurrent}`} sub={`record : ${user.streakBest}`} color="text-orange-400" />
       </div>
+
+      {/* Mastery milestone */}
+      {nextMilestone && (
+        <div className="bg-slate-900 rounded-2xl p-4 space-y-3">
+          <div className="flex justify-between items-center">
+            <span className="font-semibold text-slate-300">Prochain palier de maîtrise</span>
+            <span className="text-green-400 text-sm font-bold">{masteredCount} / {nextMilestone} mots</span>
+          </div>
+          <div className="h-2 bg-slate-800 rounded-full overflow-hidden">
+            <div
+              className="h-full bg-green-500 rounded-full"
+              style={{ width: `${Math.min((masteredCount / nextMilestone) * 100, 100)}%` }}
+            />
+          </div>
+          <p className="text-slate-500 text-xs">Un mot est maîtrisé quand son intervalle SM-2 dépasse 21 jours</p>
+        </div>
+      )}
 
       {/* Level progress */}
       <div className="bg-slate-900 rounded-2xl p-4 space-y-3">

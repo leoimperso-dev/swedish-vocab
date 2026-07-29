@@ -2,7 +2,21 @@ import { auth, signOut } from '@/auth'
 import { db } from '@/lib/db'
 import { getLevelForXp, xpToNextLevel, LEVELS } from '@/lib/xp'
 import { ACHIEVEMENTS } from '@/lib/achievements'
+import { MAX_FREEZES, FREEZE_EARN_EVERY } from '@/lib/streak'
+import { revalidatePath } from 'next/cache'
 import Image from 'next/image'
+
+const DAILY_GOAL_OPTIONS = [10, 20, 30, 50]
+
+async function setDailyGoal(formData: FormData) {
+  'use server'
+  const goal = Number(formData.get('goal'))
+  if (!DAILY_GOAL_OPTIONS.includes(goal)) return
+  const session = await auth()
+  if (!session?.user?.id) return
+  await db.user.update({ where: { id: session.user.id }, data: { dailyGoalXp: goal } })
+  revalidatePath('/profile')
+}
 
 export default async function ProfilePage() {
   const session = await auth()
@@ -77,6 +91,32 @@ export default async function ProfilePage() {
         <MiniStat label="XP total" value={user.xp} />
         <MiniStat label="Série" value={`🔥 ${user.streakCurrent}`} />
         <MiniStat label="Record" value={`${user.streakBest}j`} />
+      </div>
+
+      {/* Daily goal setting */}
+      <div className="bg-slate-900 rounded-2xl p-4 space-y-4">
+        <h2 className="font-semibold text-slate-300">Objectif quotidien</h2>
+        <form action={setDailyGoal} className="grid grid-cols-4 gap-2">
+          {DAILY_GOAL_OPTIONS.map(goal => (
+            <button
+              key={goal}
+              type="submit"
+              name="goal"
+              value={goal}
+              className={`py-3 rounded-xl text-sm font-bold transition-all cursor-pointer ${
+                user.dailyGoalXp === goal
+                  ? 'bg-blue-600 text-white'
+                  : 'bg-slate-800 text-slate-400 hover:bg-slate-700'
+              }`}
+            >
+              {goal} XP
+            </button>
+          ))}
+        </form>
+        <p className="text-slate-500 text-xs">
+          🧊 Streak freezes : {user.freezeCount} / {MAX_FREEZES} — un freeze protège ta série si tu
+          rates un jour ; tu en regagnes un tous les {FREEZE_EARN_EVERY} jours de suite.
+        </p>
       </div>
 
       {/* Achievements */}

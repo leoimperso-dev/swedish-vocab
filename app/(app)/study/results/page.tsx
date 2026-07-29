@@ -8,6 +8,8 @@ interface SessionData {
   xpGained: number
   newAchievements: Array<{ slug: string; name: string; icon: string }>
   streakCurrent: number
+  freezesUsed?: number
+  dailyGoal?: { goal: number; xpToday: number; reached: boolean }
   leveledUp: boolean
   newLevel: number
   results: string[]
@@ -60,7 +62,23 @@ function ResultsContent() {
             <div className="text-green-400 font-semibold">🆙 Niveau {data.newLevel} débloqué !</div>
           )}
           <div className="text-slate-500 text-sm">Série : {data.streakCurrent} jour{data.streakCurrent > 1 ? 's' : ''} 🔥</div>
+          {(data.freezesUsed ?? 0) > 0 && (
+            <div className="text-cyan-400 text-sm">🧊 Série sauvée par un streak freeze !</div>
+          )}
         </div>
+
+        {/* Daily goal */}
+        {data.dailyGoal && (
+          <div className={`rounded-2xl p-3 text-sm font-semibold ${
+            data.dailyGoal.reached
+              ? 'bg-green-950 border border-green-800 text-green-400'
+              : 'bg-slate-900 text-slate-400'
+          }`}>
+            {data.dailyGoal.reached
+              ? `🎯 Objectif du jour atteint — ${data.dailyGoal.xpToday} / ${data.dailyGoal.goal} XP`
+              : `🎯 Objectif du jour : ${data.dailyGoal.xpToday} / ${data.dailyGoal.goal} XP`}
+          </div>
+        )}
 
         {/* New achievements */}
         {data.newAchievements?.length > 0 && (

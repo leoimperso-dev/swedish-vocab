@@ -1,0 +1,3 @@
+-- Streak freeze + customizable daily XP goal
+ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "freezeCount" INTEGER NOT NULL DEFAULT 2;
+ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "dailyGoalXp" INTEGER NOT NULL DEFAULT 30;

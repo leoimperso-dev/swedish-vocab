@@ -12,7 +12,7 @@ Next.js app for learning Swedish vocabulary with spaced repetition.
 - `lib/sm2.ts` — SM-2 spaced repetition algorithm
 - `lib/fuzzy.ts` — Levenshtein fuzzy matching for answer evaluation
 - `lib/xp.ts` — XP calculation and level system
-- `lib/streak.ts` — Daily streak logic (timezone-aware)
+- `lib/streak.ts` — Daily streak logic (timezone-aware) + streak freezes (max 2, absorb missed days, +1 earned per 7-day milestone)
 - `lib/achievements.ts` — Achievement definitions and unlock checks
 - `auth.ts` — NextAuth config (Google provider + PrismaAdapter)
 - `scripts/parse-vocabulary.ts` — Parser for Swedish.txt and Swedish_core_5000.txt

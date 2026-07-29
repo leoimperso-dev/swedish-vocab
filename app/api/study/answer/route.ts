@@ -3,7 +3,7 @@ import { auth } from '@/auth'
 import { db } from '@/lib/db'
 import { sm2Update, qualityFromResult } from '@/lib/sm2'
 import { calculateSessionXp, getLevelForXp } from '@/lib/xp'
-import { updateStreak } from '@/lib/streak'
+import { updateStreak, toLocalDateString } from '@/lib/streak'
 import { checkNewAchievements } from '@/lib/achievements'
 import type { AnswerPayload } from '@/types'
 
@@ -70,8 +70,10 @@ export async function PUT(req: NextRequest) {
   })
   if (!user) return NextResponse.json({ error: 'User not found' }, { status: 404 })
 
-  // Streak
-  const streakUpdate = updateStreak(user.lastStudiedAt, user.streakCurrent, user.streakBest, user.timezone)
+  // Streak (freezes can absorb missed days)
+  const streakUpdate = updateStreak(
+    user.lastStudiedAt, user.streakCurrent, user.streakBest, user.timezone, user.freezeCount
+  )
 
   // XP
   const { total: xpGained, breakdown } = calculateSessionXp(results, streakUpdate.isFirstStudyOfDay)
@@ -96,6 +98,16 @@ export async function PUT(req: NextRequest) {
     sessionPerfect: results.every((r: string) => r === 'correct') && results.length >= 15,
   })
 
+  // Daily goal — XP earned today (user timezone) including this session
+  const today = toLocalDateString(new Date(), user.timezone)
+  const recentSessions = await db.studySession.findMany({
+    where: { userId, endedAt: { not: null }, startedAt: { gte: new Date(Date.now() - 36 * 3600000) } },
+    select: { startedAt: true, xpGained: true },
+  })
+  const priorXpToday = recentSessions
+    .filter(s => toLocalDateString(s.startedAt, user.timezone) === today)
+    .reduce((sum, s) => sum + s.xpGained, 0)
+
   // Save everything
   const achievementXp = newAchievements.reduce((sum, a) => sum + a.xpReward, 0)
 
@@ -111,6 +123,7 @@ export async function PUT(req: NextRequest) {
         level: newLevel,
         streakCurrent: streakUpdate.streakCurrent,
         streakBest: streakUpdate.streakBest,
+        freezeCount: streakUpdate.freezeCount,
         lastStudiedAt: new Date(),
       },
     }),
@@ -123,11 +136,15 @@ export async function PUT(req: NextRequest) {
     ),
   ])
 
+  const xpToday = priorXpToday + xpGained + achievementXp
   return NextResponse.json({
     xpGained: xpGained + achievementXp,
     xpBreakdown: breakdown,
     newAchievements: newAchievements.map(a => ({ slug: a.slug, name: a.name, icon: a.icon })),
     streakCurrent: streakUpdate.streakCurrent,
+    freezesUsed: streakUpdate.freezesUsed,
+    freezeCount: streakUpdate.freezeCount,
+    dailyGoal: { goal: user.dailyGoalXp, xpToday, reached: xpToday >= user.dailyGoalXp },
     leveledUp: newLevel > oldLevel,
     newLevel,
   })

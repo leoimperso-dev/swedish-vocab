@@ -16,23 +16,19 @@ interface RankedUser {
   isCurrentUser: boolean
 }
 
+type Period = 'week' | 'all'
+
 export default function LeaderboardPage() {
   const [users, setUsers] = useState<RankedUser[]>([])
+  const [period, setPeriod] = useState<Period>('week')
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    fetch('/api/leaderboard')
+    setLoading(true)
+    fetch(`/api/leaderboard?period=${period}`)
       .then(r => r.json())
       .then(d => { setUsers(d.leaderboard); setLoading(false) })
-  }, [])
-
-  if (loading) {
-    return (
-      <main className="min-h-dvh flex items-center justify-center">
-        <p className="text-slate-400">Chargement...</p>
-      </main>
-    )
-  }
+  }, [period])
 
   const top3 = users.slice(0, 3)
   const rest = users.slice(3)
@@ -40,6 +36,20 @@ export default function LeaderboardPage() {
   return (
     <main className="px-4 pt-12 pb-6 max-w-lg mx-auto space-y-6">
       <h1 className="text-2xl font-bold">Classement</h1>
+
+      {/* Period tabs */}
+      <div className="flex bg-slate-900 rounded-2xl p-1">
+        <PeriodTab label="Cette semaine" active={period === 'week'} onClick={() => setPeriod('week')} />
+        <PeriodTab label="Général" active={period === 'all'} onClick={() => setPeriod('all')} />
+      </div>
+      {period === 'week' && (
+        <p className="text-slate-500 text-xs -mt-3">XP gagnés depuis lundi — remise à zéro chaque semaine</p>
+      )}
+
+      {loading ? (
+        <div className="py-16 text-center text-slate-400">Chargement...</div>
+      ) : (
+        <>
 
       {/* Podium */}
       {top3.length >= 3 && (
@@ -80,7 +90,22 @@ export default function LeaderboardPage() {
           Sois le premier à étudier !
         </div>
       )}
+        </>
+      )}
     </main>
+  )
+}
+
+function PeriodTab({ label, active, onClick }: { label: string; active: boolean; onClick: () => void }) {
+  return (
+    <button
+      onClick={onClick}
+      className={`flex-1 py-2 rounded-xl text-sm font-semibold transition-all cursor-pointer ${
+        active ? 'bg-blue-600 text-white' : 'text-slate-400 hover:text-slate-200'
+      }`}
+    >
+      {label}
+    </button>
   )
 }
 
