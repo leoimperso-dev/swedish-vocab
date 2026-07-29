@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { motion } from 'framer-motion'
 import { speak, unlock } from '@/lib/tts'
+import { formatForms, parseDetails } from '@/lib/word-display'
 import type { Word } from '@prisma/client'
 import type { AnswerResult } from '@/types'
 
@@ -34,13 +35,7 @@ export default function FlashCard({ word, onAnswer }: Props) {
             <p className="text-slate-500 text-sm">Appuie pour voir la traduction</p>
           </div>
         ) : (
-          <div className="space-y-3">
-            <p className="text-slate-400 text-sm">{word.swedish}</p>
-            <p className="text-2xl font-bold text-blue-300">{word.french}</p>
-            {word.forms && (
-              <p className="text-slate-500 text-xs mt-2">{JSON.stringify(word.forms)}</p>
-            )}
-          </div>
+          <FlashCardBack word={word} />
         )}
       </motion.div>
 
@@ -79,6 +74,35 @@ export default function FlashCard({ word, onAnswer }: Props) {
         >
           Retourner 🔊
         </button>
+      )}
+    </div>
+  )
+}
+
+function FlashCardBack({ word }: { word: Word }) {
+  const forms = formatForms(word.forms)
+  const details = parseDetails(word.details)
+
+  return (
+    <div className="space-y-3">
+      <p className="text-slate-400 text-sm">
+        {word.swedish}
+        {forms && <span className="text-slate-500"> ({forms})</span>}
+      </p>
+      <p className="text-2xl font-bold text-blue-300">
+        {details?.translations ? details.translations.join(' · ') : word.french}
+      </p>
+      {details?.context && (
+        <p className="text-slate-500 text-xs italic">{details.context}</p>
+      )}
+      {details?.usage && (
+        <div className="text-xs space-y-1 pt-1">
+          {details.usage.map(u => (
+            <p key={u.sv} className="text-slate-400">
+              <span className="text-slate-200 font-medium">{u.sv}</span> — {u.fr}
+            </p>
+          ))}
+        </div>
       )}
     </div>
   )

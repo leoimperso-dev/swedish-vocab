@@ -89,6 +89,8 @@ model Word {
   forms    Json?
   source   String?  // "swedish_txt" | "core_3000"
   frequencyRank Int? // real-world rank from OpenSubtitles corpus (1 = most common)
+  // { translations: string[], context?: string, usage?: [{sv, fr}] }
+  details  Json?
   createdAt DateTime @default(now())
 
   userProgress UserWord[]
