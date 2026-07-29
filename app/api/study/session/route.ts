@@ -38,7 +38,8 @@ export async function GET() {
   const newWords = await db.word.findMany({
     where: { id: { notIn: studiedIds } },
     take: Math.max(NEW_WORDS_PER_SESSION, SESSION_SIZE - dueUserWords.length),
-    orderBy: { createdAt: 'asc' },
+    // Most common words (real corpus rank) first; unranked words last
+    orderBy: [{ frequencyRank: { sort: 'asc', nulls: 'last' } }, { createdAt: 'asc' }],
   })
 
   // 3. Create session record

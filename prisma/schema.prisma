@@ -88,11 +88,13 @@ model Word {
   // verbe: {present,preterit,supine} | nom: {plural} | adj: {ett,plural,comparative,superlative}
   forms    Json?
   source   String?  // "swedish_txt" | "core_3000"
+  frequencyRank Int? // real-world rank from OpenSubtitles corpus (1 = most common)
   createdAt DateTime @default(now())
 
   userProgress UserWord[]
 
   @@unique([swedish, wordType, source])
+  @@index([frequencyRank])
 }
 
 model UserWord {
