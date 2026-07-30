@@ -27,6 +27,12 @@ the learned language), TTS locale, QCM distractor language (`?lang=` param), and
 `Word.details` (JSONB `{translations[], context?, usage[{sv,fr}]}`) is written in French —
 translations/context only shown in `fr` mode; usage pairs shown in both.
 
+## Example sentences & cloze
+`Word.examples` (`[{sv, fr?, blank}]`) holds real Tatoeba sentences (CC-BY) matched by
+headword+forms via `scripts/build-examples.ts` (pure script — French through direct links then
+English pivot). `ClozeExercise` blanks the `blank` surface form; CLOZE is fr-native only,
+available in the mode picker and the MIX rotation (repetitions ≥ 3).
+
 ## Data sources
 - `C:\Users\Arnau\Desktop\pro\Swedish.txt` — Personal vocab list (~930 entries, mixed format)
 - `C:\Users\Arnau\Desktop\pro\Swedish_core_5000.txt` — Core ~5000 most common Swedish words (generated in themed chunks, merged via merge-core.ts)
