@@ -3,6 +3,7 @@ import { Geist } from 'next/font/google'
 import './globals.css'
 import { SessionProvider } from 'next-auth/react'
 import { auth } from '@/auth'
+import ServiceWorkerRegister from '@/components/ServiceWorkerRegister'
 
 const geist = Geist({ subsets: ['latin'] })
 
@@ -27,6 +28,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
         <SessionProvider session={session}>
           {children}
         </SessionProvider>
+        <ServiceWorkerRegister />
       </body>
     </html>
   )

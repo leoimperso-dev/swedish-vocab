@@ -10,5 +10,8 @@ export async function GET(req: NextRequest) {
   if (!wordId) return NextResponse.json({ error: 'Missing wordId' }, { status: 400 })
 
   const word = await db.word.findUnique({ where: { id: wordId }, select: { examples: true } })
-  return NextResponse.json({ examples: Array.isArray(word?.examples) ? word.examples : [] })
+  return NextResponse.json(
+    { examples: Array.isArray(word?.examples) ? word.examples : [] },
+    { headers: { 'Cache-Control': 'private, max-age=86400' } }
+  )
 }

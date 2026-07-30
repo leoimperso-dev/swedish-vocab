@@ -5,6 +5,15 @@ import { asLang, getStrings } from '@/lib/i18n'
 
 const MASTERY_MILESTONES = [50, 100, 250, 500, 1000, 2000, 5000]
 
+// The vocabulary size changes rarely — memoize per lambda for an hour
+let vocabTotalCache: { value: number; at: number } | null = null
+async function getVocabTotal(): Promise<number> {
+  if (vocabTotalCache && Date.now() - vocabTotalCache.at < 3600000) return vocabTotalCache.value
+  const value = await db.word.count()
+  vocabTotalCache = { value, at: Date.now() }
+  return value
+}
+
 export default async function StatsPage() {
   const session = await auth()
   const userId = session!.user!.id
@@ -37,7 +46,7 @@ export default async function StatsPage() {
         include: { achievement: true },
         orderBy: { unlockedAt: 'desc' },
       }),
-      db.word.count(),
+      getVocabTotal(),
     ])
 
   if (!user) return null

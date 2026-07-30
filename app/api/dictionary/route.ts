@@ -10,5 +10,7 @@ export async function GET(req: NextRequest) {
   if (!q) return NextResponse.json({ error: 'Missing q' }, { status: 400 })
 
   const entry = await lookupWord(q)
-  return NextResponse.json(entry ? { found: true, ...entry } : { found: false })
+  return NextResponse.json(entry ? { found: true, ...entry } : { found: false }, {
+    headers: { 'Cache-Control': 'private, max-age=86400' },
+  })
 }

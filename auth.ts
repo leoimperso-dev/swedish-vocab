@@ -5,6 +5,8 @@ import { db } from '@/lib/db'
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
   adapter: PrismaAdapter(db),
+  // JWT sessions: auth() verifies the cookie locally, no DB query per request
+  session: { strategy: 'jwt' },
   providers: [
     Google({
       clientId: process.env.AUTH_GOOGLE_ID!,
@@ -12,8 +14,12 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     }),
   ],
   callbacks: {
-    session({ session, user }) {
-      session.user.id = user.id
+    jwt({ token, user }) {
+      if (user) token.id = user.id
+      return token
+    },
+    session({ session, token }) {
+      session.user.id = (token.id ?? token.sub) as string
       return session
     },
   },
