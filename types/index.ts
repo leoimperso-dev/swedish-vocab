@@ -18,6 +18,7 @@ export interface AnswerPayload {
   wordId: string
   result: AnswerResult
   exerciseType: ExerciseType
+  direction: 'SV_FR' | 'FR_SV'
   timeSpent: number
   sessionId: string
 }

@@ -4,7 +4,7 @@ import { useRef, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { speak, unlock } from '@/lib/tts'
 import { evaluateAnswer } from '@/lib/fuzzy'
-import { promptText, answerText, learnedLocale } from '@/lib/word-display'
+import { directionPrompt, directionAnswer, learnedText, learnedLocale, type Direction } from '@/lib/word-display'
 import { getStrings } from '@/lib/i18n'
 import { useLang } from '@/components/LangProvider'
 import type { Word } from '@prisma/client'
@@ -12,16 +12,18 @@ import type { AnswerResult } from '@/types'
 
 interface Props {
   word: Word
+  direction: Direction
   onAnswer: (result: AnswerResult, type: string) => void
 }
 
-export default function TypingExercise({ word, onAnswer }: Props) {
+export default function TypingExercise({ word, direction, onAnswer }: Props) {
   const [input, setInput] = useState('')
   const [result, setResult] = useState<AnswerResult | null>(null)
   const inputRef = useRef<HTMLInputElement>(null)
   const lang = useLang()
   const t = getStrings(lang)
-  const expected = answerText(word, lang)
+  const expected = directionAnswer(word, direction)
+  const translateLabel = direction === 'FR_SV' ? t.translateToSwedish : t.translateToFrench
 
   const resultConfig = {
     correct: { bg: 'bg-green-900 border-green-600', text: 'text-green-300', label: t.resultCorrect },
@@ -32,7 +34,7 @@ export default function TypingExercise({ word, onAnswer }: Props) {
   const handleSubmit = () => {
     if (!input.trim() || result) return
     unlock()
-    speak(promptText(word, lang), learnedLocale(lang))
+    speak(learnedText(word, lang), learnedLocale(lang))
 
     const evaluation = evaluateAnswer(input, expected)
     setResult(evaluation)
@@ -43,8 +45,8 @@ export default function TypingExercise({ word, onAnswer }: Props) {
   return (
     <div className="space-y-6">
       <div className="bg-slate-900 rounded-3xl p-8 text-center">
-        <p className="text-3xl font-bold">{promptText(word, lang)}</p>
-        <p className="text-slate-500 text-sm mt-2">{t.translateTo}</p>
+        <p className="text-3xl font-bold">{directionPrompt(word, direction)}</p>
+        <p className="text-slate-500 text-sm mt-2">{translateLabel}</p>
       </div>
 
       <div className="space-y-3">

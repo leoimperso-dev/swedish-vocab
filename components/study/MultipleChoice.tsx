@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react'
 import { motion } from 'framer-motion'
 import { speak, unlock } from '@/lib/tts'
-import { promptText, answerText, learnedLocale } from '@/lib/word-display'
+import { directionPrompt, directionAnswer, learnedText, learnedLocale, type Direction } from '@/lib/word-display'
 import { getStrings } from '@/lib/i18n'
 import { useLang } from '@/components/LangProvider'
 import type { Word } from '@prisma/client'
@@ -11,19 +11,21 @@ import type { AnswerResult } from '@/types'
 
 interface Props {
   word: Word
+  direction: Direction
   onAnswer: (result: AnswerResult, type: string) => void
 }
 
-export default function MultipleChoice({ word, onAnswer }: Props) {
+export default function MultipleChoice({ word, direction, onAnswer }: Props) {
   const [options, setOptions] = useState<string[]>([])
   const [selected, setSelected] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
   const lang = useLang()
   const t = getStrings(lang)
-  const correctOption = answerText(word, lang)
+  const correctOption = directionAnswer(word, direction)
+  const answerLang = direction === 'FR_SV' ? 'sv' : 'fr'
 
   useEffect(() => {
-    fetch(`/api/words/distractors?wordId=${word.id}&wordType=${word.wordType}&lang=${lang}`)
+    fetch(`/api/words/distractors?wordId=${word.id}&wordType=${word.wordType}&lang=${answerLang}`)
       .then(r => r.json())
       .then(data => {
         const distractors: string[] = Array.isArray(data?.distractors) ? data.distractors : []
@@ -43,7 +45,7 @@ export default function MultipleChoice({ word, onAnswer }: Props) {
     if (selected) return
     setSelected(option)
     unlock()
-    speak(promptText(word, lang), learnedLocale(lang))
+    speak(learnedText(word, lang), learnedLocale(lang))
 
     setTimeout(() => {
       const result: AnswerResult = option === correctOption ? 'correct' : 'incorrect'
@@ -56,7 +58,7 @@ export default function MultipleChoice({ word, onAnswer }: Props) {
   return (
     <div className="space-y-6">
       <div className="bg-slate-900 rounded-3xl p-8 text-center">
-        <p className="text-3xl font-bold">{promptText(word, lang)}</p>
+        <p className="text-3xl font-bold">{directionPrompt(word, direction)}</p>
         <p className="text-slate-500 text-sm mt-2">{t.whichTranslation}</p>
       </div>
 

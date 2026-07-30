@@ -6,16 +6,27 @@ interface BilingualWord {
   french: string
 }
 
-// Exercises always prompt in the language being learned and answer in the native one
-export function promptText(word: BilingualWord, lang: Lang): string {
+// Translation direction of an exercise session — each has its own SM-2 progression
+export type Direction = 'SV_FR' | 'FR_SV'
+
+export function directionPrompt(word: BilingualWord, direction: Direction): string {
+  return direction === 'SV_FR' ? word.swedish : word.french
+}
+
+export function directionAnswer(word: BilingualWord, direction: Direction): string {
+  return direction === 'SV_FR' ? word.french : word.swedish
+}
+
+// Default direction shows the learned language as prompt (comprehension)
+export function defaultDirection(lang: Lang): Direction {
+  return lang === 'fr' ? 'SV_FR' : 'FR_SV'
+}
+
+// TTS always pronounces the learned-language side of the word
+export function learnedText(word: BilingualWord, lang: Lang): string {
   return lang === 'fr' ? word.swedish : word.french
 }
 
-export function answerText(word: BilingualWord, lang: Lang): string {
-  return lang === 'fr' ? word.french : word.swedish
-}
-
-// TTS locale of the language being learned
 export function learnedLocale(lang: Lang): string {
   return lang === 'fr' ? 'sv-SE' : 'fr-FR'
 }

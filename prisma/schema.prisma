@@ -105,6 +105,17 @@ model Word {
   @@index([frequencyRank])
 }
 
+model Story {
+  id          String   @id @default(cuid())
+  slug        String   @unique
+  title       String // Swedish title
+  titleFrench String
+  level       String // "beginner" | "intermediate" | "expert"
+  body        String // Swedish text, paragraphs separated by \n\n
+  wordCount   Int
+  createdAt   DateTime @default(now())
+}
+
 model Favorite {
   id        String   @id @default(cuid())
   userId    String
@@ -121,6 +132,9 @@ model UserWord {
   id             String    @id @default(cuid())
   userId         String
   wordId         String
+  // "SV_FR" = prompted in Swedish, answered in French | "FR_SV" = the reverse.
+  // Each direction has its own SM-2 progression.
+  direction      String    @default("SV_FR")
   // SM-2 fields
   easeFactor     Float     @default(2.5)
   interval       Int       @default(0)
@@ -136,7 +150,7 @@ model UserWord {
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
   word Word @relation(fields: [wordId], references: [id], onDelete: Cascade)
 
-  @@unique([userId, wordId])
+  @@unique([userId, wordId, direction])
 }
 
 model StudySession {

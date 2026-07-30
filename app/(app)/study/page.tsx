@@ -2,6 +2,7 @@
 
 import { Component, useEffect, useState, useCallback, type ReactNode } from 'react'
 import { useRouter } from 'next/navigation'
+import Link from 'next/link'
 import FlashCard from '@/components/study/FlashCard'
 import MultipleChoice from '@/components/study/MultipleChoice'
 import TypingExercise from '@/components/study/TypingExercise'
@@ -10,6 +11,7 @@ import ClozeExercise from '@/components/study/ClozeExercise'
 import SessionProgress from '@/components/study/SessionProgress'
 import { getStrings } from '@/lib/i18n'
 import { useLang } from '@/components/LangProvider'
+import { defaultDirection, type Direction } from '@/lib/word-display'
 import type { ExerciseWord, AnswerResult, ExerciseType } from '@/types'
 
 type StudyMode = 'MIX' | ExerciseType
@@ -19,6 +21,7 @@ export default function StudyPage() {
   const lang = useLang()
   const t = getStrings(lang)
   const [mode, setMode] = useState<StudyMode | null>(null)
+  const [direction, setDirection] = useState<Direction>(defaultDirection(lang))
   const [sessionId, setSessionId] = useState<string | null>(null)
   const [exercises, setExercises] = useState<ExerciseWord[]>([])
   const [currentIndex, setCurrentIndex] = useState(0)
@@ -32,8 +35,9 @@ export default function StudyPage() {
   useEffect(() => {
     if (!mode) return
     setLoading(true)
-    const param = mode === 'MIX' ? '' : `?mode=${mode}`
-    fetch(`/api/study/session${param}`)
+    const params = new URLSearchParams({ direction })
+    if (mode !== 'MIX') params.set('mode', mode)
+    fetch(`/api/study/session?${params}`)
       .then(r => r.json())
       .then(data => {
         setSessionId(data.sessionId ?? null)
@@ -44,6 +48,7 @@ export default function StudyPage() {
         setMode(null)
         setLoading(false)
       })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mode])
 
   // Warn before accidental reload (pull-to-refresh) while a session is running
@@ -67,7 +72,7 @@ export default function StudyPage() {
       await fetch('/api/study/answer', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ wordId: word.id, result, exerciseType, timeSpent: 0, sessionId }),
+        body: JSON.stringify({ wordId: word.id, result, exerciseType, direction, timeSpent: 0, sessionId }),
       })
     } catch {}
 
@@ -97,9 +102,18 @@ export default function StudyPage() {
     } else {
       setCurrentIndex(i => i + 1)
     }
-  }, [sessionId, exercises, currentIndex, results, combo, bestCombo, router])
+  }, [sessionId, exercises, currentIndex, results, combo, bestCombo, router, direction])
 
-  if (!mode) return <ModePicker onPick={setMode} conjugationAvailable={lang === 'fr'} />
+  if (!mode) {
+    return (
+      <ModePicker
+        onPick={setMode}
+        direction={direction}
+        onDirectionChange={setDirection}
+        conjugationAvailable={lang === 'fr'}
+      />
+    )
+  }
   if (loading) return <LoadingScreen />
   if (exercises.length === 0) return <EmptyState />
 
@@ -161,13 +175,13 @@ export default function StudyPage() {
           }
         >
           {current.exerciseType === 'FLASHCARD' && (
-            <FlashCard word={current.word} onAnswer={handleAnswer} />
+            <FlashCard word={current.word} direction={direction} onAnswer={handleAnswer} />
           )}
           {current.exerciseType === 'QCM' && (
-            <MultipleChoice word={current.word} onAnswer={handleAnswer} />
+            <MultipleChoice word={current.word} direction={direction} onAnswer={handleAnswer} />
           )}
           {current.exerciseType === 'TYPING' && (
-            <TypingExercise word={current.word} onAnswer={handleAnswer} />
+            <TypingExercise word={current.word} direction={direction} onAnswer={handleAnswer} />
           )}
           {current.exerciseType === 'CONJUGATION' && (
             <ConjugationExercise word={current.word} onAnswer={handleAnswer} />
@@ -181,8 +195,10 @@ export default function StudyPage() {
   )
 }
 
-function ModePicker({ onPick, conjugationAvailable }: {
+function ModePicker({ onPick, direction, onDirectionChange, conjugationAvailable }: {
   onPick: (mode: StudyMode) => void
+  direction: Direction
+  onDirectionChange: (d: Direction) => void
   conjugationAvailable: boolean
 }) {
   const t = getStrings(useLang())
@@ -203,6 +219,25 @@ function ModePicker({ onPick, conjugationAvailable }: {
   return (
     <main className="px-4 pt-12 pb-6 max-w-lg mx-auto space-y-4">
       <h1 className="text-2xl font-bold">{t.chooseExercise}</h1>
+
+      {/* Direction toggle — each direction has its own SM-2 progression */}
+      <div className="space-y-1">
+        <p className="text-slate-500 text-xs">{t.chooseDirection}</p>
+        <div className="flex bg-slate-900 rounded-2xl p-1">
+          {(['SV_FR', 'FR_SV'] as const).map(d => (
+            <button
+              key={d}
+              onClick={() => onDirectionChange(d)}
+              className={`flex-1 py-2 rounded-xl text-sm font-semibold transition-all cursor-pointer ${
+                direction === d ? 'bg-blue-600 text-white' : 'text-slate-400 hover:text-slate-200'
+              }`}
+            >
+              {d === 'SV_FR' ? t.directionSvFr : t.directionFrSv}
+            </button>
+          ))}
+        </div>
+      </div>
+
       <div className="space-y-3">
         {modes.map(({ mode, icon, label, desc }) => (
           <button
@@ -221,6 +256,18 @@ function ModePicker({ onPick, conjugationAvailable }: {
             </span>
           </button>
         ))}
+        {conjugationAvailable && (
+          <Link
+            href="/reading"
+            className="w-full flex items-center gap-4 p-4 rounded-2xl text-left transition-all cursor-pointer active:scale-98 bg-slate-900 hover:bg-slate-800 border border-slate-800"
+          >
+            <span className="text-3xl">📕</span>
+            <span>
+              <span className="block font-bold">{t.readingTitle}</span>
+              <span className="block text-sm text-slate-500">{t.readingDesc}</span>
+            </span>
+          </Link>
+        )}
       </div>
     </main>
   )

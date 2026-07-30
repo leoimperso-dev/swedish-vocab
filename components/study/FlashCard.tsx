@@ -3,7 +3,10 @@
 import { useState } from 'react'
 import { motion, useMotionValue, useTransform, type PanInfo } from 'framer-motion'
 import { speak, unlock } from '@/lib/tts'
-import { formatForms, parseDetails, promptText, answerText, learnedLocale } from '@/lib/word-display'
+import {
+  formatForms, parseDetails, directionPrompt, directionAnswer,
+  learnedText, learnedLocale, type Direction,
+} from '@/lib/word-display'
 import { getStrings } from '@/lib/i18n'
 import { useLang } from '@/components/LangProvider'
 import type { Word } from '@prisma/client'
@@ -13,10 +16,11 @@ const SWIPE_THRESHOLD = 100
 
 interface Props {
   word: Word
+  direction: Direction
   onAnswer: (result: AnswerResult, type: string) => void
 }
 
-export default function FlashCard({ word, onAnswer }: Props) {
+export default function FlashCard({ word, direction, onAnswer }: Props) {
   const [flipped, setFlipped] = useState(false)
   const [answered, setAnswered] = useState(false)
   const lang = useLang()
@@ -35,7 +39,7 @@ export default function FlashCard({ word, onAnswer }: Props) {
 
   const handleFlip = () => {
     unlock()
-    speak(promptText(word, lang), learnedLocale(lang))
+    speak(learnedText(word, lang), learnedLocale(lang))
     setFlipped(true)
   }
 
@@ -60,12 +64,12 @@ export default function FlashCard({ word, onAnswer }: Props) {
         >
           {!flipped ? (
             <div className="space-y-4">
-              <p className="text-3xl font-bold">{promptText(word, lang)}</p>
+              <p className="text-3xl font-bold">{directionPrompt(word, direction)}</p>
               <p className="text-slate-500 text-sm">{t.tapToReveal}</p>
             </div>
           ) : (
             <>
-              <FlashCardBack word={word} />
+              <FlashCardBack word={word} direction={direction} />
               {/* Swipe overlays */}
               <motion.div
                 style={{ opacity: knownOpacity }}
@@ -127,23 +131,23 @@ export default function FlashCard({ word, onAnswer }: Props) {
   )
 }
 
-function FlashCardBack({ word }: { word: Word }) {
+function FlashCardBack({ word, direction }: { word: Word; direction: Direction }) {
   const lang = useLang()
   const forms = formatForms(word.forms)
   const details = parseDetails(word.details)
   // Multiple translations and context notes are written in French — only useful in fr mode
-  const mainAnswer = lang === 'fr' && details?.translations
+  const mainAnswer = lang === 'fr' && direction === 'SV_FR' && details?.translations
     ? details.translations.join(' · ')
-    : answerText(word, lang)
+    : directionAnswer(word, direction)
 
   return (
     <div className="space-y-3">
       <p className="text-slate-400 text-sm">
-        {promptText(word, lang)}
-        {lang === 'fr' && forms && <span className="text-slate-500"> ({forms})</span>}
+        {directionPrompt(word, direction)}
+        {lang === 'fr' && direction === 'SV_FR' && forms && <span className="text-slate-500"> ({forms})</span>}
       </p>
       <p className="text-2xl font-bold text-blue-300">{mainAnswer}</p>
-      {lang === 'sv' && forms && (
+      {(lang === 'sv' || direction === 'FR_SV') && forms && (
         <p className="text-slate-500 text-xs">({forms})</p>
       )}
       {lang === 'fr' && details?.context && (

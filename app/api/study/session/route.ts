@@ -36,6 +36,7 @@ export async function GET(req: NextRequest) {
   const user = await db.user.findUnique({ where: { id: userId }, select: { nativeLanguage: true } })
   const canConjugate = user?.nativeLanguage !== 'sv'
 
+  const direction = req.nextUrl.searchParams.get('direction') === 'FR_SV' ? 'FR_SV' : 'SV_FR'
   const modeParam = req.nextUrl.searchParams.get('mode') as ExerciseType | null
   const frNativeOnly = modeParam === 'CONJUGATION' || modeParam === 'CLOZE'
   const forcedMode = modeParam && FORCED_MODES.includes(modeParam) && (!frNativeOnly || canConjugate)
@@ -50,9 +51,9 @@ export async function GET(req: NextRequest) {
     conjugationOnly ? hasFullVerbForms(word.forms) : clozeOnly ? hasExamples(word.examples) : true
   const wordFilter = conjugationOnly ? { wordType: 'VERB' as const } : {}
 
-  // 1. Due words (SM-2 scheduled for today)
+  // 1. Due words (SM-2 scheduled for today, in the session's direction)
   const dueUserWords = (await db.userWord.findMany({
-    where: { userId, nextReview: { lte: new Date() }, word: wordFilter },
+    where: { userId, direction, nextReview: { lte: new Date() }, word: wordFilter },
     include: { word: true },
     orderBy: { nextReview: 'asc' },
     take: needsEligibility ? SESSION_SIZE * 3 : SESSION_SIZE - NEW_WORDS_PER_SESSION,
@@ -60,9 +61,9 @@ export async function GET(req: NextRequest) {
     .filter(uw => isEligible(uw.word))
     .slice(0, SESSION_SIZE - NEW_WORDS_PER_SESSION)
 
-  // 2. New words (never studied)
+  // 2. New words (never studied in this direction)
   const studiedWordIds = await db.userWord.findMany({
-    where: { userId },
+    where: { userId, direction },
     select: { wordId: true },
   })
   const studiedIds = studiedWordIds.map(uw => uw.wordId)

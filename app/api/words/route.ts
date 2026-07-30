@@ -12,7 +12,7 @@ export async function GET() {
     db.word.findMany({
       select: {
         id: true, swedish: true, french: true, category: true, source: true,
-        forms: true, details: true, frequencyRank: true,
+        forms: true, details: true, frequencyRank: true, examples: true,
       },
       orderBy: { swedish: 'asc' },
     }),
@@ -20,12 +20,18 @@ export async function GET() {
     db.favorite.findMany({ where: { userId }, select: { wordId: true } }),
   ])
 
-  const levelByWord = new Map(progress.map(p => [p.wordId, knowledgeLevel(p.interval)]))
+  // Best level across directions
+  const levelByWord = new Map<string, number>()
+  for (const p of progress) {
+    const level = knowledgeLevel(p.interval)
+    if (level > (levelByWord.get(p.wordId) ?? 0)) levelByWord.set(p.wordId, level)
+  }
   const favoriteIds = new Set(favorites.map(f => f.wordId))
 
   return NextResponse.json({
-    words: words.map(w => ({
+    words: words.map(({ examples, ...w }) => ({
       ...w,
+      hasExamples: Array.isArray(examples) && examples.length > 0,
       level: levelByWord.get(w.id) ?? 0,
       favorite: favoriteIds.has(w.id),
     })),

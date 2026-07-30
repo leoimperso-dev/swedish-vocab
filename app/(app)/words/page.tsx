@@ -18,8 +18,14 @@ interface ApiWord {
   forms: unknown
   details: unknown
   frequencyRank: number | null
+  hasExamples: boolean
   level: number
   favorite: boolean
+}
+
+interface WordExample {
+  sv: string
+  fr?: string
 }
 
 type Tab = 'categories' | 'top' | 'favorites'
@@ -197,6 +203,22 @@ function WordRow({ word, lang, onToggleFavorite, showRank }: {
 }) {
   const forms = formatForms(word.forms)
   const details = parseDetails(word.details)
+  const [examples, setExamples] = useState<WordExample[] | null>(null)
+  const [showExamples, setShowExamples] = useState(false)
+
+  const toggleExamples = async () => {
+    if (showExamples) { setShowExamples(false); return }
+    setShowExamples(true)
+    if (examples === null) {
+      try {
+        const res = await fetch(`/api/words/examples?wordId=${word.id}`)
+        const data = await res.json()
+        setExamples(Array.isArray(data.examples) ? data.examples : [])
+      } catch {
+        setExamples([])
+      }
+    }
+  }
 
   return (
     <div className="py-1.5 text-sm">
@@ -217,6 +239,14 @@ function WordRow({ word, lang, onToggleFavorite, showRank }: {
         <span className="flex-1 text-slate-400">
           {lang === 'fr' && details?.translations ? details.translations.join(', ') : word.french}
         </span>
+        {word.hasExamples && (
+          <button
+            onClick={toggleExamples}
+            className={`cursor-pointer text-xs leading-none self-center ${showExamples ? 'text-blue-400' : 'text-slate-600 hover:text-slate-400'}`}
+          >
+            💬
+          </button>
+        )}
         <LevelDots level={word.level} />
       </div>
       {lang === 'fr' && details?.context && (
@@ -227,6 +257,22 @@ function WordRow({ word, lang, onToggleFavorite, showRank }: {
           <span className="text-slate-400">{u.sv}</span> — {u.fr}
         </p>
       ))}
+      {showExamples && (
+        <div className="mt-1 mb-1 pl-3 border-l-2 border-slate-700 space-y-1">
+          {examples === null ? (
+            <p className="text-xs text-slate-500">…</p>
+          ) : examples.length === 0 ? (
+            <p className="text-xs text-slate-600">—</p>
+          ) : (
+            examples.map(ex => (
+              <div key={ex.sv} className="text-xs">
+                <p className="text-slate-300">{ex.sv}</p>
+                {ex.fr && <p className="text-slate-500 italic">{ex.fr}</p>}
+              </div>
+            ))
+          )}
+        </div>
+      )}
     </div>
   )
 }

@@ -11,11 +11,15 @@ export default async function StatsPage() {
   const now = new Date()
   const thirtyDaysAgo = new Date(now.getTime() - 30 * 86400000)
 
-  const [user, totalWords, masteredCount, dueCount, recentSessions, hardestWords, achievements, vocabTotal] =
+  const [user, seenRows, masteredRows, dueCount, recentSessions, hardestWords, achievements, vocabTotal] =
     await Promise.all([
       db.user.findUnique({ where: { id: userId } }),
-      db.userWord.count({ where: { userId } }),
-      db.userWord.count({ where: { userId, interval: { gt: 21 } } }),
+      db.userWord.findMany({ where: { userId }, select: { wordId: true }, distinct: ['wordId'] }),
+      db.userWord.findMany({
+        where: { userId, interval: { gt: 21 } },
+        select: { wordId: true },
+        distinct: ['wordId'],
+      }),
       db.userWord.count({ where: { userId, nextReview: { lte: now } } }),
       db.studySession.findMany({
         where: { userId, startedAt: { gte: thirtyDaysAgo }, endedAt: { not: null } },
@@ -38,6 +42,8 @@ export default async function StatsPage() {
 
   if (!user) return null
 
+  const totalWords = seenRows.length
+  const masteredCount = masteredRows.length
   const lang = asLang(user.nativeLanguage)
   const t = getStrings(lang)
   const level = getLevelForXp(user.xp)

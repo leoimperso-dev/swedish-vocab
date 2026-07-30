@@ -27,6 +27,18 @@ the learned language), TTS locale, QCM distractor language (`?lang=` param), and
 `Word.details` (JSONB `{translations[], context?, usage[{sv,fr}]}`) is written in French —
 translations/context only shown in `fr` mode; usage pairs shown in both.
 
+## Study directions
+`UserWord.direction` (`SV_FR` | `FR_SV`) — each word has one SM-2 progression per direction
+(unique on `[userId, wordId, direction]`). The user picks the direction on the mode-picker screen;
+it flows through session/answer APIs and exercise props (`directionPrompt`/`directionAnswer`).
+TTS always speaks the learned-language side (`learnedText`). Word counts in stats/achievements
+use `distinct: ['wordId']` so directions don't double-count.
+
+## Reading
+`Story` table (24 graded stories, 3 levels) under `/reading`; `StoryReader` makes every word
+tappable → `/api/dictionary?q=` backed by `lib/dictionary.ts` (in-memory map of headwords+forms
+with Swedish suffix stripping: definite/plural/genitive/verb endings, consonant undoubling).
+
 ## Example sentences & cloze
 `Word.examples` (`[{sv, fr?, blank}]`) holds real Tatoeba sentences (CC-BY) matched by
 headword+forms via `scripts/build-examples.ts` (pure script — French through direct links then

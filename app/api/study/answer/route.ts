@@ -14,18 +14,21 @@ export async function POST(req: NextRequest) {
   const userId = session.user.id
   const body: AnswerPayload = await req.json()
   const { wordId, result, sessionId } = body
+  const direction = body.direction === 'FR_SV' ? 'FR_SV' : 'SV_FR'
 
-  // 1. Update or create UserWord with SM-2
-  const existing = await db.userWord.findUnique({ where: { userId_wordId: { userId, wordId } } })
+  // 1. Update or create UserWord with SM-2 (per direction)
+  const existing = await db.userWord.findUnique({
+    where: { userId_wordId_direction: { userId, wordId, direction } },
+  })
 
   const quality = qualityFromResult(result)
   const currentState = existing ?? { easeFactor: 2.5, interval: 0, repetitions: 0, nextReview: new Date() }
   const newState = sm2Update(currentState, quality)
 
   const userWord = await db.userWord.upsert({
-    where: { userId_wordId: { userId, wordId } },
+    where: { userId_wordId_direction: { userId, wordId, direction } },
     create: {
-      userId, wordId,
+      userId, wordId, direction,
       ...newState,
       correctCount: result === 'correct' ? 1 : 0,
       incorrectCount: result === 'incorrect' ? 1 : 0,
@@ -81,13 +84,24 @@ export async function PUT(req: NextRequest) {
   const oldLevel = user.level
   const newLevel = getLevelForXp(newXp).level
 
-  // Achievements
-  const totalStudied = await db.userWord.count({ where: { userId } })
-  const masteredVerbs = await db.userWord.count({
-    where: { userId, interval: { gt: 21 }, word: { wordType: 'VERB' } },
-  })
+  // Achievements — word counts are per distinct word (directions don't double-count)
   const todayStart = new Date(); todayStart.setHours(0, 0, 0, 0)
-  const studiedToday = await db.userWord.count({ where: { userId, lastStudied: { gte: todayStart } } })
+  const [studiedRows, masteredVerbRows, todayRows] = await Promise.all([
+    db.userWord.findMany({ where: { userId }, select: { wordId: true }, distinct: ['wordId'] }),
+    db.userWord.findMany({
+      where: { userId, interval: { gt: 21 }, word: { wordType: 'VERB' } },
+      select: { wordId: true },
+      distinct: ['wordId'],
+    }),
+    db.userWord.findMany({
+      where: { userId, lastStudied: { gte: todayStart } },
+      select: { wordId: true },
+      distinct: ['wordId'],
+    }),
+  ])
+  const totalStudied = studiedRows.length
+  const masteredVerbs = masteredVerbRows.length
+  const studiedToday = todayRows.length
 
   const unlockedSlugs = user.achievements.map(ua => ua.achievement.slug)
   const newAchievements = checkNewAchievements(unlockedSlugs, {
