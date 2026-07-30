@@ -54,13 +54,14 @@ export type VerbEvaluation = Record<keyof VerbForms, AnswerResult>
 
 export function evaluateVerbForms(
   inputs: Partial<VerbForms>,
-  forms: VerbForms
+  forms: Partial<VerbForms>
 ): VerbEvaluation {
-  return {
-    present: inputs.present ? evaluateAnswer(inputs.present, forms.present) : 'incorrect',
-    preterit: inputs.preterit ? evaluateAnswer(inputs.preterit, forms.preterit) : 'incorrect',
-    supine: inputs.supine ? evaluateAnswer(inputs.supine, forms.supine) : 'incorrect',
+  // A missing expected form counts as correct (the field isn't part of the exercise)
+  const evalForm = (key: keyof VerbForms): AnswerResult => {
+    if (!forms[key]) return 'correct'
+    return inputs[key] ? evaluateAnswer(inputs[key]!, forms[key]!) : 'incorrect'
   }
+  return { present: evalForm('present'), preterit: evalForm('preterit'), supine: evalForm('supine') }
 }
 
 // Parse verb forms from string like "går, gick, gått" or "(går, gick, gått)"

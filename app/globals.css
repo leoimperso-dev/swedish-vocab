@@ -10,6 +10,11 @@ body {
   color: var(--foreground);
 }
 
+/* Disable pull-to-refresh on mobile (accidental session reloads) */
+html, body {
+  overscroll-behavior-y: none;
+}
+
 /* Fix iOS safe area for bottom nav */
 .safe-area-pb {
   padding-bottom: env(safe-area-inset-bottom, 0px);

@@ -1,13 +1,15 @@
 'use client'
 
 import { useState } from 'react'
-import { motion } from 'framer-motion'
+import { motion, useMotionValue, useTransform, type PanInfo } from 'framer-motion'
 import { speak, unlock } from '@/lib/tts'
 import { formatForms, parseDetails, promptText, answerText, learnedLocale } from '@/lib/word-display'
 import { getStrings } from '@/lib/i18n'
 import { useLang } from '@/components/LangProvider'
 import type { Word } from '@prisma/client'
 import type { AnswerResult } from '@/types'
+
+const SWIPE_THRESHOLD = 100
 
 interface Props {
   word: Word
@@ -16,8 +18,20 @@ interface Props {
 
 export default function FlashCard({ word, onAnswer }: Props) {
   const [flipped, setFlipped] = useState(false)
+  const [answered, setAnswered] = useState(false)
   const lang = useLang()
   const t = getStrings(lang)
+
+  const x = useMotionValue(0)
+  const rotate = useTransform(x, [-250, 250], [-14, 14])
+  const knownOpacity = useTransform(x, [30, SWIPE_THRESHOLD], [0, 1])
+  const unknownOpacity = useTransform(x, [-SWIPE_THRESHOLD, -30], [1, 0])
+
+  const answer = (result: AnswerResult) => {
+    if (answered) return
+    setAnswered(true)
+    onAnswer(result, 'FLASHCARD')
+  }
 
   const handleFlip = () => {
     unlock()
@@ -25,49 +39,79 @@ export default function FlashCard({ word, onAnswer }: Props) {
     setFlipped(true)
   }
 
+  const handleDragEnd = (_: unknown, info: PanInfo) => {
+    if (info.offset.x > SWIPE_THRESHOLD) answer('correct')
+    else if (info.offset.x < -SWIPE_THRESHOLD) answer('incorrect')
+  }
+
   return (
     <div className="space-y-6">
       {/* Card */}
-      <motion.div
-        className="bg-slate-900 rounded-3xl p-8 min-h-52 flex flex-col items-center justify-center text-center cursor-pointer active:scale-98"
-        onClick={!flipped ? handleFlip : undefined}
-        whileTap={{ scale: 0.98 }}
-      >
-        {!flipped ? (
-          <div className="space-y-4">
-            <p className="text-3xl font-bold">{promptText(word, lang)}</p>
-            <p className="text-slate-500 text-sm">{t.tapToReveal}</p>
-          </div>
-        ) : (
-          <FlashCardBack word={word} />
-        )}
-      </motion.div>
+      <div className="relative">
+        <motion.div
+          className="bg-slate-900 rounded-3xl p-8 min-h-52 flex flex-col items-center justify-center text-center cursor-pointer active:scale-98 relative overflow-hidden"
+          onClick={!flipped ? handleFlip : undefined}
+          drag={flipped && !answered ? 'x' : false}
+          dragSnapToOrigin
+          dragElastic={0.8}
+          onDragEnd={handleDragEnd}
+          style={flipped ? { x, rotate } : undefined}
+          whileTap={{ scale: 0.98 }}
+        >
+          {!flipped ? (
+            <div className="space-y-4">
+              <p className="text-3xl font-bold">{promptText(word, lang)}</p>
+              <p className="text-slate-500 text-sm">{t.tapToReveal}</p>
+            </div>
+          ) : (
+            <>
+              <FlashCardBack word={word} />
+              {/* Swipe overlays */}
+              <motion.div
+                style={{ opacity: knownOpacity }}
+                className="absolute top-4 right-4 text-2xl font-black text-green-400 border-2 border-green-400 rounded-xl px-3 py-1 rotate-12"
+              >
+                ✅
+              </motion.div>
+              <motion.div
+                style={{ opacity: unknownOpacity }}
+                className="absolute top-4 left-4 text-2xl font-black text-red-400 border-2 border-red-400 rounded-xl px-3 py-1 -rotate-12"
+              >
+                ❌
+              </motion.div>
+            </>
+          )}
+        </motion.div>
+      </div>
 
       {/* Answer buttons (only after flip) */}
       {flipped && (
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          className="grid grid-cols-3 gap-3"
+          className="space-y-3"
         >
-          <AnswerBtn
-            label={t.answerNo}
-            sublabel={t.answerNoSub}
-            className="bg-red-950 text-red-400 border border-red-900"
-            onClick={() => onAnswer('incorrect', 'FLASHCARD')}
-          />
-          <AnswerBtn
-            label={t.answerAlmost}
-            sublabel={t.answerAlmostSub}
-            className="bg-yellow-950 text-yellow-400 border border-yellow-900"
-            onClick={() => onAnswer('approximate', 'FLASHCARD')}
-          />
-          <AnswerBtn
-            label={t.answerYes}
-            sublabel={t.answerYesSub}
-            className="bg-green-950 text-green-400 border border-green-900"
-            onClick={() => onAnswer('correct', 'FLASHCARD')}
-          />
+          <p className="text-center text-slate-600 text-xs">{t.swipeHint}</p>
+          <div className="grid grid-cols-3 gap-3">
+            <AnswerBtn
+              label={t.answerNo}
+              sublabel={t.answerNoSub}
+              className="bg-red-950 text-red-400 border border-red-900"
+              onClick={() => answer('incorrect')}
+            />
+            <AnswerBtn
+              label={t.answerAlmost}
+              sublabel={t.answerAlmostSub}
+              className="bg-yellow-950 text-yellow-400 border border-yellow-900"
+              onClick={() => answer('approximate')}
+            />
+            <AnswerBtn
+              label={t.answerYes}
+              sublabel={t.answerYesSub}
+              className="bg-green-950 text-green-400 border border-green-900"
+              onClick={() => answer('correct')}
+            />
+          </div>
         </motion.div>
       )}
 

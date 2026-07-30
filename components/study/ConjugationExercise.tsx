@@ -28,8 +28,9 @@ export default function ConjugationExercise({ word, onAnswer }: Props) {
   const [inputs, setInputs] = useState<Partial<VerbForms>>({})
   const [evaluation, setEvaluation] = useState<ReturnType<typeof evaluateVerbForms> | null>(null)
 
-  const forms = word.forms as VerbForms | null
+  const forms = word.forms as Partial<VerbForms> | null
   if (!forms) return null
+  const fields = FIELD_LABELS.filter(({ key }) => typeof forms[key] === 'string' && forms[key])
 
   const handleSubmit = () => {
     if (evaluation) return
@@ -40,7 +41,7 @@ export default function ConjugationExercise({ word, onAnswer }: Props) {
     setEvaluation(result)
 
     // Overall result: if all correct → correct, if any incorrect → incorrect, else approximate
-    const values = Object.values(result) as AnswerResult[]
+    const values = fields.map(({ key }) => result[key])
     const overall: AnswerResult = values.every(v => v === 'correct')
       ? 'correct'
       : values.some(v => v === 'incorrect')
@@ -59,7 +60,7 @@ export default function ConjugationExercise({ word, onAnswer }: Props) {
       </div>
 
       <div className="space-y-3">
-        {FIELD_LABELS.map(({ key, label }) => {
+        {fields.map(({ key, label }) => {
           const res = evaluation?.[key]
           return (
             <div key={key} className="space-y-1">

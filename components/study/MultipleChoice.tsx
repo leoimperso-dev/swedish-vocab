@@ -26,8 +26,14 @@ export default function MultipleChoice({ word, onAnswer }: Props) {
     fetch(`/api/words/distractors?wordId=${word.id}&wordType=${word.wordType}&lang=${lang}`)
       .then(r => r.json())
       .then(data => {
-        const all = [correctOption, ...data.distractors]
-        setOptions(shuffle(all))
+        const distractors: string[] = Array.isArray(data?.distractors) ? data.distractors : []
+        // No duplicates — a distractor can share the exact translation of the target word
+        const unique = [...new Set([correctOption, ...distractors.filter(d => d !== correctOption)])]
+        setOptions(shuffle(unique))
+        setLoading(false)
+      })
+      .catch(() => {
+        setOptions([correctOption])
         setLoading(false)
       })
     // eslint-disable-next-line react-hooks/exhaustive-deps

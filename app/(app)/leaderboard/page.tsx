@@ -33,8 +33,10 @@ export default function LeaderboardPage() {
       .then(d => { setUsers(d.leaderboard); setLoading(false) })
   }, [period])
 
-  const top3 = users.slice(0, 3)
-  const rest = users.slice(3)
+  // Podium needs 3 users — below that, show everyone in the plain list
+  const showPodium = users.length >= 3
+  const top3 = showPodium ? users.slice(0, 3) : []
+  const rest = showPodium ? users.slice(3) : users
 
   return (
     <main className="px-4 pt-12 pb-6 max-w-lg mx-auto space-y-6">

@@ -43,6 +43,7 @@ model User {
   wordProgress  UserWord[]
   studySessions StudySession[]
   achievements  UserAchievement[]
+  favorites     Favorite[]
 }
 
 model Account {
@@ -96,9 +97,22 @@ model Word {
   createdAt DateTime @default(now())
 
   userProgress UserWord[]
+  favorites    Favorite[]
 
   @@unique([swedish, wordType, source])
   @@index([frequencyRank])
+}
+
+model Favorite {
+  id        String   @id @default(cuid())
+  userId    String
+  wordId    String
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  word Word @relation(fields: [wordId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, wordId])
 }
 
 model UserWord {

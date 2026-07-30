@@ -11,7 +11,7 @@ export default async function StatsPage() {
   const now = new Date()
   const thirtyDaysAgo = new Date(now.getTime() - 30 * 86400000)
 
-  const [user, totalWords, masteredCount, dueCount, recentSessions, hardestWords, achievements] =
+  const [user, totalWords, masteredCount, dueCount, recentSessions, hardestWords, achievements, vocabTotal] =
     await Promise.all([
       db.user.findUnique({ where: { id: userId } }),
       db.userWord.count({ where: { userId } }),
@@ -33,6 +33,7 @@ export default async function StatsPage() {
         include: { achievement: true },
         orderBy: { unlockedAt: 'desc' },
       }),
+      db.word.count(),
     ])
 
   if (!user) return null
@@ -73,6 +74,20 @@ export default async function StatsPage() {
         <StatCard label={t.mastered} value={`${masteredPct}%`} sub={t.wordsSub(masteredCount)} color="text-green-400" />
         <StatCard label={t.accuracy30d} value={`${accuracy}%`} sub={t.answersSub(totalAnswers)} color="text-yellow-400" />
         <StatCard label={t.currentStreak} value={`🔥 ${user.streakCurrent}`} sub={t.recordSub(user.streakBest)} color="text-orange-400" />
+      </div>
+
+      {/* Global progress: known words vs entire vocabulary */}
+      <div className="bg-slate-900 rounded-2xl p-4 space-y-3">
+        <div className="flex justify-between items-center">
+          <span className="font-semibold text-slate-300">{t.globalProgress}</span>
+          <span className="text-blue-400 text-sm font-bold">{t.knownOf(masteredCount, vocabTotal)}</span>
+        </div>
+        <div className="h-2 bg-slate-800 rounded-full overflow-hidden">
+          <div
+            className="h-full bg-blue-500 rounded-full"
+            style={{ width: `${Math.min((masteredCount / Math.max(vocabTotal, 1)) * 100, 100)}%` }}
+          />
+        </div>
       </div>
 
       {/* Mastery milestone */}

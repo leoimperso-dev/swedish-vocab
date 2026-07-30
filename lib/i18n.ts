@@ -32,6 +32,22 @@ const fr = {
   noWordsDue: 'Aucun mot à réviser',
   comeBackTomorrow: 'Reviens demain pour ta prochaine session !',
   loading: 'Chargement...',
+  chooseExercise: 'Choisis ton exercice',
+  modeMix: 'Mix',
+  modeMixDesc: 'Le meilleur exercice pour chaque mot (recommandé)',
+  modeFlashcard: 'Flashcards',
+  modeFlashcardDesc: 'Découverte et auto-évaluation',
+  modeQcm: 'Choix multiple',
+  modeQcmDesc: '4 options, une seule bonne',
+  modeTyping: 'Écriture',
+  modeTypingDesc: 'Tape la traduction (fautes tolérées)',
+  modeConjugation: 'Conjugaison',
+  modeConjugationDesc: 'Présent, prétérit, supin des verbes',
+  quit: 'Quitter',
+  confirmQuit: 'Quitter ? La progression des mots répondus est sauvegardée.',
+  cancel: 'Annuler',
+  skipWord: 'Passer ce mot',
+  exerciseError: "Ce mot a un problème d'affichage",
   // FlashCard
   tapToReveal: 'Appuie pour voir la traduction',
   flip: 'Retourner 🔊',
@@ -41,6 +57,7 @@ const fr = {
   answerAlmostSub: 'Pas tout à fait',
   answerYes: '✅ Oui',
   answerYesSub: 'Je savais',
+  swipeHint: '← Je ne savais pas · Je savais →',
   // QCM
   whichTranslation: 'Quelle est la traduction ?',
   // Typing
@@ -113,6 +130,17 @@ const fr = {
   wordsAndCategories: (words: number, cats: number) => `${words} mots · ${cats} catégories`,
   personalList: 'Ma liste personnelle',
   misc: 'Divers',
+  tabCategories: 'Catégories',
+  tabTop: 'Top 3000',
+  tabFavorites: '★ Favoris',
+  showMore: 'Afficher plus',
+  noFavorites: 'Aucun favori — appuie sur ☆ à côté d\'un mot pour l\'ajouter',
+  // Global progress
+  globalProgress: 'Progression globale',
+  knownOf: (known: number, total: number) => `${known} / ${total} mots connus`,
+  // Errors
+  errorTitle: 'Oups, une erreur est survenue',
+  retry: 'Réessayer',
 }
 
 const sv: typeof fr = {
@@ -142,6 +170,22 @@ const sv: typeof fr = {
   noWordsDue: 'Inga ord att repetera',
   comeBackTomorrow: 'Kom tillbaka imorgon för nästa session!',
   loading: 'Laddar...',
+  chooseExercise: 'Välj övning',
+  modeMix: 'Mix',
+  modeMixDesc: 'Bästa övningen för varje ord (rekommenderas)',
+  modeFlashcard: 'Flashcards',
+  modeFlashcardDesc: 'Upptäckt och självbedömning',
+  modeQcm: 'Flerval',
+  modeQcmDesc: '4 alternativ, ett rätt',
+  modeTyping: 'Skriva',
+  modeTypingDesc: 'Skriv översättningen (stavfel tolereras)',
+  modeConjugation: 'Böjning',
+  modeConjugationDesc: 'Presens, preteritum, supinum',
+  quit: 'Avsluta',
+  confirmQuit: 'Avsluta? Framsteg för besvarade ord sparas.',
+  cancel: 'Avbryt',
+  skipWord: 'Hoppa över ordet',
+  exerciseError: 'Det här ordet kan inte visas',
   // FlashCard
   tapToReveal: 'Tryck för att se översättningen',
   flip: 'Vänd 🔊',
@@ -151,6 +195,7 @@ const sv: typeof fr = {
   answerAlmostSub: 'Inte riktigt',
   answerYes: '✅ Ja',
   answerYesSub: 'Jag visste',
+  swipeHint: '← Jag visste inte · Jag visste →',
   // QCM
   whichTranslation: 'Vad är översättningen?',
   // Typing
@@ -223,6 +268,17 @@ const sv: typeof fr = {
   wordsAndCategories: (words, cats) => `${words} ord · ${cats} kategorier`,
   personalList: 'Personlig lista',
   misc: 'Övrigt',
+  tabCategories: 'Kategorier',
+  tabTop: 'Topp 3000',
+  tabFavorites: '★ Favoriter',
+  showMore: 'Visa fler',
+  noFavorites: 'Inga favoriter — tryck på ☆ bredvid ett ord för att lägga till det',
+  // Global progress
+  globalProgress: 'Total utveckling',
+  knownOf: (known, total) => `${known} / ${total} ord du kan`,
+  // Errors
+  errorTitle: 'Hoppsan, något gick fel',
+  retry: 'Försök igen',
 }
 
 const STRINGS: Record<Lang, typeof fr> = { fr, sv }

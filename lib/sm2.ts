@@ -36,6 +36,19 @@ export function isMastered(state: SM2State): boolean {
   return state.interval > 21
 }
 
+// Visible knowledge ladder (0-5) derived from the SM-2 interval.
+// A failed review resets the interval, so the level drops back automatically.
+export const MAX_KNOWLEDGE_LEVEL = 5
+
+export function knowledgeLevel(interval: number | null | undefined): number {
+  if (interval == null || interval <= 0) return 0
+  if (interval < 3) return 1
+  if (interval < 7) return 2
+  if (interval < 21) return 3
+  if (interval < 60) return 4
+  return 5
+}
+
 export function qualityFromResult(result: 'correct' | 'approximate' | 'incorrect'): Quality {
   switch (result) {
     case 'correct': return 4
