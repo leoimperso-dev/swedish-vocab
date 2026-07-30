@@ -40,11 +40,27 @@ export default function WordsPage() {
   const [topVisible, setTopVisible] = useState(PAGE_STEP)
 
   useEffect(() => {
+    // Stale-while-revalidate: show the cached list instantly, refresh in the background
+    try {
+      const cached = sessionStorage.getItem('words-cache-v1')
+      if (cached) {
+        const parsed = JSON.parse(cached)
+        if (Array.isArray(parsed.words)) {
+          setWords(parsed.words)
+          setLoading(false)
+        }
+      }
+    } catch {}
+
     fetch('/api/words')
       .then(r => r.json())
       .then(data => {
-        setWords(Array.isArray(data.words) ? data.words : [])
+        if (!Array.isArray(data.words)) return
+        setWords(data.words)
         setLoading(false)
+        try {
+          sessionStorage.setItem('words-cache-v1', JSON.stringify({ words: data.words }))
+        } catch {}
       })
       .catch(() => setLoading(false))
   }, [])

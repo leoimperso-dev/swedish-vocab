@@ -12,6 +12,7 @@ export interface ExerciseWord {
   word: Word
   userWord: UserWord | null
   exerciseType: ExerciseType
+  distractors?: string[]
 }
 
 export interface AnswerPayload {

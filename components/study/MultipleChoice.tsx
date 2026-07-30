@@ -12,10 +12,11 @@ import type { AnswerResult } from '@/types'
 interface Props {
   word: Word
   direction: Direction
+  distractors?: string[]
   onAnswer: (result: AnswerResult, type: string) => void
 }
 
-export default function MultipleChoice({ word, direction, onAnswer }: Props) {
+export default function MultipleChoice({ word, direction, distractors, onAnswer }: Props) {
   const [options, setOptions] = useState<string[]>([])
   const [selected, setSelected] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
@@ -25,19 +26,22 @@ export default function MultipleChoice({ word, direction, onAnswer }: Props) {
   const answerLang = direction === 'FR_SV' ? 'sv' : 'fr'
 
   useEffect(() => {
+    const applyOptions = (list: string[]) => {
+      // No duplicates — a distractor can share the exact translation of the target word
+      const unique = [...new Set([correctOption, ...list.filter(d => d !== correctOption)])]
+      setOptions(shuffle(unique))
+      setLoading(false)
+    }
+
+    // Distractors are pre-computed by the session API; fetch is only a fallback
+    if (distractors && distractors.length >= 3) {
+      applyOptions(distractors)
+      return
+    }
     fetch(`/api/words/distractors?wordId=${word.id}&wordType=${word.wordType}&lang=${answerLang}`)
       .then(r => r.json())
-      .then(data => {
-        const distractors: string[] = Array.isArray(data?.distractors) ? data.distractors : []
-        // No duplicates — a distractor can share the exact translation of the target word
-        const unique = [...new Set([correctOption, ...distractors.filter(d => d !== correctOption)])]
-        setOptions(shuffle(unique))
-        setLoading(false)
-      })
-      .catch(() => {
-        setOptions([correctOption])
-        setLoading(false)
-      })
+      .then(data => applyOptions(Array.isArray(data?.distractors) ? data.distractors : []))
+      .catch(() => applyOptions([]))
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [word])
 

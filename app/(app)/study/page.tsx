@@ -178,7 +178,12 @@ export default function StudyPage() {
             <FlashCard word={current.word} direction={direction} onAnswer={handleAnswer} />
           )}
           {current.exerciseType === 'QCM' && (
-            <MultipleChoice word={current.word} direction={direction} onAnswer={handleAnswer} />
+            <MultipleChoice
+              word={current.word}
+              direction={direction}
+              distractors={current.distractors}
+              onAnswer={handleAnswer}
+            />
           )}
           {current.exerciseType === 'TYPING' && (
             <TypingExercise word={current.word} direction={direction} onAnswer={handleAnswer} />

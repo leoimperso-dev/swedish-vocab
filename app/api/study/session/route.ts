@@ -103,5 +103,32 @@ export async function GET(req: NextRequest) {
     ;[exercises[i], exercises[j]] = [exercises[j], exercises[i]]
   }
 
-  return NextResponse.json({ sessionId: studySession.id, exercises })
+  // Pre-compute QCM distractors in one query (avoids a network round trip per question)
+  const answerField = direction === 'FR_SV' ? ('swedish' as const) : ('french' as const)
+  const distractorsByWordId = new Map<string, string[]>()
+  if (exercises.some(e => e.exerciseType === 'QCM')) {
+    const pool = await db.word.findMany({
+      where: { id: { notIn: exercises.map(e => e.word.id) } },
+      select: { swedish: true, french: true, wordType: true },
+      take: 150,
+      skip: Math.floor(Math.random() * 2000),
+    })
+    for (const ex of exercises) {
+      if (ex.exerciseType !== 'QCM') continue
+      const sameType = pool.filter(p => p.wordType === ex.word.wordType)
+      const source = sameType.length >= 3 ? sameType : pool
+      const correct = ex.word[answerField]
+      const options = [...new Set(source.map(p => p[answerField]).filter(v => v && v !== correct))]
+      for (let i = options.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1))
+        ;[options[i], options[j]] = [options[j], options[i]]
+      }
+      distractorsByWordId.set(ex.word.id, options.slice(0, 3))
+    }
+  }
+
+  return NextResponse.json({
+    sessionId: studySession.id,
+    exercises: exercises.map(e => ({ ...e, distractors: distractorsByWordId.get(e.word.id) })),
+  })
 }

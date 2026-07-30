@@ -19,19 +19,23 @@ export default function StoryReader({ story }: { story: Story }) {
   const [active, setActive] = useState<string | null>(null) // "para-token" position key
   const [entry, setEntry] = useState<DictResult | null>(null)
   const cacheRef = useRef(new Map<string, DictResult>())
+  // Guards against out-of-order responses when tapping several words quickly
+  const activeRef = useRef<string | null>(null)
 
   const paragraphs = story.body.split(/\n\n+/)
 
   const handleWordTap = async (positionKey: string, rawToken: string) => {
     if (active === positionKey) {
+      activeRef.current = null
       setActive(null)
       return
     }
+    activeRef.current = positionKey
     setActive(positionKey)
     setEntry(null)
 
     const token = rawToken.toLowerCase().replace(/[.,!?;:"«»()[\]…'’„“”–—]/g, '').trim()
-    if (!token) { setActive(null); return }
+    if (!token) { activeRef.current = null; setActive(null); return }
 
     const cached = cacheRef.current.get(token)
     if (cached) { setEntry(cached); return }
@@ -40,9 +44,10 @@ export default function StoryReader({ story }: { story: Story }) {
       const res = await fetch(`/api/dictionary?q=${encodeURIComponent(token)}`)
       const data: DictResult = await res.json()
       cacheRef.current.set(token, data)
-      setEntry(data)
+      // Only display if this word is still the active one
+      if (activeRef.current === positionKey) setEntry(data)
     } catch {
-      setActive(null)
+      if (activeRef.current === positionKey) setActive(null)
     }
   }
 
