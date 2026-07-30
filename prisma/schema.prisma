@@ -94,6 +94,8 @@ model Word {
   frequencyRank Int? // real-world rank from OpenSubtitles corpus (1 = most common)
   // { translations: string[], context?: string, usage?: [{sv, fr}] }
   details  Json?
+  // Tatoeba example sentences (CC-BY): [{ sv, fr?, blank }] — blank = surface form to hide in cloze
+  examples Json?
   createdAt DateTime @default(now())
 
   userProgress UserWord[]

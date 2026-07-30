@@ -6,6 +6,7 @@ import FlashCard from '@/components/study/FlashCard'
 import MultipleChoice from '@/components/study/MultipleChoice'
 import TypingExercise from '@/components/study/TypingExercise'
 import ConjugationExercise from '@/components/study/ConjugationExercise'
+import ClozeExercise from '@/components/study/ClozeExercise'
 import SessionProgress from '@/components/study/SessionProgress'
 import { getStrings } from '@/lib/i18n'
 import { useLang } from '@/components/LangProvider'
@@ -171,6 +172,9 @@ export default function StudyPage() {
           {current.exerciseType === 'CONJUGATION' && (
             <ConjugationExercise word={current.word} onAnswer={handleAnswer} />
           )}
+          {current.exerciseType === 'CLOZE' && (
+            <ClozeExercise word={current.word} onAnswer={handleAnswer} />
+          )}
         </ExerciseBoundary>
       </div>
     </main>
@@ -189,7 +193,10 @@ function ModePicker({ onPick, conjugationAvailable }: {
     { mode: 'QCM', icon: '🔘', label: t.modeQcm, desc: t.modeQcmDesc },
     { mode: 'TYPING', icon: '⌨️', label: t.modeTyping, desc: t.modeTypingDesc },
     ...(conjugationAvailable
-      ? [{ mode: 'CONJUGATION' as StudyMode, icon: '📖', label: t.modeConjugation, desc: t.modeConjugationDesc }]
+      ? [
+          { mode: 'CLOZE' as StudyMode, icon: '✍️', label: t.modeCloze, desc: t.modeClozeDesc },
+          { mode: 'CONJUGATION' as StudyMode, icon: '📖', label: t.modeConjugation, desc: t.modeConjugationDesc },
+        ]
       : []),
   ]
 

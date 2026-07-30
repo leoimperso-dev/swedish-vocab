@@ -6,7 +6,7 @@ import type { Word, UserWord } from '@prisma/client'
 
 const SESSION_SIZE = 15
 const NEW_WORDS_PER_SESSION = 5
-const FORCED_MODES: ExerciseType[] = ['FLASHCARD', 'QCM', 'TYPING', 'CONJUGATION']
+const FORCED_MODES: ExerciseType[] = ['FLASHCARD', 'QCM', 'TYPING', 'CONJUGATION', 'CLOZE']
 
 function hasFullVerbForms(forms: unknown): boolean {
   if (!forms || typeof forms !== 'object') return false
@@ -14,14 +14,18 @@ function hasFullVerbForms(forms: unknown): boolean {
   return ['present', 'preterit', 'supine'].every(k => typeof f[k] === 'string' && f[k])
 }
 
-function selectExerciseType(userWord: UserWord | null, word: Word, canConjugate: boolean): ExerciseType {
+function hasExamples(examples: unknown): boolean {
+  return Array.isArray(examples) && examples.length > 0
+}
+
+function selectExerciseType(userWord: UserWord | null, word: Word, frNative: boolean): ExerciseType {
   if (!userWord || userWord.repetitions === 0) return 'FLASHCARD'
   if (userWord.repetitions <= 2) return 'QCM'
-  // Conjugation drills Swedish verb forms — only for French speakers learning Swedish
-  if (canConjugate && word.wordType === 'VERB' && hasFullVerbForms(word.forms)) {
-    return Math.random() > 0.5 ? 'CONJUGATION' : 'TYPING'
-  }
-  return 'TYPING'
+  // Conjugation and cloze work on Swedish material — only for French speakers learning Swedish
+  const pool: ExerciseType[] = ['TYPING']
+  if (frNative && word.wordType === 'VERB' && hasFullVerbForms(word.forms)) pool.push('CONJUGATION')
+  if (frNative && hasExamples(word.examples)) pool.push('CLOZE')
+  return pool[Math.floor(Math.random() * pool.length)]
 }
 
 export async function GET(req: NextRequest) {
@@ -33,12 +37,17 @@ export async function GET(req: NextRequest) {
   const canConjugate = user?.nativeLanguage !== 'sv'
 
   const modeParam = req.nextUrl.searchParams.get('mode') as ExerciseType | null
-  const forcedMode = modeParam && FORCED_MODES.includes(modeParam) && (modeParam !== 'CONJUGATION' || canConjugate)
+  const frNativeOnly = modeParam === 'CONJUGATION' || modeParam === 'CLOZE'
+  const forcedMode = modeParam && FORCED_MODES.includes(modeParam) && (!frNativeOnly || canConjugate)
     ? modeParam
     : null
 
-  // Conjugation mode only makes sense on verbs with complete forms (checked in JS below)
+  // Conjugation needs verbs with complete forms; cloze needs example sentences (checked in JS below)
   const conjugationOnly = forcedMode === 'CONJUGATION'
+  const clozeOnly = forcedMode === 'CLOZE'
+  const needsEligibility = conjugationOnly || clozeOnly
+  const isEligible = (word: Word) =>
+    conjugationOnly ? hasFullVerbForms(word.forms) : clozeOnly ? hasExamples(word.examples) : true
   const wordFilter = conjugationOnly ? { wordType: 'VERB' as const } : {}
 
   // 1. Due words (SM-2 scheduled for today)
@@ -46,9 +55,9 @@ export async function GET(req: NextRequest) {
     where: { userId, nextReview: { lte: new Date() }, word: wordFilter },
     include: { word: true },
     orderBy: { nextReview: 'asc' },
-    take: conjugationOnly ? SESSION_SIZE * 3 : SESSION_SIZE - NEW_WORDS_PER_SESSION,
+    take: needsEligibility ? SESSION_SIZE * 3 : SESSION_SIZE - NEW_WORDS_PER_SESSION,
   }))
-    .filter(uw => !conjugationOnly || hasFullVerbForms(uw.word.forms))
+    .filter(uw => isEligible(uw.word))
     .slice(0, SESSION_SIZE - NEW_WORDS_PER_SESSION)
 
   // 2. New words (never studied)
@@ -61,11 +70,11 @@ export async function GET(req: NextRequest) {
   const newWordsTarget = Math.max(NEW_WORDS_PER_SESSION, SESSION_SIZE - dueUserWords.length)
   const newWords = (await db.word.findMany({
     where: { id: { notIn: studiedIds }, ...wordFilter },
-    take: conjugationOnly ? newWordsTarget * 3 : newWordsTarget,
+    take: needsEligibility ? newWordsTarget * 3 : newWordsTarget,
     // Most common words (real corpus rank) first; unranked words last
     orderBy: [{ frequencyRank: { sort: 'asc', nulls: 'last' } }, { createdAt: 'asc' }],
   }))
-    .filter(w => !conjugationOnly || hasFullVerbForms(w.forms))
+    .filter(w => isEligible(w))
     .slice(0, newWordsTarget)
 
   // 3. Create session record

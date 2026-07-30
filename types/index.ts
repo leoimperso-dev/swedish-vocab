@@ -1,6 +1,6 @@
 import type { Word, UserWord } from '@prisma/client'
 
-export type ExerciseType = 'FLASHCARD' | 'QCM' | 'TYPING' | 'CONJUGATION'
+export type ExerciseType = 'FLASHCARD' | 'QCM' | 'TYPING' | 'CONJUGATION' | 'CLOZE'
 
 export type AnswerResult = 'correct' | 'approximate' | 'incorrect'
 
