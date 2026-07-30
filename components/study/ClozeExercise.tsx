@@ -80,8 +80,9 @@ export default function ClozeExercise({ word, onAnswer }: Props) {
         {example.fr && (
           <p className="text-slate-400 text-sm italic">{example.fr}</p>
         )}
+        {/* The Swedish headword is the answer — only reveal it after answering */}
         <p className="text-blue-300 text-sm">
-          {word.swedish.replace(/\(.*?\)/g, '').trim()} — {hint}
+          {result ? `${word.swedish.replace(/\(.*?\)/g, '').trim()} — ${hint}` : hint}
         </p>
       </div>
 
