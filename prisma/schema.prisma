@@ -116,6 +116,16 @@ model Story {
   createdAt   DateTime @default(now())
 }
 
+model GrammarLesson {
+  id        String   @id @default(cuid())
+  slug      String   @unique
+  title     String // French title
+  category  String // French category label ("Verbes", "Noms & articles"...)
+  order     Int // global pedagogical order (also orders categories)
+  body      String // restricted markdown (##, -, **, > example lines)
+  createdAt DateTime @default(now())
+}
+
 model Favorite {
   id        String   @id @default(cuid())
   userId    String

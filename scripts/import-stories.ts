@@ -5,7 +5,7 @@ import fs from 'fs'
 import path from 'path'
 import { db } from '../lib/db'
 
-const LEVELS = new Set(['beginner', 'intermediate', 'expert'])
+const LEVELS = new Set(['beginner', 'intermediate', 'expert', 'dialogue'])
 
 async function main() {
   const dir = process.argv[2]

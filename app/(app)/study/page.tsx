@@ -262,16 +262,28 @@ function ModePicker({ onPick, direction, onDirectionChange, conjugationAvailable
           </button>
         ))}
         {conjugationAvailable && (
-          <Link
-            href="/reading"
-            className="w-full flex items-center gap-4 p-4 rounded-2xl text-left transition-all cursor-pointer active:scale-98 bg-slate-900 hover:bg-slate-800 border border-slate-800"
-          >
-            <span className="text-3xl">📕</span>
-            <span>
-              <span className="block font-bold">{t.readingTitle}</span>
-              <span className="block text-sm text-slate-500">{t.readingDesc}</span>
-            </span>
-          </Link>
+          <>
+            <Link
+              href="/reading"
+              className="w-full flex items-center gap-4 p-4 rounded-2xl text-left transition-all cursor-pointer active:scale-98 bg-slate-900 hover:bg-slate-800 border border-slate-800"
+            >
+              <span className="text-3xl">📕</span>
+              <span>
+                <span className="block font-bold">{t.readingTitle}</span>
+                <span className="block text-sm text-slate-500">{t.readingDesc}</span>
+              </span>
+            </Link>
+            <Link
+              href="/grammar"
+              className="w-full flex items-center gap-4 p-4 rounded-2xl text-left transition-all cursor-pointer active:scale-98 bg-slate-900 hover:bg-slate-800 border border-slate-800"
+            >
+              <span className="text-3xl">🧠</span>
+              <span>
+                <span className="block font-bold">{t.grammarTitle}</span>
+                <span className="block text-sm text-slate-500">{t.grammarDesc}</span>
+              </span>
+            </Link>
+          </>
         )}
       </div>
     </main>

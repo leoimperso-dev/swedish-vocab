@@ -5,7 +5,7 @@ import Link from 'next/link'
 import { getStrings } from '@/lib/i18n'
 import { useLang } from '@/components/LangProvider'
 
-export type StoryLevel = 'beginner' | 'intermediate' | 'expert'
+export type StoryLevel = 'beginner' | 'intermediate' | 'expert' | 'dialogue'
 
 interface StoryMeta {
   slug: string
@@ -23,6 +23,7 @@ export default function ReadingBrowser({ stories }: { stories: StoryMeta[] }) {
     { level: 'beginner', icon: '🌱', label: t.levelBeginner, desc: t.levelBeginnerDesc },
     { level: 'intermediate', icon: '🌿', label: t.levelIntermediate, desc: t.levelIntermediateDesc },
     { level: 'expert', icon: '🌳', label: t.levelExpert, desc: t.levelExpertDesc },
+    { level: 'dialogue', icon: '💬', label: t.levelDialogue, desc: t.levelDialogueDesc },
   ]
 
   if (!level) {
