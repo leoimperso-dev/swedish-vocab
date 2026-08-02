@@ -2,8 +2,12 @@
 
 import { useState } from 'react'
 import Link from 'next/link'
+import { ChevronRight } from 'lucide-react'
 import { getStrings } from '@/lib/i18n'
 import { useLang } from '@/components/LangProvider'
+import { AppShell } from '@/components/AppShell'
+import { SectionLabel } from '@/components/ui/primitives'
+import { cn } from '@/lib/utils'
 
 export type StoryLevel = 'beginner' | 'intermediate' | 'expert' | 'dialogue'
 
@@ -19,40 +23,39 @@ export default function ReadingBrowser({ stories }: { stories: StoryMeta[] }) {
   const [level, setLevel] = useState<StoryLevel | null>(null)
   const t = getStrings(useLang())
 
-  const levels: Array<{ level: StoryLevel; icon: string; label: string; desc: string }> = [
-    { level: 'beginner', icon: '🌱', label: t.levelBeginner, desc: t.levelBeginnerDesc },
-    { level: 'intermediate', icon: '🌿', label: t.levelIntermediate, desc: t.levelIntermediateDesc },
-    { level: 'expert', icon: '🌳', label: t.levelExpert, desc: t.levelExpertDesc },
-    { level: 'dialogue', icon: '💬', label: t.levelDialogue, desc: t.levelDialogueDesc },
+  const levels: Array<{ level: StoryLevel; icon: string; label: string; desc: string; tone: string }> = [
+    { level: 'beginner', icon: '🌱', label: t.levelBeginner, desc: t.levelBeginnerDesc, tone: 'text-success' },
+    { level: 'intermediate', icon: '🌿', label: t.levelIntermediate, desc: t.levelIntermediateDesc, tone: 'text-info' },
+    { level: 'expert', icon: '🌳', label: t.levelExpert, desc: t.levelExpertDesc, tone: 'text-accent' },
+    { level: 'dialogue', icon: '💬', label: t.levelDialogue, desc: t.levelDialogueDesc, tone: 'text-primary' },
   ]
 
   if (!level) {
     return (
-      <main className="px-4 pt-12 pb-6 max-w-lg mx-auto space-y-4">
-        <div>
-          <h1 className="text-2xl font-bold">{t.readingTitle}</h1>
-          <p className="text-slate-400 text-sm mt-1">{t.chooseLevel}</p>
-        </div>
+      <AppShell title={t.readingTitle} subtitle={t.chooseLevel}>
         <div className="space-y-3">
-          {levels.map(({ level: lvl, icon, label, desc }) => {
+          {levels.map(({ level: lvl, icon, label, desc, tone }) => {
             const count = stories.filter(s => s.level === lvl).length
             return (
               <button
                 key={lvl}
                 onClick={() => setLevel(lvl)}
-                className="w-full flex items-center gap-4 p-4 rounded-2xl text-left bg-slate-900 hover:bg-slate-800 border border-slate-800 transition-all cursor-pointer active:scale-98"
+                className="pressable card-surface flex w-full items-center gap-3.5 p-4 text-left"
               >
-                <span className="text-3xl">{icon}</span>
-                <span className="flex-1">
-                  <span className="block font-bold">{label}</span>
-                  <span className="block text-sm text-slate-500">{desc}</span>
+                <span className="grid size-12 shrink-0 place-items-center rounded-2xl bg-surface-raised text-2xl">
+                  {icon}
                 </span>
-                <span className="text-slate-500 text-sm">{count}</span>
+                <span className="min-w-0 flex-1">
+                  <span className={cn('block font-display text-base font-semibold', tone)}>{label}</span>
+                  <span className="block text-xs text-muted-foreground">{desc}</span>
+                </span>
+                <span className="shrink-0 text-xs tabular-nums text-muted-foreground">{count}</span>
+                <ChevronRight size={18} className="shrink-0 text-muted-foreground" />
               </button>
             )
           })}
         </div>
-      </main>
+      </AppShell>
     )
   }
 
@@ -60,26 +63,32 @@ export default function ReadingBrowser({ stories }: { stories: StoryMeta[] }) {
   const levelLabel = levels.find(l => l.level === level)!.label
 
   return (
-    <main className="px-4 pt-12 pb-6 max-w-lg mx-auto space-y-4">
-      <div>
-        <button onClick={() => setLevel(null)} className="text-slate-400 text-sm cursor-pointer hover:text-slate-200">
+    <AppShell title={t.readingTitle} subtitle={levelLabel}>
+      <div className="space-y-3">
+        <button
+          onClick={() => setLevel(null)}
+          className="pressable inline-flex items-center gap-1.5 text-sm text-muted-foreground"
+        >
           {t.back}
         </button>
-        <h1 className="text-2xl font-bold mt-1">{levelLabel}</h1>
-      </div>
-      <div className="space-y-3">
+        <SectionLabel>{t.storiesLabel}</SectionLabel>
         {levelStories.map(story => (
           <Link
             key={story.slug}
             href={`/reading/${story.slug}`}
-            className="block p-4 rounded-2xl bg-slate-900 hover:bg-slate-800 border border-slate-800 transition-all cursor-pointer active:scale-98"
+            className="pressable card-surface flex items-center gap-3 p-4"
           >
-            <p className="font-bold">{story.title}</p>
-            <p className="text-slate-500 text-sm">{story.titleFrench}</p>
-            <p className="text-slate-600 text-xs mt-1">{t.storyWordCount(story.wordCount)}</p>
+            <span className="min-w-0 flex-1">
+              <span className="block truncate font-display text-base font-semibold">{story.title}</span>
+              <span className="block truncate text-xs italic text-muted-foreground">{story.titleFrench}</span>
+              <span className="mt-1 block text-[11px] tabular-nums text-muted-foreground/80">
+                {t.storyWordCount(story.wordCount)}
+              </span>
+            </span>
+            <ChevronRight size={18} className="shrink-0 text-muted-foreground" />
           </Link>
         ))}
       </div>
-    </main>
+    </AppShell>
   )
 }

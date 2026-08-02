@@ -6,6 +6,8 @@ import { speak, unlock } from '@/lib/tts'
 import { directionPrompt, directionAnswer, learnedText, learnedLocale, type Direction } from '@/lib/word-display'
 import { getStrings } from '@/lib/i18n'
 import { useLang } from '@/components/LangProvider'
+import { Card } from '@/components/ui/primitives'
+import { cn } from '@/lib/utils'
 import type { Word } from '@prisma/client'
 import type { AnswerResult } from '@/types'
 
@@ -57,30 +59,32 @@ export default function MultipleChoice({ word, direction, distractors, onAnswer 
     }, 800)
   }
 
-  if (loading) return <div className="text-center text-slate-400">{t.loading}</div>
+  if (loading) return <div className="text-center text-muted-foreground">{t.loading}</div>
 
   return (
-    <div className="space-y-6">
-      <div className="bg-slate-900 rounded-3xl p-8 text-center">
-        <p className="text-3xl font-bold">{directionPrompt(word, direction)}</p>
-        <p className="text-slate-500 text-sm mt-2">{t.whichTranslation}</p>
-      </div>
+    <div className="space-y-4">
+      <Card className="py-8 text-center">
+        <p className="text-hero-word">{directionPrompt(word, direction)}</p>
+        <p className="mt-2 text-xs text-muted-foreground">{t.whichTranslation}</p>
+      </Card>
 
       <div className="grid grid-cols-2 gap-3">
         {options.map(option => {
-          let style = 'bg-slate-900 border border-slate-800 text-white'
-          if (selected) {
-            if (option === correctOption) style = 'bg-green-900 border border-green-600 text-green-300'
-            else if (option === selected) style = 'bg-red-900 border border-red-600 text-red-300'
-            else style = 'bg-slate-900 border border-slate-800 text-slate-600'
-          }
+          const isCorrect = !!selected && option === correctOption
+          const isWrong = selected === option && option !== correctOption
 
           return (
             <motion.button
               key={option}
               onClick={() => handleSelect(option)}
+              disabled={!!selected}
               whileTap={{ scale: 0.96 }}
-              className={`p-4 rounded-2xl text-sm font-medium text-left transition-all cursor-pointer ${style}`}
+              className={cn(
+                'pressable card-surface min-h-20 px-3 py-4 text-left text-sm font-semibold',
+                isCorrect && 'border-success/60 bg-success-soft text-success',
+                isWrong && 'animate-shake border-danger/60 bg-danger-soft text-danger',
+                selected && !isCorrect && !isWrong && 'opacity-45',
+              )}
             >
               {option}
             </motion.button>

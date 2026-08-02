@@ -2,11 +2,15 @@
 
 import { useMemo, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
+import { Check, Minus, X, Lightbulb } from 'lucide-react'
 import { speak, unlock } from '@/lib/tts'
 import { evaluateAnswer } from '@/lib/fuzzy'
 import { parseDetails } from '@/lib/word-display'
 import { getStrings } from '@/lib/i18n'
 import { useLang } from '@/components/LangProvider'
+import { Card, TextField } from '@/components/ui/primitives'
+import { Button } from '@/components/ui/button'
+import { cn } from '@/lib/utils'
 import type { Word } from '@prisma/client'
 import type { AnswerResult } from '@/types'
 
@@ -25,6 +29,18 @@ function escapeRegex(s: string): string {
   return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
 }
 
+const FEEDBACK_ICON: Record<AnswerResult, typeof Check> = {
+  correct: Check,
+  approximate: Minus,
+  incorrect: X,
+}
+
+const FEEDBACK_CLASS: Record<AnswerResult, string> = {
+  correct: 'border-success/40 bg-success-soft text-success',
+  approximate: 'border-warning/40 bg-warning-soft text-warning',
+  incorrect: 'border-danger/40 bg-danger-soft text-danger',
+}
+
 export default function ClozeExercise({ word, onAnswer }: Props) {
   const [input, setInput] = useState('')
   const [result, setResult] = useState<AnswerResult | null>(null)
@@ -40,23 +56,25 @@ export default function ClozeExercise({ word, onAnswer }: Props) {
     return pool[Math.floor(Math.random() * pool.length)]
   }, [word])
 
-  const blanked = useMemo(() => {
+  // Word-boundary match of the surface form, case-insensitive — split into before/word/after
+  // so the answer can be revealed in place (colored) instead of just unmasking the full sentence
+  const match = useMemo(() => {
     if (!example) return null
-    // Word-boundary match of the surface form, case-insensitive
     const re = new RegExp(`(?<=^|[^\\p{L}])${escapeRegex(example.blank)}(?=$|[^\\p{L}])`, 'iu')
-    if (!re.test(example.sv)) return null
-    return example.sv.replace(re, '_____')
+    const m = re.exec(example.sv)
+    if (!m) return null
+    return { before: example.sv.slice(0, m.index), word: m[0], after: example.sv.slice(m.index + m[0].length) }
   }, [example])
 
-  if (!example || !blanked) return null
+  if (!example || !match) return null
 
   const details = parseDetails(word.details)
   const hint = details?.translations ? details.translations.join(', ') : word.french
 
-  const resultConfig = {
-    correct: { bg: 'bg-green-900 border-green-600', text: 'text-green-300', label: t.resultCorrect },
-    approximate: { bg: 'bg-yellow-900 border-yellow-600', text: 'text-yellow-300', label: t.resultAlmost },
-    incorrect: { bg: 'bg-red-900 border-red-600', text: 'text-red-300', label: t.resultIncorrect },
+  const resultLabel: Record<AnswerResult, string> = {
+    correct: t.resultCorrect,
+    approximate: t.resultAlmost,
+    incorrect: t.resultIncorrect,
   }
 
   const handleSubmit = () => {
@@ -71,30 +89,47 @@ export default function ClozeExercise({ word, onAnswer }: Props) {
   }
 
   return (
-    <div className="space-y-6">
-      <div className="bg-slate-900 rounded-3xl p-6 text-center space-y-3">
-        <p className="text-slate-500 text-sm">{t.clozePrompt}</p>
-        <p className="text-xl font-semibold leading-relaxed">
-          {result ? example.sv : blanked}
+    <div className="space-y-4">
+      <Card className="space-y-3 py-6 text-center">
+        <p className="text-xs text-muted-foreground">{t.clozePrompt}</p>
+        <p className="font-display text-3xl font-semibold leading-snug tracking-tight">
+          {match.before}
+          {result ? (
+            <span className="text-success">{match.word}</span>
+          ) : (
+            <span className="text-muted-foreground">_____</span>
+          )}
+          {match.after}
         </p>
-        {example.fr && (
-          <p className="text-slate-400 text-sm italic">{example.fr}</p>
-        )}
-        {/* The Swedish headword is the answer — only reveal it after answering */}
-        <p className="text-blue-300 text-sm">
-          {result ? `${word.swedish.replace(/\(.*?\)/g, '').trim()} — ${hint}` : hint}
+        {example.fr && <p className="text-sm italic text-muted-foreground">{example.fr}</p>}
+      </Card>
+
+      <div className="flex items-start gap-2 rounded-xl border border-border bg-surface p-3">
+        <Lightbulb size={14} className="mt-0.5 shrink-0 text-warning" />
+        <p className="text-xs text-muted-foreground">
+          {/* The Swedish headword is the answer — only reveal it after answering */}
+          {result ? (
+            <>
+              <span className="font-semibold text-foreground">
+                {word.swedish.replace(/\(.*?\)/g, '').trim()}
+              </span>{' '}
+              — {hint}
+            </>
+          ) : (
+            hint
+          )}
         </p>
       </div>
 
       <div className="space-y-3">
-        <input
+        <TextField
           value={input}
           onChange={e => setInput(e.target.value)}
           onKeyDown={e => e.key === 'Enter' && handleSubmit()}
           disabled={!!result}
           placeholder="_____"
           autoFocus
-          className="w-full bg-slate-900 border border-slate-700 rounded-2xl px-4 py-4 text-lg outline-none focus:border-blue-500 transition-colors disabled:opacity-60"
+          state={result === 'incorrect' ? 'error' : result ? 'success' : 'idle'}
         />
 
         <AnimatePresence>
@@ -102,13 +137,17 @@ export default function ClozeExercise({ word, onAnswer }: Props) {
             <motion.div
               initial={{ opacity: 0, y: -8 }}
               animate={{ opacity: 1, y: 0 }}
-              className={`border rounded-xl p-3 ${resultConfig[result].bg}`}
+              className={cn('animate-pop rounded-xl border p-3', FEEDBACK_CLASS[result])}
             >
-              <p className={`font-semibold ${resultConfig[result].text}`}>
-                {resultConfig[result].label}
+              <p className="flex items-center gap-2 text-sm font-semibold">
+                {(() => {
+                  const Icon = FEEDBACK_ICON[result]
+                  return <Icon size={16} />
+                })()}
+                {resultLabel[result]}
               </p>
               {result !== 'correct' && (
-                <p className="text-slate-300 text-sm mt-1">
+                <p className="mt-1 text-xs text-foreground/80">
                   {t.expectedAnswer} <span className="font-medium">{example.blank}</span>
                 </p>
               )}
@@ -117,13 +156,9 @@ export default function ClozeExercise({ word, onAnswer }: Props) {
         </AnimatePresence>
 
         {!result && (
-          <button
-            onClick={handleSubmit}
-            disabled={!input.trim()}
-            className="w-full py-4 rounded-2xl bg-blue-600 hover:bg-blue-500 disabled:opacity-40 disabled:cursor-not-allowed font-semibold text-lg active:scale-95 transition-all cursor-pointer"
-          >
+          <Button size="lg" className="w-full" disabled={!input.trim()} onClick={handleSubmit}>
             {t.submit}
-          </button>
+          </Button>
         )}
       </div>
     </div>

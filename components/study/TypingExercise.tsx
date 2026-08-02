@@ -1,12 +1,16 @@
 'use client'
 
-import { useRef, useState } from 'react'
+import { useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
+import { Check, Minus, X } from 'lucide-react'
 import { speak, unlock } from '@/lib/tts'
 import { evaluateAnswer } from '@/lib/fuzzy'
 import { directionPrompt, directionAnswer, learnedText, learnedLocale, type Direction } from '@/lib/word-display'
 import { getStrings } from '@/lib/i18n'
 import { useLang } from '@/components/LangProvider'
+import { Card, TextField } from '@/components/ui/primitives'
+import { Button } from '@/components/ui/button'
+import { cn } from '@/lib/utils'
 import type { Word } from '@prisma/client'
 import type { AnswerResult } from '@/types'
 
@@ -16,19 +20,30 @@ interface Props {
   onAnswer: (result: AnswerResult, type: string) => void
 }
 
+const FEEDBACK_ICON: Record<AnswerResult, typeof Check> = {
+  correct: Check,
+  approximate: Minus,
+  incorrect: X,
+}
+
+const FEEDBACK_CLASS: Record<AnswerResult, string> = {
+  correct: 'border-success/40 bg-success-soft text-success',
+  approximate: 'border-warning/40 bg-warning-soft text-warning',
+  incorrect: 'border-danger/40 bg-danger-soft text-danger',
+}
+
 export default function TypingExercise({ word, direction, onAnswer }: Props) {
   const [input, setInput] = useState('')
   const [result, setResult] = useState<AnswerResult | null>(null)
-  const inputRef = useRef<HTMLInputElement>(null)
   const lang = useLang()
   const t = getStrings(lang)
   const expected = directionAnswer(word, direction)
   const translateLabel = direction === 'FR_SV' ? t.translateToSwedish : t.translateToFrench
 
-  const resultConfig = {
-    correct: { bg: 'bg-green-900 border-green-600', text: 'text-green-300', label: t.resultCorrect },
-    approximate: { bg: 'bg-yellow-900 border-yellow-600', text: 'text-yellow-300', label: t.resultAlmost },
-    incorrect: { bg: 'bg-red-900 border-red-600', text: 'text-red-300', label: t.resultIncorrect },
+  const resultLabel: Record<AnswerResult, string> = {
+    correct: t.resultCorrect,
+    approximate: t.resultAlmost,
+    incorrect: t.resultIncorrect,
   }
 
   const handleSubmit = () => {
@@ -43,22 +58,21 @@ export default function TypingExercise({ word, direction, onAnswer }: Props) {
   }
 
   return (
-    <div className="space-y-6">
-      <div className="bg-slate-900 rounded-3xl p-8 text-center">
-        <p className="text-3xl font-bold">{directionPrompt(word, direction)}</p>
-        <p className="text-slate-500 text-sm mt-2">{translateLabel}</p>
-      </div>
+    <div className="space-y-4">
+      <Card className="py-8 text-center">
+        <p className="text-hero-word">{directionPrompt(word, direction)}</p>
+        <p className="mt-2 text-xs text-muted-foreground">{translateLabel}</p>
+      </Card>
 
       <div className="space-y-3">
-        <input
-          ref={inputRef}
+        <TextField
           value={input}
           onChange={e => setInput(e.target.value)}
           onKeyDown={e => e.key === 'Enter' && handleSubmit()}
           disabled={!!result}
           placeholder={t.yourAnswer}
           autoFocus
-          className="w-full bg-slate-900 border border-slate-700 rounded-2xl px-4 py-4 text-lg outline-none focus:border-blue-500 transition-colors disabled:opacity-60"
+          state={result === 'incorrect' ? 'error' : result ? 'success' : 'idle'}
         />
 
         <AnimatePresence>
@@ -66,13 +80,17 @@ export default function TypingExercise({ word, direction, onAnswer }: Props) {
             <motion.div
               initial={{ opacity: 0, y: -8 }}
               animate={{ opacity: 1, y: 0 }}
-              className={`border rounded-xl p-3 ${resultConfig[result].bg}`}
+              className={cn('animate-pop rounded-xl border p-3', FEEDBACK_CLASS[result])}
             >
-              <p className={`font-semibold ${resultConfig[result].text}`}>
-                {resultConfig[result].label}
+              <p className="flex items-center gap-2 text-sm font-semibold">
+                {(() => {
+                  const Icon = FEEDBACK_ICON[result]
+                  return <Icon size={16} />
+                })()}
+                {resultLabel[result]}
               </p>
               {result !== 'correct' && (
-                <p className="text-slate-300 text-sm mt-1">
+                <p className="mt-1 text-xs text-foreground/80">
                   {t.expectedAnswer} <span className="font-medium">{expected}</span>
                 </p>
               )}
@@ -81,13 +99,9 @@ export default function TypingExercise({ word, direction, onAnswer }: Props) {
         </AnimatePresence>
 
         {!result && (
-          <button
-            onClick={handleSubmit}
-            disabled={!input.trim()}
-            className="w-full py-4 rounded-2xl bg-blue-600 hover:bg-blue-500 disabled:opacity-40 disabled:cursor-not-allowed font-semibold text-lg active:scale-95 transition-all cursor-pointer"
-          >
+          <Button size="lg" className="w-full" disabled={!input.trim()} onClick={handleSubmit}>
             {t.submit}
-          </button>
+          </Button>
         )}
       </div>
     </div>

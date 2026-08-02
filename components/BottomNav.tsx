@@ -2,41 +2,58 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
+import { Home, Dumbbell, Layers, BarChart3, Trophy, User } from 'lucide-react'
 import { getStrings } from '@/lib/i18n'
 import { useLang } from '@/components/LangProvider'
+import { cn } from '@/lib/utils'
 
 export default function BottomNav() {
   const pathname = usePathname()
   const t = getStrings(useLang())
 
   const navItems = [
-    { href: '/dashboard', label: t.navHome, icon: '🏠' },
-    { href: '/study', label: t.navStudy, icon: '📖' },
-    { href: '/words', label: t.navWords, icon: '📚' },
-    { href: '/stats', label: t.navStats, icon: '📊' },
-    { href: '/leaderboard', label: t.navLeaderboard, icon: '🏆' },
-    { href: '/profile', label: t.navProfile, icon: '👤' },
+    { href: '/dashboard', label: t.navHome, icon: Home },
+    { href: '/study', label: t.navStudy, icon: Dumbbell },
+    { href: '/words', label: t.navWords, icon: Layers },
+    { href: '/stats', label: t.navStats, icon: BarChart3 },
+    { href: '/leaderboard', label: t.navLeaderboard, icon: Trophy },
+    { href: '/profile', label: t.navProfile, icon: User },
   ]
 
   return (
-    <nav className="fixed bottom-0 left-0 right-0 z-50 bg-slate-900 border-t border-slate-800 safe-area-pb">
-      <div className="flex">
-        {navItems.map(item => {
-          const active = pathname.startsWith(item.href)
+    <nav
+      aria-label={t.navHome}
+      className="safe-bottom fixed inset-x-0 bottom-0 z-50 border-t border-border bg-background/85 pt-1.5 backdrop-blur-xl"
+    >
+      <ul className="mx-auto grid max-w-[430px] grid-cols-6 px-1">
+        {navItems.map(({ href, label, icon: Icon }) => {
+          const active = pathname.startsWith(href)
           return (
-            <Link
-              key={item.href}
-              href={item.href}
-              className={`flex-1 flex flex-col items-center gap-1 py-3 text-xs transition-colors cursor-pointer ${
-                active ? 'text-blue-400' : 'text-slate-500 hover:text-slate-300'
-              }`}
-            >
-              <span className="text-xl leading-none">{item.icon}</span>
-              <span>{item.label}</span>
-            </Link>
+            <li key={href} className="min-w-0">
+              <Link
+                href={href}
+                aria-current={active ? 'page' : undefined}
+                className={cn(
+                  'pressable flex flex-col items-center gap-1 rounded-xl px-0.5 py-1.5',
+                  active ? 'text-primary' : 'text-muted-foreground',
+                )}
+              >
+                <span
+                  className={cn(
+                    'flex h-7 w-11 items-center justify-center rounded-full transition-colors',
+                    active && 'bg-info-soft',
+                  )}
+                >
+                  <Icon size={19} strokeWidth={active ? 2.4 : 1.8} />
+                </span>
+                <span className="w-full truncate text-center text-[10px] font-medium tracking-tight">
+                  {label}
+                </span>
+              </Link>
+            </li>
           )
         })}
-      </div>
+      </ul>
     </nav>
   )
 }

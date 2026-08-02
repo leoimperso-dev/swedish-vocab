@@ -2,8 +2,13 @@
 
 import { useEffect, useState } from 'react'
 import Image from 'next/image'
+import { Flame, Trophy, Zap } from 'lucide-react'
 import { getStrings } from '@/lib/i18n'
 import { useLang } from '@/components/LangProvider'
+import { cn } from '@/lib/utils'
+import { AppShell } from '@/components/AppShell'
+import { Card, Segmented } from '@/components/ui/primitives'
+import { EmptyState, ListSkeleton } from '@/components/ui/feedback'
 
 interface RankedUser {
   rank: number
@@ -19,6 +24,8 @@ interface RankedUser {
 }
 
 type Period = 'week' | 'all'
+
+const PODIUM_HEIGHTS = ['h-16', 'h-24', 'h-12']
 
 export default function LeaderboardPage() {
   const [users, setUsers] = useState<RankedUser[]>([])
@@ -37,91 +44,96 @@ export default function LeaderboardPage() {
   const showPodium = users.length >= 3
   const top3 = showPodium ? users.slice(0, 3) : []
   const rest = showPodium ? users.slice(3) : users
+  const podiumOrder = showPodium ? [top3[1], top3[0], top3[2]] : []
 
   return (
-    <main className="px-4 pt-12 pb-6 max-w-lg mx-auto space-y-6">
-      <h1 className="text-2xl font-bold">{t.leaderboardTitle}</h1>
+    <AppShell title={t.leaderboardTitle} subtitle={period === 'week' ? t.thisWeek : t.allTime}>
+      <div className="space-y-4">
+        <Segmented
+          value={period}
+          onChange={v => setPeriod(v as Period)}
+          options={[
+            { value: 'week', label: t.thisWeek },
+            { value: 'all', label: t.allTime },
+          ]}
+        />
+        {period === 'week' && (
+          <p className="-mt-2 text-xs text-muted-foreground">{t.weeklyReset}</p>
+        )}
 
-      {/* Period tabs */}
-      <div className="flex bg-slate-900 rounded-2xl p-1">
-        <PeriodTab label={t.thisWeek} active={period === 'week'} onClick={() => setPeriod('week')} />
-        <PeriodTab label={t.allTime} active={period === 'all'} onClick={() => setPeriod('all')} />
-      </div>
-      {period === 'week' && (
-        <p className="text-slate-500 text-xs -mt-3">{t.weeklyReset}</p>
-      )}
+        {loading ? (
+          <ListSkeleton rows={6} />
+        ) : (
+          <>
+            {showPodium && (
+              <Card className="pt-5">
+                <div className="grid grid-cols-3 items-end gap-2">
+                  {podiumOrder.map((user, i) => (
+                    <PodiumSlot key={user.id} user={user} height={PODIUM_HEIGHTS[i]} size={i === 1 ? 52 : 42} />
+                  ))}
+                </div>
+              </Card>
+            )}
 
-      {loading ? (
-        <div className="py-16 text-center text-slate-400">{t.loading}</div>
-      ) : (
-        <>
-
-      {/* Podium */}
-      {top3.length >= 3 && (
-        <div className="flex items-end justify-center gap-3 py-4">
-          <PodiumSlot user={top3[1]} height="h-20" medal="🥈" />
-          <PodiumSlot user={top3[0]} height="h-28" medal="🥇" />
-          <PodiumSlot user={top3[2]} height="h-16" medal="🥉" />
-        </div>
-      )}
-
-      {/* List */}
-      <div className="space-y-2">
-        {rest.map(user => (
-          <div
-            key={user.id}
-            className={`flex items-center gap-3 p-3 rounded-2xl ${
-              user.isCurrentUser ? 'bg-blue-950 border border-blue-700' : 'bg-slate-900'
-            }`}
-          >
-            <span className="text-slate-500 w-6 text-sm text-center">{user.rank}</span>
-            <Avatar user={user} size={36} />
-            <div className="flex-1 min-w-0">
-              <p className="font-medium truncate">
-                {user.name}{user.isCurrentUser && <span className="text-blue-400 text-xs ml-2">{t.you}</span>}
-              </p>
-              <p className="text-slate-500 text-xs">{user.levelTitle} · {user.wordsStudied} {t.words}</p>
+            <div className="space-y-2">
+              {rest.map(user => (
+                <Card
+                  key={user.id}
+                  className={cn(
+                    'flex items-center gap-3 p-3',
+                    user.isCurrentUser && 'border-primary/50 shadow-[var(--shadow-glow)]',
+                  )}
+                >
+                  <span className="w-6 shrink-0 text-center text-sm font-semibold tabular-nums text-muted-foreground">
+                    {user.rank}
+                  </span>
+                  <Avatar user={user} size={36} />
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-sm font-semibold">
+                      {user.name}
+                      {user.isCurrentUser ? (
+                        <span className="ml-1.5 text-xs font-medium text-primary">{t.you}</span>
+                      ) : null}
+                    </p>
+                    <p className="truncate text-xs text-muted-foreground">
+                      {user.levelTitle} · {user.wordsStudied} {t.words}
+                    </p>
+                  </div>
+                  {user.streak > 0 ? (
+                    <span className="flex shrink-0 items-center gap-1 text-xs font-semibold tabular-nums text-streak">
+                      <Flame size={13} /> {user.streak}
+                    </span>
+                  ) : null}
+                  <span className="flex shrink-0 items-center gap-1 text-xs font-semibold tabular-nums text-warning">
+                    <Zap size={13} /> {user.xp}
+                  </span>
+                </Card>
+              ))}
             </div>
-            <div className="text-right">
-              <p className="font-bold text-blue-400">{user.xp} XP</p>
-              {user.streak > 0 && <p className="text-orange-400 text-xs">🔥 {user.streak}</p>}
-            </div>
-          </div>
-        ))}
-      </div>
 
-      {users.length === 0 && (
-        <div className="text-center py-12 text-slate-500">
-          {t.beFirst}
-        </div>
-      )}
-        </>
-      )}
-    </main>
+            {users.length === 0 && (
+              <EmptyState icon={<Trophy size={22} className="text-accent" />} title={t.beFirst} />
+            )}
+          </>
+        )}
+      </div>
+    </AppShell>
   )
 }
 
-function PeriodTab({ label, active, onClick }: { label: string; active: boolean; onClick: () => void }) {
+function PodiumSlot({ user, height, size }: { user: RankedUser; height: string; size: number }) {
   return (
-    <button
-      onClick={onClick}
-      className={`flex-1 py-2 rounded-xl text-sm font-semibold transition-all cursor-pointer ${
-        active ? 'bg-blue-600 text-white' : 'text-slate-400 hover:text-slate-200'
-      }`}
-    >
-      {label}
-    </button>
-  )
-}
-
-function PodiumSlot({ user, height, medal }: { user: RankedUser; height: string; medal: string }) {
-  return (
-    <div className="flex flex-col items-center gap-2">
-      <span className="text-2xl">{medal}</span>
-      <Avatar user={user} size={48} />
-      <p className="text-xs text-center max-w-16 truncate">{user.name}</p>
-      <div className={`w-16 ${height} bg-slate-800 rounded-t-lg flex items-center justify-center`}>
-        <span className="text-xs text-slate-400 font-bold">{user.xp}</span>
+    <div className="flex min-w-0 flex-col items-center gap-2">
+      <Avatar user={user} size={size} />
+      <p className="w-full truncate text-center text-xs font-semibold">{user.name}</p>
+      <div
+        className={cn(
+          'flex w-full flex-col items-center justify-center gap-0.5 rounded-t-xl border border-b-0 border-border bg-surface-raised',
+          height,
+        )}
+      >
+        <span className="font-display text-lg font-semibold text-accent">{user.rank}</span>
+        <span className="text-[10px] tabular-nums text-muted-foreground">{user.xp} XP</span>
       </div>
     </div>
   )
@@ -135,16 +147,17 @@ function Avatar({ user, size }: { user: RankedUser; size: number }) {
         alt={user.name ?? ''}
         width={size}
         height={size}
-        className="rounded-full"
+        className="shrink-0 rounded-full object-cover"
+        style={{ width: size, height: size }}
       />
     )
   }
   return (
-    <div
-      className="rounded-full bg-slate-700 flex items-center justify-center text-sm font-bold"
+    <span
       style={{ width: size, height: size }}
+      className="grid shrink-0 place-items-center rounded-full bg-gradient-nordic font-display text-sm font-semibold text-primary-foreground"
     >
       {user.name?.[0]?.toUpperCase() ?? '?'}
-    </div>
+    </span>
   )
 }

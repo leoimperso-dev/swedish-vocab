@@ -3,8 +3,12 @@ import { db } from '@/lib/db'
 import { getLevelForXp, getNextLevel, xpToNextLevel } from '@/lib/xp'
 import { toLocalDateString } from '@/lib/streak'
 import { asLang, getStrings } from '@/lib/i18n'
-import { toggleLanguage } from '../actions'
+import { cn } from '@/lib/utils'
+import { AppShell } from '@/components/AppShell'
+import { Card, CardTitle, Chip, ProgressBar, SectionLabel } from '@/components/ui/primitives'
+import { buttonClasses } from '@/components/ui/button'
 import Link from 'next/link'
+import { Flame, Snowflake, Zap, Target, CheckCircle2, BookOpen, Trophy, ArrowRight } from 'lucide-react'
 
 export default async function DashboardPage() {
   const session = await auth()
@@ -41,113 +45,114 @@ export default async function DashboardPage() {
     .filter(s => toLocalDateString(s.startedAt, user.timezone) === today)
     .reduce((sum, s) => sum + s.xpGained, 0)
   const goalReached = xpToday >= user.dailyGoalXp
+  const goalProgress = Math.min((xpToday / user.dailyGoalXp) * 100, 100)
+
+  const stats = [
+    { label: t.toReview, value: dueCount, icon: Target, tone: 'text-info' },
+    { label: t.masteredWords, value: masteredCount, icon: CheckCircle2, tone: 'text-success' },
+    { label: t.totalXp, value: user.xp, icon: Zap, tone: 'text-warning' },
+    { label: t.bestStreak, value: user.streakBest, icon: Trophy, tone: 'text-streak' },
+  ]
 
   return (
-    <main className="px-4 pt-12 pb-6 max-w-lg mx-auto space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <p className="text-slate-400 text-sm">{t.hello}</p>
-          <h1 className="text-2xl font-bold">{user.name?.split(' ')[0]}</h1>
-        </div>
-        <div className="flex items-center gap-3">
-          <form action={toggleLanguage}>
-            <button
-              type="submit"
-              title={t.switchMode}
-              className="text-3xl cursor-pointer hover:scale-110 active:scale-95 transition-transform leading-none"
-            >
-              {lang === 'fr' ? '🇸🇪' : '🇫🇷'}
-            </button>
-          </form>
-          <div className="text-right">
-            <div className="text-2xl font-bold text-orange-400">🔥 {user.streakCurrent}</div>
-            <p className="text-slate-500 text-xs">
-              {t.streakDays}{user.freezeCount > 0 && <span className="text-cyan-400 ml-1">🧊×{user.freezeCount}</span>}
-            </p>
+    <AppShell
+      title={`${t.hello} ${user.name?.split(' ')[0]}`}
+      subtitle={t.dashboardSubtitle}
+    >
+      <div className="space-y-4">
+        {/* Objectif du jour */}
+        <Card className={goalReached ? 'border-success/30 bg-success-soft' : undefined}>
+          <div className="flex items-start justify-between gap-3">
+            <div className="min-w-0">
+              <SectionLabel className={goalReached ? 'text-success' : undefined}>
+                {t.dailyGoal}
+              </SectionLabel>
+              <p className="mt-1 font-display text-2xl font-semibold tabular-nums">
+                {xpToday}
+                <span className="text-muted-foreground">/{user.dailyGoalXp} XP</span>
+              </p>
+            </div>
+            {goalReached ? (
+              <Chip tone="success">
+                <CheckCircle2 size={13} /> {t.goalReached}
+              </Chip>
+            ) : null}
           </div>
+          <ProgressBar value={goalProgress} tone="success" className="mt-3" />
+        </Card>
+
+        {/* Niveau */}
+        <Card>
+          <div className="flex items-baseline justify-between gap-3">
+            <div className="min-w-0">
+              <CardTitle className="font-display text-lg">{level.title}</CardTitle>
+              <p className="text-xs text-muted-foreground">
+                {t.level} {level.level}
+              </p>
+            </div>
+            <span className="shrink-0 text-xs font-semibold tabular-nums text-warning">
+              {user.xp} XP
+            </span>
+          </div>
+          <ProgressBar value={Math.min(progress * 100, 100)} tone="xp" className="mt-3" />
+          {nextLevel ? (
+            <p className="mt-2 text-xs text-muted-foreground">
+              {t.xpBeforeLevel(needed - current, nextLevel.title)}
+            </p>
+          ) : null}
+        </Card>
+
+        {/* Stats */}
+        <div className="grid grid-cols-2 gap-3">
+          {stats.map(s => (
+            <Card key={s.label} className="p-3.5">
+              <s.icon size={16} className={s.tone} />
+              <p className="mt-2 font-display text-2xl font-semibold tabular-nums">{s.value}</p>
+              <p className="truncate text-xs text-muted-foreground">{s.label}</p>
+            </Card>
+          ))}
         </div>
+
+        {/* CTA */}
+        <Link href="/study" className={buttonClasses({ size: 'lg', className: 'w-full' })}>
+          {dueCount > 0 ? t.studyDue(dueCount) : t.studyNew} <ArrowRight size={18} />
+        </Link>
+
+        <Link
+          href="/study"
+          className={buttonClasses({ variant: 'secondary', size: 'lg', className: 'w-full' })}
+        >
+          <BookOpen size={18} /> {t.chooseExercise}
+        </Link>
+
+        {/* Activité récente */}
+        <Card>
+          <div className="flex items-center justify-between gap-2">
+            <CardTitle>{t.recentActivity}</CardTitle>
+            <div className="flex items-center gap-1.5">
+              <Chip tone="streak">
+                <Flame size={13} /> {user.streakCurrent}
+              </Chip>
+              {user.freezeCount > 0 ? (
+                <Chip tone="freeze">
+                  <Snowflake size={13} /> ×{user.freezeCount}
+                </Chip>
+              ) : null}
+            </div>
+          </div>
+          <div className="mt-3 grid grid-cols-10 gap-1.5">
+            {Array.from({ length: 30 }).map((_, i) => (
+              <span
+                key={i}
+                className={cn(
+                  'aspect-square rounded-md',
+                  i < user.streakCurrent ? 'bg-success' : 'bg-muted',
+                )}
+              />
+            ))}
+          </div>
+        </Card>
       </div>
-
-      {/* Daily goal */}
-      <div className={`rounded-2xl p-4 space-y-3 ${goalReached ? 'bg-green-950 border border-green-800' : 'bg-slate-900'}`}>
-        <div className="flex items-center justify-between">
-          <span className="font-semibold">{goalReached ? t.goalReached : t.dailyGoal}</span>
-          <span className={`text-sm ${goalReached ? 'text-green-400' : 'text-slate-400'}`}>
-            {xpToday} / {user.dailyGoalXp} XP
-          </span>
-        </div>
-        <div className="h-2 bg-slate-800 rounded-full overflow-hidden">
-          <div
-            className={`h-full rounded-full transition-all duration-500 ${goalReached ? 'bg-green-500' : 'bg-yellow-500'}`}
-            style={{ width: `${Math.min((xpToday / user.dailyGoalXp) * 100, 100)}%` }}
-          />
-        </div>
-      </div>
-
-      {/* Level + XP */}
-      <div className="bg-slate-900 rounded-2xl p-4 space-y-3">
-        <div className="flex items-center justify-between">
-          <span className="font-semibold">{level.title}</span>
-          <span className="text-slate-400 text-sm">{t.level} {level.level}</span>
-        </div>
-        <div className="h-2 bg-slate-800 rounded-full overflow-hidden">
-          <div
-            className="h-full bg-blue-500 rounded-full transition-all duration-500"
-            style={{ width: `${Math.min(progress * 100, 100)}%` }}
-          />
-        </div>
-        <p className="text-slate-500 text-xs">
-          {current} / {needed || '∞'} XP
-          {nextLevel && (
-            <span className="text-blue-400 ml-2">{t.xpBeforeLevel(needed - current, nextLevel.title)}</span>
-          )}
-        </p>
-      </div>
-
-      {/* Quick stats */}
-      <div className="grid grid-cols-2 gap-3">
-        <StatCard label={t.toReview} value={dueCount} color="text-yellow-400" />
-        <StatCard label={t.masteredWords} value={masteredCount} color="text-green-400" />
-        <StatCard label={t.totalXp} value={user.xp} color="text-blue-400" />
-        <StatCard label={t.bestStreak} value={user.streakBest} color="text-orange-400" />
-      </div>
-
-      {/* CTA */}
-      <Link
-        href="/study"
-        className="block w-full text-center bg-blue-600 hover:bg-blue-500 active:scale-95 transition-all rounded-2xl py-5 text-lg font-bold cursor-pointer"
-      >
-        {dueCount > 0 ? t.studyDue(dueCount) : t.studyNew}
-      </Link>
-
-      {/* Streak calendar placeholder */}
-      <div className="bg-slate-900 rounded-2xl p-4">
-        <h2 className="font-semibold mb-3 text-slate-300">{t.recentActivity}</h2>
-        <StreakDots streak={user.streakCurrent} />
-      </div>
-    </main>
-  )
-}
-
-function StatCard({ label, value, color }: { label: string; value: number; color: string }) {
-  return (
-    <div className="bg-slate-900 rounded-2xl p-3 text-center">
-      <div className={`text-2xl font-bold ${color}`}>{value}</div>
-      <div className="text-slate-500 text-xs mt-1">{label}</div>
-    </div>
-  )
-}
-
-function StreakDots({ streak }: { streak: number }) {
-  return (
-    <div className="flex gap-1 flex-wrap">
-      {Array.from({ length: 30 }).map((_, i) => (
-        <div
-          key={i}
-          className={`w-6 h-6 rounded-md ${i < streak ? 'bg-orange-500' : 'bg-slate-800'}`}
-        />
-      ))}
-    </div>
+    </AppShell>
   )
 }

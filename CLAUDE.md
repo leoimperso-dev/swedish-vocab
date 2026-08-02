@@ -3,10 +3,19 @@
 Next.js app for learning Swedish vocabulary with spaced repetition.
 
 ## Stack
-- Next.js 16 App Router, TypeScript, Tailwind CSS
+- Next.js 16 App Router, TypeScript, Tailwind CSS v4
 - Auth: NextAuth v5 (beta) + Google OAuth
 - DB: PostgreSQL via Supabase + Prisma ORM (**pinned to v6** — v7 dropped `url` in schema datasource and requires driver adapters; do not upgrade without migrating the config)
-- Animations: Framer Motion
+- Animations: Framer Motion (exercises) + CSS keyframes (`animate-rise/pop/shake`)
+
+## Design system
+Dark-only, mobile-first (max-w-[430px]), ported from the svensk-spark Lovable design.
+- Tokens: oklch semantic vars in `app/globals.css` (`@theme inline`) — use `bg-surface`, `text-muted-foreground`, `text-success/warning/danger/streak/freeze/info/accent`, `*-soft` backgrounds; never raw palette classes (slate-*, blue-*)
+- Utilities: `card-surface`, `pressable` (cursor + active scale), `text-hero-word`, `bg-gradient-nordic`, `bg-gradient-xp`, `safe-top/bottom`
+- Fonts: Inter (`font-sans`) + Space Grotesk (`font-display` — headings, big numbers) via next/font
+- Primitives: `components/ui/` (Card, Chip, ProgressBar, Segmented, TextField, Button + `buttonClasses()` for Links — no cva/radix)
+- `components/AppShell.tsx`: sticky page header (title + flag toggle + streak/freeze/XP chips fed by `StatsProvider` from the (app) layout). Used by all pages except session/login/results.
+- Icons: lucide-react (no emojis in UI chrome; emojis stay in content data)
 
 ## Key files
 - `lib/sm2.ts` — SM-2 spaced repetition algorithm

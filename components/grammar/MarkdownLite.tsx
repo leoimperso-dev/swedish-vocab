@@ -4,7 +4,7 @@ import type { ReactNode } from 'react'
 
 function renderBold(text: string, keyPrefix: string): ReactNode[] {
   return text.split(/\*\*(.+?)\*\*/g).map((part, i) =>
-    i % 2 === 1 ? <strong key={`${keyPrefix}-${i}`} className="text-white font-semibold">{part}</strong> : part
+    i % 2 === 1 ? <strong key={`${keyPrefix}-${i}`} className="font-semibold text-foreground">{part}</strong> : part
   )
 }
 
@@ -18,7 +18,7 @@ export default function MarkdownLite({ body }: { body: string }) {
   const flush = (key: number) => {
     if (paragraph.length > 0) {
       blocks.push(
-        <p key={`p-${key}`} className="text-slate-300 leading-relaxed">
+        <p key={`p-${key}`} className="text-sm leading-relaxed text-muted-foreground">
           {renderBold(paragraph.join(' '), `p-${key}`)}
         </p>
       )
@@ -28,8 +28,8 @@ export default function MarkdownLite({ body }: { body: string }) {
       blocks.push(
         <ul key={`ul-${key}`} className="space-y-1.5 pl-1">
           {bullets.map((b, i) => (
-            <li key={i} className="text-slate-300 leading-relaxed flex gap-2">
-              <span className="text-blue-400 shrink-0">•</span>
+            <li key={i} className="flex gap-2 text-sm leading-relaxed text-muted-foreground">
+              <span className="shrink-0 text-primary">•</span>
               <span>{renderBold(b, `b-${key}-${i}`)}</span>
             </li>
           ))}
@@ -39,13 +39,16 @@ export default function MarkdownLite({ body }: { body: string }) {
     }
     if (examples.length > 0) {
       blocks.push(
-        <div key={`ex-${key}`} className="border-l-2 border-blue-600 bg-slate-900 rounded-r-xl px-4 py-3 space-y-1.5">
+        <div
+          key={`ex-${key}`}
+          className="space-y-1.5 rounded-r-xl border-l-2 border-primary bg-surface-raised px-4 py-3"
+        >
           {examples.map((ex, i) => {
             const [sv, fr] = ex.split(/\s+—\s+/)
             return (
               <p key={i} className="text-sm">
-                <span className="text-white font-medium">{sv}</span>
-                {fr && <span className="text-slate-400"> — {fr}</span>}
+                <span className="font-medium text-foreground">{sv}</span>
+                {fr && <span className="text-muted-foreground"> — {fr}</span>}
               </p>
             )
           })}
@@ -60,7 +63,7 @@ export default function MarkdownLite({ body }: { body: string }) {
     if (line.startsWith('## ')) {
       flush(index)
       blocks.push(
-        <h2 key={`h-${index}`} className="text-lg font-bold text-white pt-3">
+        <h2 key={`h-${index}`} className="pt-3 font-display text-lg font-semibold tracking-tight text-foreground">
           {line.slice(3)}
         </h2>
       )

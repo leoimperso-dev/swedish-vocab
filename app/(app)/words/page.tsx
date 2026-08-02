@@ -1,10 +1,16 @@
 'use client'
 
 import { useEffect, useMemo, useState } from 'react'
+import { ChevronDown, MessageSquare, Star } from 'lucide-react'
 import { formatForms, parseDetails } from '@/lib/word-display'
 import { MAX_KNOWLEDGE_LEVEL } from '@/lib/sm2'
 import { getStrings, type Lang } from '@/lib/i18n'
 import { useLang } from '@/components/LangProvider'
+import { cn } from '@/lib/utils'
+import { AppShell } from '@/components/AppShell'
+import { LevelDots, Segmented, SectionLabel } from '@/components/ui/primitives'
+import { Button } from '@/components/ui/button'
+import { EmptyState, ListSkeleton } from '@/components/ui/feedback'
 
 const TOP_LIST_SIZE = 3000
 const PAGE_STEP = 300
@@ -115,99 +121,81 @@ export default function WordsPage() {
     })
   }
 
-  if (loading) {
-    return (
-      <main className="min-h-dvh flex items-center justify-center">
-        <p className="text-slate-400">{t.loading}</p>
-      </main>
-    )
-  }
+  const tabOptions = [
+    { value: 'categories', label: t.tabCategories },
+    { value: 'top', label: t.tabTop },
+    { value: 'favorites', label: t.tabFavorites },
+  ]
 
   return (
-    <main className="px-4 pt-12 pb-6 max-w-lg mx-auto space-y-4">
-      <div>
-        <h1 className="text-2xl font-bold">{t.vocabularyTitle}</h1>
-        <p className="text-slate-400 text-sm mt-1">
-          {t.wordsAndCategories(words.length, groups.length)}
-        </p>
-      </div>
+    <AppShell
+      title={t.vocabularyTitle}
+      subtitle={loading ? undefined : t.wordsAndCategories(words.length, groups.length)}
+    >
+      <div className="space-y-4">
+        <Segmented options={tabOptions} value={tab} onChange={v => setTab(v as Tab)} />
 
-      {/* Tabs */}
-      <div className="flex bg-slate-900 rounded-2xl p-1">
-        <TabBtn label={t.tabCategories} active={tab === 'categories'} onClick={() => setTab('categories')} />
-        <TabBtn label={t.tabTop} active={tab === 'top'} onClick={() => setTab('top')} />
-        <TabBtn label={t.tabFavorites} active={tab === 'favorites'} onClick={() => setTab('favorites')} />
-      </div>
-
-      {tab === 'categories' && (
-        <div className="space-y-2">
-          {groups.map(([label, groupWords]) => {
-            const open = openCategories.has(label)
-            return (
-              <div key={label} className="bg-slate-900 rounded-2xl overflow-hidden">
-                <button
-                  onClick={() => toggleCategory(label)}
-                  className="w-full flex items-center justify-between px-4 py-3 cursor-pointer"
-                >
-                  <span className="font-semibold capitalize">{label.toLowerCase()}</span>
-                  <span className="text-slate-500 text-sm">{groupWords.length} {open ? '▾' : '▸'}</span>
-                </button>
-                {open && (
-                  <div className="px-4 pb-3 divide-y divide-slate-800">
-                    {groupWords.map(word => (
-                      <WordRow key={word.id} word={word} lang={lang} onToggleFavorite={toggleFavorite} />
-                    ))}
-                  </div>
-                )}
-              </div>
-            )
-          })}
-        </div>
-      )}
-
-      {tab === 'top' && (
-        <div className="space-y-2">
-          <div className="bg-slate-900 rounded-2xl px-4 divide-y divide-slate-800">
+        {loading ? (
+          <ListSkeleton rows={5} />
+        ) : tab === 'categories' ? (
+          <div className="space-y-2">
+            {groups.map(([label, groupWords]) => {
+              const open = openCategories.has(label)
+              return (
+                <div key={label} className="card-surface overflow-hidden">
+                  <button
+                    onClick={() => toggleCategory(label)}
+                    aria-expanded={open}
+                    className="pressable flex w-full items-center gap-3 px-4 py-3.5 text-left"
+                  >
+                    <span className="min-w-0 flex-1 truncate font-display text-[15px] font-semibold capitalize">
+                      {label.toLowerCase()}
+                    </span>
+                    <span className="shrink-0 rounded-full bg-surface-raised px-2 py-0.5 text-[11px] font-semibold tabular-nums text-muted-foreground">
+                      {groupWords.length}
+                    </span>
+                    <ChevronDown
+                      size={17}
+                      className={cn(
+                        'shrink-0 text-muted-foreground transition-transform duration-200',
+                        open && 'rotate-180',
+                      )}
+                    />
+                  </button>
+                  {open ? (
+                    <div className="animate-rise space-y-2 border-t border-border bg-background/40 p-2">
+                      {groupWords.map(word => (
+                        <WordRow key={word.id} word={word} lang={lang} onToggleFavorite={toggleFavorite} />
+                      ))}
+                    </div>
+                  ) : null}
+                </div>
+              )
+            })}
+          </div>
+        ) : tab === 'top' ? (
+          <div className="space-y-2">
+            <SectionLabel>{t.topWordsHint}</SectionLabel>
             {topWords.slice(0, topVisible).map(word => (
               <WordRow key={word.id} word={word} lang={lang} onToggleFavorite={toggleFavorite} showRank />
             ))}
+            {topVisible < topWords.length ? (
+              <Button variant="secondary" className="w-full" onClick={() => setTopVisible(v => v + PAGE_STEP)}>
+                {t.showMore} ({topVisible} / {topWords.length})
+              </Button>
+            ) : null}
           </div>
-          {topVisible < topWords.length && (
-            <button
-              onClick={() => setTopVisible(v => v + PAGE_STEP)}
-              className="w-full py-3 rounded-2xl bg-slate-900 hover:bg-slate-800 text-slate-300 font-semibold cursor-pointer active:scale-98 transition-all"
-            >
-              {t.showMore} ({topVisible} / {topWords.length})
-            </button>
-          )}
-        </div>
-      )}
-
-      {tab === 'favorites' && (
-        favoriteWords.length > 0 ? (
-          <div className="bg-slate-900 rounded-2xl px-4 divide-y divide-slate-800">
+        ) : favoriteWords.length > 0 ? (
+          <div className="space-y-2">
             {favoriteWords.map(word => (
               <WordRow key={word.id} word={word} lang={lang} onToggleFavorite={toggleFavorite} />
             ))}
           </div>
         ) : (
-          <p className="text-center py-12 text-slate-500 text-sm">{t.noFavorites}</p>
-        )
-      )}
-    </main>
-  )
-}
-
-function TabBtn({ label, active, onClick }: { label: string; active: boolean; onClick: () => void }) {
-  return (
-    <button
-      onClick={onClick}
-      className={`flex-1 py-2 rounded-xl text-sm font-semibold transition-all cursor-pointer ${
-        active ? 'bg-blue-600 text-white' : 'text-slate-400 hover:text-slate-200'
-      }`}
-    >
-      {label}
-    </button>
+          <EmptyState icon={<Star size={22} className="text-accent" />} title={t.noFavorites} />
+        )}
+      </div>
+    </AppShell>
   )
 }
 
@@ -236,72 +224,77 @@ function WordRow({ word, lang, onToggleFavorite, showRank }: {
     }
   }
 
+  const translation = lang === 'fr' && details?.translations ? details.translations.join(', ') : word.french
+
   return (
-    <div className="py-1.5 text-sm">
-      <div className="flex items-baseline gap-2">
+    <div className="card-surface overflow-hidden">
+      <div className="flex items-start gap-2.5 p-3.5">
         <button
           onClick={() => onToggleFavorite(word.id)}
-          className={`cursor-pointer text-base leading-none ${word.favorite ? 'text-yellow-400' : 'text-slate-600 hover:text-slate-400'}`}
+          aria-label={word.favorite ? `Retirer ${word.swedish} des favoris` : `Ajouter ${word.swedish} aux favoris`}
+          aria-pressed={word.favorite}
+          className="pressable mt-0.5 shrink-0 rounded-lg p-1"
         >
-          {word.favorite ? '★' : '☆'}
+          <Star size={17} className={word.favorite ? 'fill-accent text-accent' : 'text-muted-foreground'} />
         </button>
-        {showRank && word.frequencyRank !== null && (
-          <span className="text-slate-600 text-xs w-9 shrink-0">#{word.frequencyRank}</span>
-        )}
-        <span className="flex-1 font-medium">
-          {word.swedish}
-          {forms && <span className="text-slate-500 font-normal text-xs"> ({forms})</span>}
-        </span>
-        <span className="flex-1 text-slate-400">
-          {lang === 'fr' && details?.translations ? details.translations.join(', ') : word.french}
-        </span>
+
+        <div className="min-w-0 flex-1">
+          <div className="flex items-baseline gap-2">
+            {showRank && word.frequencyRank !== null && (
+              <span className="shrink-0 text-[11px] font-semibold tabular-nums text-muted-foreground">
+                #{word.frequencyRank}
+              </span>
+            )}
+            <p className="min-w-0 truncate font-display text-[17px] font-semibold tracking-tight">
+              {word.swedish}
+            </p>
+          </div>
+          {forms && <p className="truncate text-xs text-muted-foreground/80">({forms})</p>}
+          <p className="mt-1 text-sm text-muted-foreground">{translation}</p>
+          {lang === 'fr' && details?.context && (
+            <p className="mt-1 text-xs italic text-muted-foreground">{details.context}</p>
+          )}
+          {details?.usage?.map(u => (
+            <p key={u.sv} className="mt-0.5 text-xs text-muted-foreground">
+              <span className="text-foreground/80">{u.sv}</span> — {u.fr}
+            </p>
+          ))}
+          <LevelDots level={word.level} total={MAX_KNOWLEDGE_LEVEL} className="mt-2" />
+        </div>
+
         {word.hasExamples && (
           <button
             onClick={toggleExamples}
-            className={`cursor-pointer text-xs leading-none self-center ${showExamples ? 'text-blue-400' : 'text-slate-600 hover:text-slate-400'}`}
+            aria-expanded={showExamples}
+            aria-label={`Exemples pour ${word.swedish}`}
+            className={cn(
+              'pressable mt-0.5 grid size-9 shrink-0 place-items-center rounded-xl border',
+              showExamples
+                ? 'border-primary/40 bg-info-soft text-primary'
+                : 'border-border bg-surface text-muted-foreground',
+            )}
           >
-            💬
+            <MessageSquare size={16} />
           </button>
         )}
-        <LevelDots level={word.level} />
       </div>
-      {lang === 'fr' && details?.context && (
-        <p className="text-slate-600 text-xs italic mt-0.5">{details.context}</p>
-      )}
-      {details?.usage?.map(u => (
-        <p key={u.sv} className="text-xs text-slate-500 mt-0.5">
-          <span className="text-slate-400">{u.sv}</span> — {u.fr}
-        </p>
-      ))}
+
       {showExamples && (
-        <div className="mt-1 mb-1 pl-3 border-l-2 border-slate-700 space-y-1">
+        <div className="animate-rise space-y-2.5 border-t border-border bg-surface/60 px-3.5 py-3">
           {examples === null ? (
-            <p className="text-xs text-slate-500">…</p>
+            <p className="text-xs text-muted-foreground">…</p>
           ) : examples.length === 0 ? (
-            <p className="text-xs text-slate-600">—</p>
+            <p className="text-xs text-muted-foreground">—</p>
           ) : (
             examples.map(ex => (
-              <div key={ex.sv} className="text-xs">
-                <p className="text-slate-300">{ex.sv}</p>
-                {ex.fr && <p className="text-slate-500 italic">{ex.fr}</p>}
+              <div key={ex.sv}>
+                <p className="text-sm leading-snug text-foreground">{ex.sv}</p>
+                {ex.fr && <p className="text-xs italic leading-snug text-muted-foreground">{ex.fr}</p>}
               </div>
             ))
           )}
         </div>
       )}
     </div>
-  )
-}
-
-function LevelDots({ level }: { level: number }) {
-  return (
-    <span className="flex gap-0.5 shrink-0 self-center" title={`${level} / ${MAX_KNOWLEDGE_LEVEL}`}>
-      {Array.from({ length: MAX_KNOWLEDGE_LEVEL }).map((_, i) => (
-        <span
-          key={i}
-          className={`w-1.5 h-1.5 rounded-full ${i < level ? 'bg-green-500' : 'bg-slate-700'}`}
-        />
-      ))}
-    </span>
   )
 }

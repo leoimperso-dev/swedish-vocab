@@ -1,9 +1,10 @@
 'use client'
 
 import { useState } from 'react'
-import { motion, AnimatePresence } from 'framer-motion'
 import { speak, unlock } from '@/lib/tts'
 import { evaluateVerbForms } from '@/lib/fuzzy'
+import { Card, TextField } from '@/components/ui/primitives'
+import { Button } from '@/components/ui/button'
 import type { Word } from '@prisma/client'
 import type { AnswerResult, VerbForms } from '@/types'
 
@@ -12,17 +13,14 @@ interface Props {
   onAnswer: (result: AnswerResult, type: string) => void
 }
 
+// CONJUGATION mode is fr-native only (see conjugationAvailable in study/page.tsx) — labels
+// are intentionally hardcoded French rather than pulled from lib/i18n.ts, matching the
+// pre-existing behavior of this file.
 const FIELD_LABELS = [
   { key: 'present' as const, label: 'Présent' },
   { key: 'preterit' as const, label: 'Prétérit' },
   { key: 'supine' as const, label: 'Supin' },
 ]
-
-const RESULT_COLORS = {
-  correct: 'border-green-600 bg-green-900/40',
-  approximate: 'border-yellow-600 bg-yellow-900/40',
-  incorrect: 'border-red-600 bg-red-900/40',
-}
 
 export default function ConjugationExercise({ word, onAnswer }: Props) {
   const [inputs, setInputs] = useState<Partial<VerbForms>>({})
@@ -52,54 +50,39 @@ export default function ConjugationExercise({ word, onAnswer }: Props) {
   }
 
   return (
-    <div className="space-y-5">
-      <div className="bg-slate-900 rounded-3xl p-6 text-center">
-        <p className="text-slate-500 text-sm mb-1">Infinitif</p>
-        <p className="text-3xl font-bold">{word.swedish}</p>
-        <p className="text-blue-300 mt-2">{word.french}</p>
-      </div>
+    <div className="space-y-4">
+      <Card className="py-6 text-center">
+        <p className="text-xs text-muted-foreground">Infinitif</p>
+        <p className="text-hero-word">{word.swedish}</p>
+        <p className="mt-2 text-sm text-primary">{word.french}</p>
+      </Card>
 
       <div className="space-y-3">
         {fields.map(({ key, label }) => {
           const res = evaluation?.[key]
           return (
-            <div key={key} className="space-y-1">
-              <label className="text-slate-400 text-sm">{label}</label>
-              <div className="relative">
-                <input
-                  value={inputs[key] ?? ''}
-                  onChange={e => setInputs(prev => ({ ...prev, [key]: e.target.value }))}
-                  onKeyDown={e => e.key === 'Enter' && handleSubmit()}
-                  disabled={!!evaluation}
-                  placeholder={`${label.toLowerCase()}...`}
-                  className={`w-full bg-slate-900 border rounded-xl px-4 py-3 outline-none transition-all disabled:opacity-70 ${
-                    res ? RESULT_COLORS[res] : 'border-slate-700 focus:border-blue-500'
-                  }`}
-                />
-              </div>
-              <AnimatePresence>
-                {evaluation && res !== 'correct' && (
-                  <motion.p
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    className="text-slate-400 text-xs pl-1"
-                  >
-                    → <span className="text-white font-medium">{forms[key]}</span>
-                  </motion.p>
-                )}
-              </AnimatePresence>
-            </div>
+            <TextField
+              key={key}
+              label={label}
+              placeholder="…"
+              value={inputs[key] ?? ''}
+              disabled={!!evaluation}
+              // TextField only supports success/error (no dedicated "approximate" tone) —
+              // non-correct results (incorrect or approximate) render as error
+              state={res ? (res === 'correct' ? 'success' : 'error') : 'idle'}
+              // i18n-missing: expectedForm ("Attendu :") — this component doesn't use lib/i18n.ts at all (fr-only)
+              hint={evaluation && res !== 'correct' ? `Attendu : ${forms[key]}` : undefined}
+              onKeyDown={e => e.key === 'Enter' && handleSubmit()}
+              onChange={e => setInputs(prev => ({ ...prev, [key]: e.target.value }))}
+            />
           )
         })}
       </div>
 
       {!evaluation && (
-        <button
-          onClick={handleSubmit}
-          className="w-full py-4 rounded-2xl bg-blue-600 hover:bg-blue-500 font-semibold text-lg active:scale-95 transition-all cursor-pointer"
-        >
+        <Button size="lg" className="w-full" onClick={handleSubmit}>
           Valider
-        </button>
+        </Button>
       )}
     </div>
   )

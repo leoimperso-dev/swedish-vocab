@@ -2,9 +2,12 @@
 
 import { useRef, useState } from 'react'
 import Link from 'next/link'
+import { Volume2 } from 'lucide-react'
 import { speak, unlock } from '@/lib/tts'
 import { getStrings } from '@/lib/i18n'
 import { useLang } from '@/components/LangProvider'
+import { AppShell } from '@/components/AppShell'
+import { Card } from '@/components/ui/primitives'
 import type { Story } from '@prisma/client'
 
 interface DictResult {
@@ -52,72 +55,84 @@ export default function StoryReader({ story }: { story: Story }) {
   }
 
   return (
-    <main className="px-4 pt-12 pb-6 max-w-lg mx-auto space-y-5" onClick={() => setActive(null)}>
-      <div>
-        <Link href="/reading" className="text-slate-400 text-sm cursor-pointer hover:text-slate-200">
+    <AppShell title={story.title} subtitle={story.titleFrench}>
+      {/* Closes the popover on any outside tap — mirrors the old <main onClick> behavior */}
+      <div onClick={() => setActive(null)}>
+        <Link
+          href="/reading"
+          className="pressable mb-3 inline-flex items-center gap-1.5 text-sm text-muted-foreground"
+        >
           {t.back}
         </Link>
-        <h1 className="text-2xl font-bold mt-1">{story.title}</h1>
-        <p className="text-slate-500 text-sm">{story.titleFrench}</p>
-      </div>
 
-      <p className="text-slate-600 text-xs">{t.tapAnyWord}</p>
-
-      <article className="space-y-4 text-lg leading-loose">
-        {paragraphs.map((paragraph, pIdx) => (
-          <p key={pIdx}>
-            {paragraph.split(/(\s+)/).map((token, tIdx) => {
-              if (/^\s*$/.test(token)) return token
-              const positionKey = `${pIdx}-${tIdx}`
-              const isActive = active === positionKey
-              return (
-                <span key={positionKey} className="relative inline-block">
-                  <button
-                    onClick={e => { e.stopPropagation(); handleWordTap(positionKey, token) }}
-                    className={`cursor-pointer rounded px-0.5 transition-colors ${
-                      isActive ? 'bg-blue-600 text-white' : 'hover:bg-slate-800'
-                    }`}
-                  >
-                    {token}
-                  </button>
-                  {isActive && (
-                    <span
-                      onClick={e => e.stopPropagation()}
-                      className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1.5 z-20 block w-max max-w-[75vw] bg-slate-800 border border-slate-600 rounded-xl px-3 py-2 text-sm shadow-xl shadow-black/40"
-                    >
-                      {!entry ? (
-                        <span className="text-slate-400">…</span>
-                      ) : entry.found ? (
-                        <span className="block text-left space-y-0.5">
-                          <span className="flex items-center gap-2">
-                            <span className="font-bold text-white">{entry.swedish}</span>
-                            <button
-                              onClick={e => {
-                                e.stopPropagation()
-                                unlock()
-                                speak(entry.swedish!, 'sv-SE')
-                              }}
-                              className="cursor-pointer text-xs"
-                            >
-                              🔊
-                            </button>
-                          </span>
-                          <span className="block text-blue-300">{entry.french}</span>
-                          {entry.forms && (
-                            <span className="block text-slate-400 text-xs">({entry.forms})</span>
+        <Card className="p-5">
+          <div className="space-y-5 text-[17px] leading-[2] tracking-tight">
+            {paragraphs.map((paragraph, pIdx) => (
+              <p key={pIdx}>
+                {paragraph.split(/(\s+)/).map((token, tIdx) => {
+                  if (/^\s*$/.test(token)) return token
+                  const positionKey = `${pIdx}-${tIdx}`
+                  const isActive = active === positionKey
+                  return (
+                    <span key={positionKey} className="relative inline-block">
+                      <button
+                        onClick={e => { e.stopPropagation(); handleWordTap(positionKey, token) }}
+                        className={`cursor-pointer rounded-md px-0.5 transition-colors ${
+                          isActive ? 'bg-info-soft text-primary' : 'hover:bg-surface-raised'
+                        }`}
+                      >
+                        {token}
+                      </button>
+                      {isActive && (
+                        <span
+                          onClick={e => e.stopPropagation()}
+                          className="animate-rise absolute bottom-full left-1/2 z-50 mb-2 w-[min(16rem,78vw)] -translate-x-1/2 rounded-2xl border border-border-strong bg-popover p-3.5 text-left shadow-[0_18px_45px_-12px_oklch(0_0_0/70%)]"
+                        >
+                          {!entry ? (
+                            <span className="block text-sm text-muted-foreground">…</span>
+                          ) : entry.found ? (
+                            <span className="block">
+                              <span className="block font-display text-lg font-semibold leading-tight text-foreground">
+                                {entry.swedish}
+                              </span>
+                              <span className="mt-0.5 block text-sm leading-snug text-muted-foreground">
+                                {entry.french}
+                              </span>
+                              {entry.forms && (
+                                <span className="mt-1 block text-[11px] italic leading-snug text-muted-foreground/80">
+                                  ({entry.forms})
+                                </span>
+                              )}
+                              <button
+                                onClick={e => {
+                                  e.stopPropagation()
+                                  unlock()
+                                  speak(entry.swedish!, 'sv-SE')
+                                }}
+                                className="pressable mt-2.5 inline-flex items-center gap-1.5 rounded-lg border border-border bg-surface px-2.5 py-1.5 text-xs font-semibold text-primary"
+                              >
+                                <Volume2 size={13} /> {t.listen}
+                              </button>
+                            </span>
+                          ) : (
+                            <span className="block text-xs text-muted-foreground">{t.wordNotFound}</span>
                           )}
+                          <span
+                            aria-hidden="true"
+                            className="absolute -bottom-1.5 left-1/2 size-3 -translate-x-1/2 rotate-45 border-b border-r border-border-strong bg-popover"
+                          />
                         </span>
-                      ) : (
-                        <span className="text-slate-400 text-xs">{t.wordNotFound}</span>
                       )}
                     </span>
-                  )}
-                </span>
-              )
-            })}
-          </p>
-        ))}
-      </article>
-    </main>
+                  )
+                })}
+              </p>
+            ))}
+          </div>
+        </Card>
+
+        <p className="mt-3 text-center text-xs text-muted-foreground">{t.tapAnyWord}</p>
+      </div>
+    </AppShell>
   )
 }

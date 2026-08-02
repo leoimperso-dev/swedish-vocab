@@ -3,12 +3,22 @@
 import { Component, useEffect, useState, useCallback, type ReactNode } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
+import {
+  Shuffle, Layers, ListChecks, PenLine, TextCursorInput, Repeat2,
+  BookOpen, Brain, ChevronRight, Sparkles, Loader2, PartyPopper,
+  type LucideIcon,
+} from 'lucide-react'
 import FlashCard from '@/components/study/FlashCard'
 import MultipleChoice from '@/components/study/MultipleChoice'
 import TypingExercise from '@/components/study/TypingExercise'
 import ConjugationExercise from '@/components/study/ConjugationExercise'
 import ClozeExercise from '@/components/study/ClozeExercise'
 import SessionProgress from '@/components/study/SessionProgress'
+import { AppShell } from '@/components/AppShell'
+import { Card, Chip, SectionLabel, Segmented } from '@/components/ui/primitives'
+import { Button } from '@/components/ui/button'
+import { EmptyState } from '@/components/ui/feedback'
+import { cn } from '@/lib/utils'
 import { getStrings } from '@/lib/i18n'
 import { useLang } from '@/components/LangProvider'
 import { defaultDirection, type Direction } from '@/lib/word-display'
@@ -115,62 +125,43 @@ export default function StudyPage() {
     )
   }
   if (loading) return <LoadingScreen />
-  if (exercises.length === 0) return <EmptyState />
+  if (exercises.length === 0) return <NoWordsDueScreen />
 
   const current = exercises[currentIndex]
 
   return (
-    <main className="min-h-dvh flex flex-col px-4 pt-6">
-      <div className="flex items-center gap-3">
-        <div className="flex-1">
-          <SessionProgress
-            current={currentIndex}
-            total={exercises.length}
-            combo={combo}
-            results={results}
-          />
-        </div>
-        <button
-          onClick={() => setConfirmQuit(true)}
-          title={t.quit}
-          className="text-slate-500 hover:text-slate-300 text-xl px-2 py-1 cursor-pointer"
-        >
-          ✕
-        </button>
-      </div>
+    <div className="mx-auto min-h-dvh max-w-[430px] pb-24">
+      <SessionProgress
+        current={currentIndex}
+        total={exercises.length}
+        combo={combo}
+        results={results}
+        onQuit={() => setConfirmQuit(true)}
+        quitLabel={t.quit}
+      />
 
       {confirmQuit && (
-        <div className="mt-3 bg-slate-900 border border-slate-700 rounded-2xl p-4 space-y-3">
-          <p className="text-sm text-slate-300">{t.confirmQuit}</p>
-          <div className="flex gap-3">
-            <button
-              onClick={() => router.push('/dashboard')}
-              className="flex-1 py-3 rounded-xl bg-red-950 border border-red-900 text-red-400 font-semibold cursor-pointer active:scale-95 transition-all"
-            >
-              {t.quit}
-            </button>
-            <button
-              onClick={() => setConfirmQuit(false)}
-              className="flex-1 py-3 rounded-xl bg-slate-800 text-slate-300 font-semibold cursor-pointer active:scale-95 transition-all"
-            >
-              {t.cancel}
-            </button>
-          </div>
+        <div className="px-4 pt-4">
+          <Card className="animate-rise space-y-3">
+            <p className="text-sm text-muted-foreground">{t.confirmQuit}</p>
+            <div className="flex gap-3">
+              <Button variant="destructive" className="flex-1" onClick={() => router.push('/dashboard')}>
+                {t.quit}
+              </Button>
+              <Button variant="secondary" className="flex-1" onClick={() => setConfirmQuit(false)}>
+                {t.cancel}
+              </Button>
+            </div>
+          </Card>
         </div>
       )}
 
-      <div className="flex-1 flex flex-col justify-center mt-4">
+      <main key={currentIndex} className="animate-rise px-4 pt-5">
         <ExerciseBoundary
-          key={currentIndex}
           fallback={
-            <div className="text-center space-y-4">
-              <p className="text-slate-400">{t.exerciseError}</p>
-              <button
-                onClick={() => handleAnswer('incorrect', current.exerciseType)}
-                className="px-6 py-3 rounded-2xl bg-blue-600 font-semibold cursor-pointer"
-              >
-                {t.skipWord}
-              </button>
+            <div className="space-y-4 text-center">
+              <p className="text-muted-foreground">{t.exerciseError}</p>
+              <Button onClick={() => handleAnswer('incorrect', current.exerciseType)}>{t.skipWord}</Button>
             </div>
           }
         >
@@ -195,9 +186,18 @@ export default function StudyPage() {
             <ClozeExercise word={current.word} onAnswer={handleAnswer} />
           )}
         </ExerciseBoundary>
-      </div>
-    </main>
+      </main>
+    </div>
   )
+}
+
+const MODE_ICONS: Record<StudyMode, LucideIcon> = {
+  MIX: Shuffle,
+  FLASHCARD: Layers,
+  QCM: ListChecks,
+  TYPING: PenLine,
+  CLOZE: TextCursorInput,
+  CONJUGATION: Repeat2,
 }
 
 function ModePicker({ onPick, direction, onDirectionChange, conjugationAvailable }: {
@@ -208,85 +208,91 @@ function ModePicker({ onPick, direction, onDirectionChange, conjugationAvailable
 }) {
   const t = getStrings(useLang())
 
-  const modes: Array<{ mode: StudyMode; icon: string; label: string; desc: string }> = [
-    { mode: 'MIX', icon: '🎲', label: t.modeMix, desc: t.modeMixDesc },
-    { mode: 'FLASHCARD', icon: '🃏', label: t.modeFlashcard, desc: t.modeFlashcardDesc },
-    { mode: 'QCM', icon: '🔘', label: t.modeQcm, desc: t.modeQcmDesc },
-    { mode: 'TYPING', icon: '⌨️', label: t.modeTyping, desc: t.modeTypingDesc },
+  const modes: Array<{ mode: StudyMode; label: string; desc: string }> = [
+    { mode: 'MIX', label: t.modeMix, desc: t.modeMixDesc },
+    { mode: 'FLASHCARD', label: t.modeFlashcard, desc: t.modeFlashcardDesc },
+    { mode: 'QCM', label: t.modeQcm, desc: t.modeQcmDesc },
+    { mode: 'TYPING', label: t.modeTyping, desc: t.modeTypingDesc },
     ...(conjugationAvailable
       ? [
-          { mode: 'CLOZE' as StudyMode, icon: '✍️', label: t.modeCloze, desc: t.modeClozeDesc },
-          { mode: 'CONJUGATION' as StudyMode, icon: '📖', label: t.modeConjugation, desc: t.modeConjugationDesc },
+          { mode: 'CLOZE' as StudyMode, label: t.modeCloze, desc: t.modeClozeDesc },
+          { mode: 'CONJUGATION' as StudyMode, label: t.modeConjugation, desc: t.modeConjugationDesc },
         ]
       : []),
   ]
 
   return (
-    <main className="px-4 pt-12 pb-6 max-w-lg mx-auto space-y-4">
-      <h1 className="text-2xl font-bold">{t.chooseExercise}</h1>
-
-      {/* Direction toggle — each direction has its own SM-2 progression */}
-      <div className="space-y-1">
-        <p className="text-slate-500 text-xs">{t.chooseDirection}</p>
-        <div className="flex bg-slate-900 rounded-2xl p-1">
-          {(['SV_FR', 'FR_SV'] as const).map(d => (
-            <button
-              key={d}
-              onClick={() => onDirectionChange(d)}
-              className={`flex-1 py-2 rounded-xl text-sm font-semibold transition-all cursor-pointer ${
-                direction === d ? 'bg-blue-600 text-white' : 'text-slate-400 hover:text-slate-200'
-              }`}
-            >
-              {d === 'SV_FR' ? t.directionSvFr : t.directionFrSv}
-            </button>
-          ))}
+    <AppShell title={t.chooseExercise}>
+      <div className="space-y-4">
+        {/* Direction toggle — each direction has its own SM-2 progression */}
+        <div>
+          <SectionLabel>{t.chooseDirection}</SectionLabel>
+          <Segmented
+            className="mt-2"
+            value={direction}
+            onChange={v => onDirectionChange(v as Direction)}
+            options={[
+              { value: 'SV_FR', label: t.directionSvFr },
+              { value: 'FR_SV', label: t.directionFrSv },
+            ]}
+          />
         </div>
-      </div>
 
-      <div className="space-y-3">
-        {modes.map(({ mode, icon, label, desc }) => (
-          <button
-            key={mode}
-            onClick={() => onPick(mode)}
-            className={`w-full flex items-center gap-4 p-4 rounded-2xl text-left transition-all cursor-pointer active:scale-98 ${
-              mode === 'MIX'
-                ? 'bg-blue-600 hover:bg-blue-500'
-                : 'bg-slate-900 hover:bg-slate-800 border border-slate-800'
-            }`}
-          >
-            <span className="text-3xl">{icon}</span>
-            <span>
-              <span className="block font-bold">{label}</span>
-              <span className={`block text-sm ${mode === 'MIX' ? 'text-blue-200' : 'text-slate-500'}`}>{desc}</span>
-            </span>
-          </button>
-        ))}
+        <div className="grid grid-cols-2 gap-3">
+          {modes.map(({ mode, label, desc }) => {
+            const Icon = MODE_ICONS[mode]
+            const featured = mode === 'MIX'
+            return (
+              <button
+                key={mode}
+                onClick={() => onPick(mode)}
+                className={cn(
+                  'pressable card-surface flex flex-col gap-1 p-4 text-left',
+                  featured &&
+                    'col-span-2 border-primary/40 bg-linear-to-br from-info-soft to-transparent shadow-[var(--shadow-glow)]',
+                )}
+              >
+                <div className="flex items-center justify-between gap-2">
+                  <Icon size={20} className={featured ? 'text-primary' : 'text-muted-foreground'} />
+                  {featured ? (
+                    <Chip tone="info">
+                      <Sparkles size={12} /> {t.recommended}
+                    </Chip>
+                  ) : null}
+                </div>
+                <p className="mt-1 font-display text-base font-semibold tracking-tight">{label}</p>
+                <p className="text-xs text-muted-foreground">{desc}</p>
+              </button>
+            )
+          })}
+        </div>
+
         {conjugationAvailable && (
-          <>
-            <Link
-              href="/reading"
-              className="w-full flex items-center gap-4 p-4 rounded-2xl text-left transition-all cursor-pointer active:scale-98 bg-slate-900 hover:bg-slate-800 border border-slate-800"
-            >
-              <span className="text-3xl">📕</span>
-              <span>
-                <span className="block font-bold">{t.readingTitle}</span>
-                <span className="block text-sm text-slate-500">{t.readingDesc}</span>
+          <div className="space-y-2">
+            <Link href="/reading" className="pressable card-surface flex items-center gap-3 p-4">
+              <span className="grid size-11 shrink-0 place-items-center rounded-xl bg-warning-soft text-warning">
+                <BookOpen size={20} />
               </span>
-            </Link>
-            <Link
-              href="/grammar"
-              className="w-full flex items-center gap-4 p-4 rounded-2xl text-left transition-all cursor-pointer active:scale-98 bg-slate-900 hover:bg-slate-800 border border-slate-800"
-            >
-              <span className="text-3xl">🧠</span>
-              <span>
-                <span className="block font-bold">{t.grammarTitle}</span>
-                <span className="block text-sm text-slate-500">{t.grammarDesc}</span>
+              <span className="min-w-0 flex-1">
+                <span className="block truncate font-display text-base font-semibold">{t.readingTitle}</span>
+                <span className="block truncate text-xs text-muted-foreground">{t.readingDesc}</span>
               </span>
+              <ChevronRight size={18} className="shrink-0 text-muted-foreground" />
             </Link>
-          </>
+            <Link href="/grammar" className="pressable card-surface flex items-center gap-3 p-4">
+              <span className="grid size-11 shrink-0 place-items-center rounded-xl bg-info-soft text-info">
+                <Brain size={20} />
+              </span>
+              <span className="min-w-0 flex-1">
+                <span className="block truncate font-display text-base font-semibold">{t.grammarTitle}</span>
+                <span className="block truncate text-xs text-muted-foreground">{t.grammarDesc}</span>
+              </span>
+              <ChevronRight size={18} className="shrink-0 text-muted-foreground" />
+            </Link>
+          </div>
         )}
       </div>
-    </main>
+    </AppShell>
   )
 }
 
@@ -303,22 +309,22 @@ class ExerciseBoundary extends Component<{ children: ReactNode; fallback: ReactN
 function LoadingScreen() {
   const t = getStrings(useLang())
   return (
-    <main className="min-h-dvh flex items-center justify-center">
-      <div className="text-center space-y-4">
-        <div className="text-4xl animate-spin">⚙️</div>
-        <p className="text-slate-400">{t.preparingSession}</p>
+    <main className="flex min-h-dvh items-center justify-center px-4">
+      <div className="space-y-4 text-center">
+        <Loader2 size={32} className="mx-auto animate-spin text-muted-foreground" />
+        <p className="text-muted-foreground">{t.preparingSession}</p>
       </div>
     </main>
   )
 }
 
-function EmptyState() {
+function NoWordsDueScreen() {
   const t = getStrings(useLang())
   return (
-    <main className="min-h-dvh flex flex-col items-center justify-center px-4 text-center">
-      <div className="text-5xl mb-4">🎉</div>
-      <h1 className="text-2xl font-bold mb-2">{t.noWordsDue}</h1>
-      <p className="text-slate-400">{t.comeBackTomorrow}</p>
+    <main className="flex min-h-dvh flex-col items-center justify-center px-4">
+      <div className="w-full max-w-[430px]">
+        <EmptyState icon={<PartyPopper size={22} />} title={t.noWordsDue} description={t.comeBackTomorrow} />
+      </div>
     </main>
   )
 }

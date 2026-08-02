@@ -2,8 +2,10 @@ import { db } from '@/lib/db'
 import { auth } from '@/auth'
 import { notFound } from 'next/navigation'
 import Link from 'next/link'
+import { ChevronLeft, ChevronRight } from 'lucide-react'
 import { asLang, getStrings } from '@/lib/i18n'
 import MarkdownLite from '@/components/grammar/MarkdownLite'
+import { AppShell } from '@/components/AppShell'
 
 export default async function GrammarLessonPage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params
@@ -29,37 +31,32 @@ export default async function GrammarLessonPage({ params }: { params: Promise<{ 
   ])
 
   return (
-    <main className="px-4 pt-12 pb-6 max-w-lg mx-auto space-y-5">
-      <div>
-        <Link href="/grammar" className="text-slate-400 text-sm cursor-pointer hover:text-slate-200">
+    <AppShell title={lesson.title} subtitle={lesson.category}>
+      <div className="space-y-5">
+        <Link
+          href="/grammar"
+          className="pressable inline-flex items-center gap-1.5 text-sm text-muted-foreground"
+        >
           {t.back}
         </Link>
-        <p className="text-blue-400 text-xs font-semibold uppercase tracking-wide mt-2">{lesson.category}</p>
-        <h1 className="text-2xl font-bold mt-1">{lesson.title}</h1>
-      </div>
 
-      <MarkdownLite body={lesson.body} />
+        <MarkdownLite body={lesson.body} />
 
-      <div className="flex gap-3 pt-4">
-        {previous && (
-          <Link
-            href={`/grammar/${previous.slug}`}
-            className="flex-1 p-3 rounded-2xl bg-slate-900 hover:bg-slate-800 transition-colors cursor-pointer"
-          >
-            <span className="block text-slate-500 text-xs">←</span>
-            <span className="text-sm font-medium">{previous.title}</span>
-          </Link>
-        )}
-        {next && (
-          <Link
-            href={`/grammar/${next.slug}`}
-            className="flex-1 p-3 rounded-2xl bg-slate-900 hover:bg-slate-800 transition-colors cursor-pointer text-right"
-          >
-            <span className="block text-slate-500 text-xs">→</span>
-            <span className="text-sm font-medium">{next.title}</span>
-          </Link>
-        )}
+        <div className="flex gap-3 pt-1">
+          {previous && (
+            <Link href={`/grammar/${previous.slug}`} className="pressable card-surface flex-1 p-3">
+              <ChevronLeft size={14} className="text-muted-foreground" />
+              <span className="mt-1 block truncate text-sm font-medium">{previous.title}</span>
+            </Link>
+          )}
+          {next && (
+            <Link href={`/grammar/${next.slug}`} className="pressable card-surface flex-1 p-3 text-right">
+              <ChevronRight size={14} className="ml-auto text-muted-foreground" />
+              <span className="mt-1 block truncate text-sm font-medium">{next.title}</span>
+            </Link>
+          )}
+        </div>
       </div>
-    </main>
+    </AppShell>
   )
 }

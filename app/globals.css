@@ -1,36 +1,236 @@
 @import "tailwindcss";
 
+/*
+ * Svenska — design system
+ * Dark-only. Scandinavian minimalism + restrained gamification warmth.
+ * All colors in oklch, exposed as semantic tokens.
+ */
+
+@theme inline {
+  --radius-sm: calc(var(--radius) - 6px);
+  --radius-md: calc(var(--radius) - 4px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+  --radius-2xl: calc(var(--radius) + 8px);
+  --radius-3xl: calc(var(--radius) + 16px);
+
+  --font-sans: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+  --font-display: var(--font-space-grotesk), var(--font-inter), ui-sans-serif, sans-serif;
+
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-surface: var(--surface);
+  --color-surface-raised: var(--surface-raised);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-border-strong: var(--border-strong);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+
+  --color-success: var(--success);
+  --color-success-foreground: var(--success-foreground);
+  --color-success-soft: var(--success-soft);
+  --color-warning: var(--warning);
+  --color-warning-foreground: var(--warning-foreground);
+  --color-warning-soft: var(--warning-soft);
+  --color-danger: var(--danger);
+  --color-danger-foreground: var(--danger-foreground);
+  --color-danger-soft: var(--danger-soft);
+  --color-streak: var(--streak);
+  --color-streak-soft: var(--streak-soft);
+  --color-freeze: var(--freeze);
+  --color-freeze-soft: var(--freeze-soft);
+  --color-info: var(--info);
+  --color-info-foreground: var(--info-foreground);
+  --color-info-soft: var(--info-soft);
+
+  --ease-snap: cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
 :root {
-  --background: #0f172a;
-  --foreground: #f8fafc;
+  color-scheme: dark;
+  --radius: 1rem;
+
+  /* Base — deep nordic night */
+  --background: oklch(0.17 0.021 265);
+  --foreground: oklch(0.97 0.005 250);
+  --surface: oklch(0.215 0.023 265);
+  --surface-raised: oklch(0.26 0.025 265);
+  --card: oklch(0.215 0.023 265);
+  --card-foreground: oklch(0.97 0.005 250);
+  --popover: oklch(0.235 0.024 265);
+  --popover-foreground: oklch(0.97 0.005 250);
+
+  --muted: oklch(0.26 0.025 265);
+  --muted-foreground: oklch(0.7 0.022 258);
+
+  --border: oklch(0.31 0.024 264);
+  --border-strong: oklch(0.42 0.028 264);
+  --input: oklch(0.28 0.024 264);
+  --ring: oklch(0.72 0.135 236);
+
+  /* Swedish blue — primary action */
+  --primary: oklch(0.66 0.145 244);
+  --primary-foreground: oklch(0.16 0.03 260);
+  --secondary: oklch(0.28 0.026 265);
+  --secondary-foreground: oklch(0.95 0.006 250);
+  --accent: oklch(0.86 0.155 92); /* Swedish yellow */
+  --accent-foreground: oklch(0.2 0.035 90);
+
+  --destructive: oklch(0.63 0.2 22);
+  --destructive-foreground: oklch(0.98 0.01 20);
+
+  /* Semantics */
+  --success: oklch(0.75 0.16 156);
+  --success-foreground: oklch(0.19 0.04 160);
+  --success-soft: oklch(0.75 0.16 156 / 14%);
+  --warning: oklch(0.86 0.155 92);
+  --warning-foreground: oklch(0.2 0.035 90);
+  --warning-soft: oklch(0.86 0.155 92 / 14%);
+  --danger: oklch(0.66 0.195 22);
+  --danger-foreground: oklch(0.99 0.01 20);
+  --danger-soft: oklch(0.66 0.195 22 / 15%);
+  --streak: oklch(0.74 0.17 52);
+  --streak-soft: oklch(0.74 0.17 52 / 15%);
+  --freeze: oklch(0.81 0.115 205);
+  --freeze-soft: oklch(0.81 0.115 205 / 15%);
+  --info: oklch(0.7 0.14 244);
+  --info-foreground: oklch(0.16 0.03 260);
+  --info-soft: oklch(0.7 0.14 244 / 15%);
+
+  --shadow-card: 0 1px 0 0 oklch(1 0 0 / 5%) inset, 0 8px 24px -12px oklch(0 0 0 / 60%);
+  --shadow-glow: 0 0 0 1px oklch(0.66 0.145 244 / 30%), 0 8px 32px -10px oklch(0.66 0.145 244 / 45%);
+  --gradient-nordic: linear-gradient(140deg, var(--primary), oklch(0.8 0.13 214));
+  --gradient-xp: linear-gradient(90deg, var(--warning), var(--streak));
 }
 
-body {
-  background: var(--background);
-  color: var(--foreground);
+@layer base {
+  * {
+    border-color: var(--color-border);
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  html {
+    scroll-behavior: smooth;
+  }
+
+  /* Disable pull-to-refresh on mobile (accidental session reloads) */
+  html,
+  body {
+    overscroll-behavior-y: none;
+  }
+
+  body {
+    background-color: var(--color-background);
+    color: var(--color-foreground);
+    font-family: var(--font-sans);
+    font-feature-settings: "cv02", "cv03", "ss01";
+    -webkit-font-smoothing: antialiased;
+  }
 }
 
-/* Disable pull-to-refresh on mobile (accidental session reloads) */
-html, body {
-  overscroll-behavior-y: none;
+/* --- Utilities --------------------------------------------------------- */
+
+@utility pressable {
+  cursor: pointer;
+  transition:
+    transform 140ms var(--ease-snap),
+    background-color 140ms var(--ease-snap),
+    border-color 140ms var(--ease-snap),
+    opacity 140ms var(--ease-snap);
+  &:active {
+    transform: scale(0.965);
+  }
 }
 
-/* Fix iOS safe area for bottom nav */
-.safe-area-pb {
-  padding-bottom: env(safe-area-inset-bottom, 0px);
+@utility safe-bottom {
+  padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 0.5rem);
 }
 
-/* Prevent layout shift from iOS virtual keyboard */
-.min-h-dvh {
-  min-height: 100dvh;
+@utility safe-top {
+  padding-top: calc(env(safe-area-inset-top, 0px) + 0.5rem);
 }
 
-/* Tap highlight removal on mobile */
-* {
-  -webkit-tap-highlight-color: transparent;
+@utility text-hero-word {
+  font-family: var(--font-display);
+  font-weight: 600;
+  letter-spacing: -0.03em;
+  line-height: 1.05;
+  font-size: clamp(2.5rem, 12vw, 3.5rem);
 }
 
-/* Smooth scrolling */
-html {
-  scroll-behavior: smooth;
+@utility card-surface {
+  background-color: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-2xl);
+  box-shadow: var(--shadow-card);
+}
+
+@utility bg-gradient-nordic {
+  background-image: var(--gradient-nordic);
+}
+
+@utility bg-gradient-xp {
+  background-image: var(--gradient-xp);
+}
+
+@keyframes svk-shake {
+  0%,
+  100% {
+    transform: translateX(0);
+  }
+  25% {
+    transform: translateX(-6px);
+  }
+  75% {
+    transform: translateX(6px);
+  }
+}
+
+@keyframes svk-pop {
+  0% {
+    transform: scale(0.94);
+  }
+  60% {
+    transform: scale(1.03);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+@keyframes svk-rise {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@utility animate-shake {
+  animation: svk-shake 180ms var(--ease-snap);
+}
+
+@utility animate-pop {
+  animation: svk-pop 180ms var(--ease-snap);
+}
+
+@utility animate-rise {
+  animation: svk-rise 200ms var(--ease-snap) both;
 }
