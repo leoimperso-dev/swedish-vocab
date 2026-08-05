@@ -30,8 +30,7 @@ Dark-only, mobile-first (max-w-[430px]), ported from the svensk-spark Lovable de
 ## Bilingual mode
 `User.nativeLanguage` (`fr` default | `sv`) drives everything: UI strings (`lib/i18n.ts` via
 `LangProvider`/`useLang` for client components, `getStrings(asLang(...))` server-side), exercise
-direction (`promptText`/`answerText`/`learnedLocale` in `lib/word-display.ts` — prompt is always
-the learned language), TTS locale, QCM distractor language (`?lang=` param), and exercise selection
+direction (`promptText`/`answerText`/`learnedLocale` in `lib/word-display.ts` — default direction is production mode: native language as prompt, learned language as answer), TTS locale, QCM distractor language (`?lang=` param), and exercise selection
 (no CONJUGATION for `sv` natives). Flag button on dashboard toggles via `app/(app)/actions.ts`.
 `Word.details` (JSONB `{translations[], context?, usage[{sv,fr}]}`) is written in French —
 translations/context only shown in `fr` mode; usage pairs shown in both.

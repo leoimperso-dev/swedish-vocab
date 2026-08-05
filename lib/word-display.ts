@@ -17,9 +17,9 @@ export function directionAnswer(word: BilingualWord, direction: Direction): stri
   return direction === 'SV_FR' ? word.french : word.swedish
 }
 
-// Default direction shows the learned language as prompt (comprehension)
+// Default direction shows the native language as prompt (production)
 export function defaultDirection(lang: Lang): Direction {
-  return lang === 'fr' ? 'SV_FR' : 'FR_SV'
+  return lang === 'fr' ? 'FR_SV' : 'SV_FR'
 }
 
 // TTS always pronounces the learned-language side of the word
