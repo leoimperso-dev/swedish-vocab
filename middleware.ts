@@ -13,9 +13,8 @@ export default function middleware(req: NextRequest) {
   if (!hasSession && !isAuthPage) {
     return NextResponse.redirect(new URL('/login', req.nextUrl))
   }
-  if (hasSession && isAuthPage) {
-    return NextResponse.redirect(new URL('/dashboard', req.nextUrl))
-  }
+  // No redirect for hasSession && isAuthPage: the cookie may be expired/invalid.
+  // server-side auth() in page.tsx handles the redirect correctly after JWT validation.
   return NextResponse.next()
 }
 
