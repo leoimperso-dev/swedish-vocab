@@ -224,7 +224,10 @@ function WordRow({ word, lang, onToggleFavorite, showRank }: {
     }
   }
 
-  const translation = lang === 'fr' && details?.translations ? details.translations.join(', ') : word.french
+  const frenchLabel = lang === 'fr' && details?.translations ? details.translations.join(', ') : word.french
+  // fr-native: show the known language (French) as primary, Swedish to learn as secondary
+  const primaryWord = lang === 'fr' ? frenchLabel : word.swedish
+  const secondaryWord = lang === 'fr' ? word.swedish : frenchLabel
 
   return (
     <div className="card-surface overflow-hidden">
@@ -246,11 +249,14 @@ function WordRow({ word, lang, onToggleFavorite, showRank }: {
               </span>
             )}
             <p className="min-w-0 truncate font-display text-[17px] font-semibold tracking-tight">
-              {word.swedish}
+              {primaryWord}
             </p>
           </div>
-          {forms && <p className="truncate text-xs text-muted-foreground/80">({forms})</p>}
-          <p className="mt-1 text-sm text-muted-foreground">{translation}</p>
+          {lang !== 'fr' && forms && <p className="truncate text-xs text-muted-foreground/80">({forms})</p>}
+          <p className="mt-1 text-sm text-muted-foreground">
+            {secondaryWord}
+            {lang === 'fr' && forms && <span className="ml-1 text-xs opacity-70">({forms})</span>}
+          </p>
           {lang === 'fr' && details?.context && (
             <p className="mt-1 text-xs italic text-muted-foreground">{details.context}</p>
           )}
