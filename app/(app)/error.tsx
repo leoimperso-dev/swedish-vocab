@@ -2,7 +2,7 @@
 
 import { OctagonAlert } from 'lucide-react'
 import { getStrings } from '@/lib/i18n'
-import { useLang } from '@/components/LangProvider'
+import { useLang } from '@/components/CourseProvider'
 import { Card } from '@/components/ui/primitives'
 import { Button } from '@/components/ui/button'
 

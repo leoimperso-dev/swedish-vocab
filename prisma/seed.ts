@@ -23,8 +23,9 @@ async function main() {
     const batch = words.slice(i, i + batchSize)
     const result = await db.word.createMany({
       data: batch.map(w => ({
-        swedish: w.swedish,
-        french: w.french,
+        pair: w.pair,
+        term: w.term,
+        translation: w.translation,
         wordType: w.wordType,
         category: w.category,
         forms: w.forms ?? undefined,

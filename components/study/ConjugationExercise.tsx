@@ -3,43 +3,47 @@
 import { useState } from 'react'
 import { speak, unlock } from '@/lib/tts'
 import { evaluateVerbForms } from '@/lib/fuzzy'
+import { learnedLocale } from '@/lib/word-display'
+import { pairOf, verbFormsFor } from '@/lib/courses'
+import { getStrings } from '@/lib/i18n'
+import { useCourse } from '@/components/CourseProvider'
 import { Card, TextField } from '@/components/ui/primitives'
 import { Button } from '@/components/ui/button'
 import type { Word } from '@prisma/client'
-import type { AnswerResult, VerbForms } from '@/types'
+import type { AnswerResult } from '@/types'
 
 interface Props {
   word: Word
   onAnswer: (result: AnswerResult, type: string) => void
 }
 
-// CONJUGATION mode is fr-native only (see conjugationAvailable in study/page.tsx) — labels
-// are intentionally hardcoded French rather than pulled from lib/i18n.ts, matching the
-// pre-existing behavior of this file.
-const FIELD_LABELS = [
-  { key: 'present' as const, label: 'Présent' },
-  { key: 'preterit' as const, label: 'Prétérit' },
-  { key: 'supine' as const, label: 'Supin' },
-]
+// Drilled forms differ per language: Swedish present/preterit/supine,
+// English past/past participle — the registry decides, i18n supplies the labels.
+type FormKey = 'present' | 'preterit' | 'supine' | 'past' | 'pastParticiple'
 
 export default function ConjugationExercise({ word, onAnswer }: Props) {
-  const [inputs, setInputs] = useState<Partial<VerbForms>>({})
+  const course = useCourse()
+  const t = getStrings(course.native)
+  const [inputs, setInputs] = useState<Record<string, string>>({})
   const [evaluation, setEvaluation] = useState<ReturnType<typeof evaluateVerbForms> | null>(null)
 
-  const forms = word.forms as Partial<VerbForms> | null
+  const forms = word.forms as Record<string, string> | null
   if (!forms) return null
-  const fields = FIELD_LABELS.filter(({ key }) => typeof forms[key] === 'string' && forms[key])
+
+  const keys = verbFormsFor(pairOf(word.pair).term).filter(
+    key => typeof forms[key] === 'string' && forms[key],
+  )
 
   const handleSubmit = () => {
     if (evaluation) return
     unlock()
-    speak(word.swedish)
+    speak(word.term, learnedLocale(course))
 
-    const result = evaluateVerbForms(inputs, forms)
+    const result = evaluateVerbForms(inputs, forms, keys)
     setEvaluation(result)
 
     // Overall result: if all correct → correct, if any incorrect → incorrect, else approximate
-    const values = fields.map(({ key }) => result[key])
+    const values = keys.map(key => result[key])
     const overall: AnswerResult = values.every(v => v === 'correct')
       ? 'correct'
       : values.some(v => v === 'incorrect')
@@ -52,26 +56,25 @@ export default function ConjugationExercise({ word, onAnswer }: Props) {
   return (
     <div className="space-y-4">
       <Card className="py-6 text-center">
-        <p className="text-xs text-muted-foreground">Infinitif</p>
-        <p className="text-hero-word">{word.swedish}</p>
-        <p className="mt-2 text-sm text-primary">{word.french}</p>
+        <p className="text-xs text-muted-foreground">{t.infinitive}</p>
+        <p className="text-hero-word">{word.term}</p>
+        <p className="mt-2 text-sm text-primary">{word.translation}</p>
       </Card>
 
       <div className="space-y-3">
-        {fields.map(({ key, label }) => {
+        {keys.map(key => {
           const res = evaluation?.[key]
           return (
             <TextField
               key={key}
-              label={label}
+              label={t[key as FormKey]}
               placeholder="…"
               value={inputs[key] ?? ''}
               disabled={!!evaluation}
               // TextField only supports success/error (no dedicated "approximate" tone) —
               // non-correct results (incorrect or approximate) render as error
               state={res ? (res === 'correct' ? 'success' : 'error') : 'idle'}
-              // i18n-missing: expectedForm ("Attendu :") — this component doesn't use lib/i18n.ts at all (fr-only)
-              hint={evaluation && res !== 'correct' ? `Attendu : ${forms[key]}` : undefined}
+              hint={evaluation && res !== 'correct' ? `${t.expectedAnswer} ${forms[key]}` : undefined}
               onKeyDown={e => e.key === 'Enter' && handleSubmit()}
               onChange={e => setInputs(prev => ({ ...prev, [key]: e.target.value }))}
             />
@@ -81,7 +84,7 @@ export default function ConjugationExercise({ word, onAnswer }: Props) {
 
       {!evaluation && (
         <Button size="lg" className="w-full" onClick={handleSubmit}>
-          Valider
+          {t.submit}
         </Button>
       )}
     </div>

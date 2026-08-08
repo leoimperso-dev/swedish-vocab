@@ -1,13 +1,15 @@
 // Imports agent-generated grammar lessons (lessons-*.json) into GrammarLesson.
-// Usage: pnpm tsx scripts/import-grammar.ts <dir>
+// Usage: pnpm tsx scripts/import-grammar.ts <dir> [pair]
 import 'dotenv/config'
 import fs from 'fs'
 import path from 'path'
 import { db } from '../lib/db'
+import { asPairId } from '../lib/courses'
 
 async function main() {
   const dir = process.argv[2]
-  if (!dir) { console.error('Usage: tsx scripts/import-grammar.ts <dir>'); process.exit(1) }
+  if (!dir) { console.error('Usage: tsx scripts/import-grammar.ts <dir> [pair]'); process.exit(1) }
+  const pair = asPairId(process.argv[3])
 
   const files = fs.readdirSync(dir).filter(f => /^lessons-.*\.json$/.test(f)).sort()
   console.log(`Files: ${files.join(', ')}`)
@@ -27,7 +29,7 @@ async function main() {
         console.error(`invalid record in ${file}:`, r?.slug)
         continue
       }
-      lessons.push({ slug: r.slug, title: r.title, category: r.category, order: r.order, body: r.body })
+      lessons.push({ pair, slug: r.slug, title: r.title, category: r.category, order: r.order, body: r.body })
     }
   }
 

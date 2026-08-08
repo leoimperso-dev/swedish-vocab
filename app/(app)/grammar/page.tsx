@@ -2,20 +2,20 @@ import { db } from '@/lib/db'
 import { auth } from '@/auth'
 import Link from 'next/link'
 import { BookOpen, ChevronRight } from 'lucide-react'
-import { asLang, getStrings } from '@/lib/i18n'
+import { getStrings } from '@/lib/i18n'
+import { getCourse } from '@/lib/current-course'
 import { AppShell } from '@/components/AppShell'
 import { SectionLabel } from '@/components/ui/primitives'
 
 export default async function GrammarPage() {
   const session = await auth()
-  const [user, lessons] = await Promise.all([
-    db.user.findUnique({ where: { id: session!.user!.id }, select: { nativeLanguage: true } }),
-    db.grammarLesson.findMany({
-      select: { slug: true, title: true, category: true, order: true },
-      orderBy: { order: 'asc' },
-    }),
-  ])
-  const t = getStrings(asLang(user?.nativeLanguage))
+  const course = await getCourse(session!.user!.id)
+  const lessons = await db.grammarLesson.findMany({
+    where: { pair: course.pair },
+    select: { slug: true, title: true, category: true, order: true },
+    orderBy: { order: 'asc' },
+  })
+  const t = getStrings(course.native)
 
   const categories = new Map<string, typeof lessons>()
   for (const lesson of lessons) {

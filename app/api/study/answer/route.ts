@@ -5,6 +5,7 @@ import { sm2Update, qualityFromResult } from '@/lib/sm2'
 import { calculateSessionXp, getLevelForXp } from '@/lib/xp'
 import { updateStreak, toLocalDateString } from '@/lib/streak'
 import { checkNewAchievements } from '@/lib/achievements'
+import { isDirection, DEFAULT_COURSE, defaultDirection } from '@/lib/courses'
 import type { AnswerPayload } from '@/types'
 
 export async function POST(req: NextRequest) {
@@ -14,7 +15,7 @@ export async function POST(req: NextRequest) {
   const userId = session.user.id
   const body: AnswerPayload = await req.json()
   const { wordId, result, sessionId } = body
-  const direction = body.direction === 'FR_SV' ? 'FR_SV' : 'SV_FR'
+  const direction = isDirection(body.direction) ? body.direction : defaultDirection(DEFAULT_COURSE)
 
   // 1. Update or create UserWord with SM-2 (per direction)
   const existing = await db.userWord.findUnique({

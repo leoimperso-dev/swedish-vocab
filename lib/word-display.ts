@@ -1,38 +1,57 @@
 // Shared formatting for word forms and enrichment details
-import type { Lang } from '@/lib/i18n'
+import { pairOf, promptLang, localeOf, type Course, type Direction } from '@/lib/courses'
 
-interface BilingualWord {
-  swedish: string
-  french: string
+// Minimal shape needed to render a word: which pair it belongs to and both sides
+interface DisplayWord {
+  pair: string
+  term: string
+  translation: string
 }
 
-// Translation direction of an exercise session — each has its own SM-2 progression
-export type Direction = 'SV_FR' | 'FR_SV'
-
-export function directionPrompt(word: BilingualWord, direction: Direction): string {
-  return direction === 'SV_FR' ? word.swedish : word.french
+function isTermSide(word: DisplayWord, lang: string): boolean {
+  return pairOf(word.pair).term === lang
 }
 
-export function directionAnswer(word: BilingualWord, direction: Direction): string {
-  return direction === 'SV_FR' ? word.french : word.swedish
+export function directionPrompt(word: DisplayWord, direction: Direction): string {
+  return isTermSide(word, promptLang(direction)) ? word.term : word.translation
 }
 
-// Default direction shows the native language as prompt (production)
-export function defaultDirection(lang: Lang): Direction {
-  return lang === 'fr' ? 'FR_SV' : 'SV_FR'
+export function directionAnswer(word: DisplayWord, direction: Direction): string {
+  return isTermSide(word, promptLang(direction)) ? word.translation : word.term
 }
 
-// TTS always pronounces the learned-language side of the word
-export function learnedText(word: BilingualWord, lang: Lang): string {
-  return lang === 'fr' ? word.swedish : word.french
+// TTS always pronounces the side being learned
+export function learnedText(word: DisplayWord, course: Course): string {
+  return isTermSide(word, course.learned) ? word.term : word.translation
 }
 
-export function learnedLocale(lang: Lang): string {
-  return lang === 'fr' ? 'sv-SE' : 'fr-FR'
+export function learnedLocale(course: Course): string {
+  return localeOf(course.learned)
 }
 
-// Display order: verb tenses, then noun plural, then adjective forms
-const FORM_ORDER = ['present', 'preterit', 'supine', 'plural', 'ett', 'comparative', 'superlative']
+// Is the prompt the pair's `term` side? Inflected forms belong to that side, so
+// this decides where they are shown.
+export function promptIsTerm(word: DisplayWord, direction: Direction): boolean {
+  return isTermSide(word, promptLang(direction))
+}
+
+// Enrichment (alternative translations, usage notes) is authored in the pair's
+// `translation` language: only useful to a reader of that language, and only when
+// the answer sits on that side.
+export function showsEnrichedAnswer(
+  word: DisplayWord,
+  course: Course,
+  direction: Direction,
+): boolean {
+  return course.native === pairOf(word.pair).translation && promptIsTerm(word, direction)
+}
+
+// Display order: verb tenses (Swedish then English), then noun plural, then adjective forms
+const FORM_ORDER = [
+  'present', 'preterit', 'supine',
+  'past', 'pastParticiple',
+  'plural', 'ett', 'comparative', 'superlative',
+]
 
 export function formatForms(forms: unknown): string | null {
   if (!forms || typeof forms !== 'object') return null
@@ -44,7 +63,7 @@ export function formatForms(forms: unknown): string | null {
 export interface WordDetails {
   translations?: string[]
   context?: string
-  usage?: Array<{ sv: string; fr: string }>
+  usage?: Array<{ term: string; translation: string }>
 }
 
 export function parseDetails(details: unknown): WordDetails | null {
@@ -54,7 +73,7 @@ export function parseDetails(details: unknown): WordDetails | null {
     ? d.translations.filter(t => typeof t === 'string' && t.length > 0)
     : undefined
   const usage = Array.isArray(d.usage)
-    ? d.usage.filter(u => u && typeof u.sv === 'string' && typeof u.fr === 'string')
+    ? d.usage.filter(u => u && typeof u.term === 'string' && typeof u.translation === 'string')
     : undefined
   return {
     translations: translations?.length ? translations : undefined,

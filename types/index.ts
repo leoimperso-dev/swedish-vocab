@@ -1,4 +1,5 @@
 import type { Word, UserWord } from '@prisma/client'
+import type { Direction } from '@/lib/courses'
 
 export type ExerciseType = 'FLASHCARD' | 'QCM' | 'TYPING' | 'CONJUGATION' | 'CLOZE'
 
@@ -19,7 +20,7 @@ export interface AnswerPayload {
   wordId: string
   result: AnswerResult
   exerciseType: ExerciseType
-  direction: 'SV_FR' | 'FR_SV'
+  direction: Direction
   timeSpent: number
   sessionId: string
 }
@@ -34,12 +35,6 @@ export interface SessionSummary {
   newAchievements: string[]
   streakCurrent: number
   leveledUp: boolean
-}
-
-export interface VerbForms {
-  present: string
-  preterit: string
-  supine: string
 }
 
 export interface NounForms {

@@ -4,14 +4,17 @@ import 'dotenv/config'
 import fs from 'fs'
 import path from 'path'
 import { db } from '../lib/db'
+import { asPairId } from '../lib/courses'
 
 async function main() {
   const dir = process.argv[2]
   const chunkSize = Number(process.argv[3] ?? 200)
-  if (!dir) { console.error('Usage: tsx scripts/dump-enrichment-chunks.ts <dir> [chunkSize]'); process.exit(1) }
+  if (!dir) { console.error('Usage: tsx scripts/dump-enrichment-chunks.ts <dir> [chunkSize] [pair]'); process.exit(1) }
 
+  const pair = asPairId(process.argv[4])
   const words = await db.word.findMany({
-    select: { id: true, swedish: true, french: true, wordType: true, forms: true },
+    where: { pair },
+    select: { id: true, term: true, translation: true, wordType: true, forms: true },
     orderBy: [{ frequencyRank: { sort: 'asc', nulls: 'last' } }, { createdAt: 'asc' }],
   })
 

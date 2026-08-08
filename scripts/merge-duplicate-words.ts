@@ -1,4 +1,4 @@
-// Merges duplicate Word rows sharing the same normalized headword AND wordType.
+// Merges duplicate Word rows sharing the same pair, normalized headword AND wordType.
 // Keeps the richest row (details > examples > frequencyRank > forms), migrates
 // user progress and favorites, deletes the rest. Different wordTypes are kept
 // (genuine homonyms like "militär" noun vs adjective).
@@ -15,11 +15,11 @@ function score(w: { details: unknown; examples: unknown; frequencyRank: number |
 
 async function main() {
   const words = await db.word.findMany({
-    select: { id: true, swedish: true, wordType: true, details: true, examples: true, frequencyRank: true, forms: true },
+    select: { id: true, pair: true, term: true, wordType: true, details: true, examples: true, frequencyRank: true, forms: true },
   })
   const groups = new Map<string, typeof words>()
   for (const w of words) {
-    const k = `${key(w.swedish)}|${w.wordType}`
+    const k = `${w.pair}|${key(w.term)}|${w.wordType}`
     const g = groups.get(k)
     if (g) g.push(w)
     else groups.set(k, [w])

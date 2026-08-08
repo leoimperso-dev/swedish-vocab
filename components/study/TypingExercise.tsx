@@ -5,9 +5,10 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { Check, Minus, X } from 'lucide-react'
 import { speak, unlock } from '@/lib/tts'
 import { evaluateAnswer } from '@/lib/fuzzy'
-import { directionPrompt, directionAnswer, learnedText, learnedLocale, type Direction } from '@/lib/word-display'
+import { directionPrompt, directionAnswer, learnedText, learnedLocale } from '@/lib/word-display'
+import { answerLang, type Direction } from '@/lib/courses'
 import { getStrings } from '@/lib/i18n'
-import { useLang } from '@/components/LangProvider'
+import { useCourse } from '@/components/CourseProvider'
 import { Card, TextField } from '@/components/ui/primitives'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
@@ -35,10 +36,10 @@ const FEEDBACK_CLASS: Record<AnswerResult, string> = {
 export default function TypingExercise({ word, direction, onAnswer }: Props) {
   const [input, setInput] = useState('')
   const [result, setResult] = useState<AnswerResult | null>(null)
-  const lang = useLang()
-  const t = getStrings(lang)
+  const course = useCourse()
+  const t = getStrings(course.native)
   const expected = directionAnswer(word, direction)
-  const translateLabel = direction === 'FR_SV' ? t.translateToSwedish : t.translateToFrench
+  const translateLabel = t.translateTo(t.languageName[answerLang(direction)])
 
   const resultLabel: Record<AnswerResult, string> = {
     correct: t.resultCorrect,
@@ -49,7 +50,7 @@ export default function TypingExercise({ word, direction, onAnswer }: Props) {
   const handleSubmit = () => {
     if (!input.trim() || result) return
     unlock()
-    speak(learnedText(word, lang), learnedLocale(lang))
+    speak(learnedText(word, course), learnedLocale(course))
 
     const evaluation = evaluateAnswer(input, expected)
     setResult(evaluation)

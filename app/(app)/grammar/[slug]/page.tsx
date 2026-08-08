@@ -3,28 +3,30 @@ import { auth } from '@/auth'
 import { notFound } from 'next/navigation'
 import Link from 'next/link'
 import { ChevronLeft, ChevronRight } from 'lucide-react'
-import { asLang, getStrings } from '@/lib/i18n'
+import { getStrings } from '@/lib/i18n'
+import { getCourse } from '@/lib/current-course'
 import MarkdownLite from '@/components/grammar/MarkdownLite'
 import { AppShell } from '@/components/AppShell'
 
 export default async function GrammarLessonPage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params
   const session = await auth()
-  const [user, lesson] = await Promise.all([
-    db.user.findUnique({ where: { id: session!.user!.id }, select: { nativeLanguage: true } }),
+  const [course, lesson] = await Promise.all([
+    getCourse(session!.user!.id),
     db.grammarLesson.findUnique({ where: { slug } }),
   ])
-  if (!lesson) notFound()
-  const t = getStrings(asLang(user?.nativeLanguage))
+  // A lesson from another pair is not part of this course
+  if (!lesson || lesson.pair !== course.pair) notFound()
+  const t = getStrings(course.native)
 
   const [previous, next] = await Promise.all([
     db.grammarLesson.findFirst({
-      where: { order: { lt: lesson.order } },
+      where: { pair: course.pair, order: { lt: lesson.order } },
       orderBy: { order: 'desc' },
       select: { slug: true, title: true },
     }),
     db.grammarLesson.findFirst({
-      where: { order: { gt: lesson.order } },
+      where: { pair: course.pair, order: { gt: lesson.order } },
       orderBy: { order: 'asc' },
       select: { slug: true, title: true },
     }),

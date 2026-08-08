@@ -1,12 +1,16 @@
 import { NextResponse } from 'next/server'
 import { auth } from '@/auth'
 import { db } from '@/lib/db'
+import { getCourse } from '@/lib/current-course'
 
 export async function GET() {
   const session = await auth()
   if (!session?.user?.id) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   const userId = session.user.id
+  // Vocabulary figures are per course; XP, streak and achievements stay global
+  const { pair } = await getCourse(userId)
+  const inCourse = { userId, word: { pair } }
   const now = new Date()
   const thirtyDaysAgo = new Date(now.getTime() - 30 * 86400000)
   const sevenDaysAgo = new Date(now.getTime() - 7 * 86400000)
@@ -22,23 +26,23 @@ export async function GET() {
     achievements,
   ] = await Promise.all([
     db.user.findUnique({ where: { id: userId }, select: { xp: true, level: true, streakCurrent: true, streakBest: true } }),
-    db.userWord.count({ where: { userId } }),
-    db.userWord.count({ where: { userId, interval: { gt: 21 } } }),
-    db.userWord.count({ where: { userId, nextReview: { lte: now } } }),
+    db.userWord.count({ where: inCourse }),
+    db.userWord.count({ where: { ...inCourse, interval: { gt: 21 } } }),
+    db.userWord.count({ where: { ...inCourse, nextReview: { lte: now } } }),
     db.studySession.findMany({
       where: { userId, startedAt: { gte: thirtyDaysAgo }, endedAt: { not: null } },
       orderBy: { startedAt: 'desc' },
       select: { startedAt: true, wordsStudied: true, wordsCorrect: true, xpGained: true },
     }),
     db.userWord.findMany({
-      where: { userId, incorrectCount: { gt: 0 } },
+      where: { ...inCourse, incorrectCount: { gt: 0 } },
       orderBy: { incorrectCount: 'desc' },
       take: 10,
-      include: { word: { select: { swedish: true, french: true } } },
+      include: { word: { select: { term: true, translation: true } } },
     }),
     db.userWord.groupBy({
       by: ['wordId'],
-      where: { userId },
+      where: inCourse,
       _count: true,
     }),
     db.userAchievement.findMany({
@@ -73,8 +77,8 @@ export async function GET() {
     accuracy,
     weekActivity,
     hardestWords: hardestWords.map(uw => ({
-      swedish: uw.word.swedish,
-      french: uw.word.french,
+      term: uw.word.term,
+      translation: uw.word.translation,
       incorrectCount: uw.incorrectCount,
       correctCount: uw.correctCount,
     })),

@@ -10,8 +10,9 @@ datasource db {
 
 enum WordType {
   VERB
-  NOUN_EN
-  NOUN_ETT
+  NOUN_EN // Swedish common-gender noun ("en bok")
+  NOUN_ETT // Swedish neuter noun ("ett hus")
+  NOUN // Genderless noun (English)
   ADJECTIVE
   ADVERB
   FUNCTION
@@ -26,8 +27,11 @@ model User {
   emailVerified DateTime?
   image         String?
   timezone      String    @default("Europe/Brussels")
-  // "fr" = French speaker learning Swedish (default) | "sv" = Swedish speaker learning French
+  // Interface language: "fr" | "sv" | "en"
   nativeLanguage String   @default("fr")
+  // Language being studied. The (nativeLanguage, learningLanguage) couple is the
+  // user's course and resolves to a content pair — see lib/courses.ts
+  learningLanguage String @default("sv")
   xp            Int       @default(0)
   level         Int       @default(1)
   streakCurrent Int       @default(0)
@@ -84,46 +88,58 @@ model VerificationToken {
 
 model Word {
   id       String   @id @default(cuid())
-  swedish  String
-  french   String
+  // Content pair this word belongs to: "sv-fr" | "en-fr" (lib/courses.ts)
+  pair     String   @default("sv-fr")
+  // Headword in the pair's `term` language, and its `translation`-language gloss
+  term        String
+  translation String
   wordType WordType @default(OTHER)
   category String?
-  // verbe: {present,preterit,supine} | nom: {plural} | adj: {ett,plural,comparative,superlative}
+  // sv verb: {present,preterit,supine} | en verb: {past,pastParticiple}
+  // noun: {plural} | adj: {ett,plural,comparative,superlative}
   forms    Json?
   source   String?  // "swedish_txt" | "core_3000"
   frequencyRank Int? // real-world rank from OpenSubtitles corpus (1 = most common)
-  // { translations: string[], context?: string, usage?: [{sv, fr}] }
+  // { translations: string[], context?: string, usage?: [{term, translation}] }
   details  Json?
-  // Tatoeba example sentences (CC-BY): [{ sv, fr?, blank }] — blank = surface form to hide in cloze
+  // Tatoeba example sentences (CC-BY): [{ term, translation?, blank }] — blank = surface form to hide in cloze
   examples Json?
   createdAt DateTime @default(now())
 
   userProgress UserWord[]
   favorites    Favorite[]
 
-  @@unique([swedish, wordType, source])
-  @@index([frequencyRank])
+  @@unique([pair, term, wordType, source], map: "Word_pair_term_wordType_source_key")
+  @@index([pair, frequencyRank], map: "Word_pair_frequencyRank_idx")
 }
 
 model Story {
-  id          String   @id @default(cuid())
-  slug        String   @unique
-  title       String // Swedish title
-  titleFrench String
-  level       String // "beginner" | "intermediate" | "expert"
-  body        String // Swedish text, paragraphs separated by \n\n
-  wordCount   Int
-  createdAt   DateTime @default(now())
+  id              String   @id @default(cuid())
+  pair            String   @default("sv-fr") // content pair (lib/courses.ts)
+  slug            String   @unique
+  title           String // title in the pair's `term` language
+  titleTranslated String
+  level           String // "beginner" | "intermediate" | "expert" | "dialogue"
+  body            String // `term`-language text, paragraphs separated by \n\n
+  wordCount       Int
+  createdAt       DateTime @default(now())
+
+  @@index([pair])
 }
 
 model GrammarLesson {
   id        String   @id @default(cuid())
+  pair      String   @default("sv-fr") // content pair (lib/courses.ts)
   slug      String   @unique
-  title     String // French title
-  category  String // French category label ("Verbes", "Noms & articles"...)
+  // Lessons teach the pair's `term` language and are written in its
+  // `translation` language, so only learners of `term` are served them.
+  title     String
+  category  String // category label ("Verbes", "Noms & articles"...)
   order     Int // global pedagogical order (also orders categories)
   body      String // restricted markdown (##, -, **, > example lines)
   createdAt DateTime @default(now())
+
+  @@index([pair, order])
 }
 
 model Favorite {

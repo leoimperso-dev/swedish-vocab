@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@/auth'
 import { lookupWord } from '@/lib/dictionary'
+import { getCourse } from '@/lib/current-course'
 
 export async function GET(req: NextRequest) {
   const session = await auth()
@@ -9,7 +10,8 @@ export async function GET(req: NextRequest) {
   const q = req.nextUrl.searchParams.get('q')
   if (!q) return NextResponse.json({ error: 'Missing q' }, { status: 400 })
 
-  const entry = await lookupWord(q)
+  const course = await getCourse(session.user.id)
+  const entry = await lookupWord(q, course.pair)
   return NextResponse.json(entry ? { found: true, ...entry } : { found: false }, {
     headers: { 'Cache-Control': 'private, max-age=86400' },
   })

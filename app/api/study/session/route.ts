@@ -1,6 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@/auth'
 import { db } from '@/lib/db'
+import { getCourse } from '@/lib/current-course'
+import {
+  courseDirections, defaultDirection, learnsTermLanguage, pairOf, promptLang, verbFormsFor,
+  type Course, type Direction,
+} from '@/lib/courses'
 import type { ExerciseType } from '@/types'
 import type { Word, UserWord } from '@prisma/client'
 
@@ -8,23 +13,29 @@ const SESSION_SIZE = 15
 const NEW_WORDS_PER_SESSION = 5
 const FORCED_MODES: ExerciseType[] = ['FLASHCARD', 'QCM', 'TYPING', 'CONJUGATION', 'CLOZE']
 
-function hasFullVerbForms(forms: unknown): boolean {
+function hasFullVerbForms(forms: unknown, course: Course): boolean {
   if (!forms || typeof forms !== 'object') return false
+  const keys = verbFormsFor(pairOf(course.pair).term)
+  if (keys.length === 0) return false
   const f = forms as Record<string, unknown>
-  return ['present', 'preterit', 'supine'].every(k => typeof f[k] === 'string' && f[k])
+  return keys.every(k => typeof f[k] === 'string' && f[k])
 }
 
 function hasExamples(examples: unknown): boolean {
   return Array.isArray(examples) && examples.length > 0
 }
 
-function selectExerciseType(userWord: UserWord | null, word: Word, frNative: boolean): ExerciseType {
+function selectExerciseType(
+  userWord: UserWord | null,
+  word: Word,
+  course: Course,
+  termExercises: boolean,
+): ExerciseType {
   if (!userWord || userWord.repetitions === 0) return 'FLASHCARD'
   if (userWord.repetitions <= 2) return 'QCM'
-  // Conjugation and cloze work on Swedish material — only for French speakers learning Swedish
   const pool: ExerciseType[] = ['TYPING']
-  if (frNative && word.wordType === 'VERB' && hasFullVerbForms(word.forms)) pool.push('CONJUGATION')
-  if (frNative && hasExamples(word.examples)) pool.push('CLOZE')
+  if (termExercises && word.wordType === 'VERB' && hasFullVerbForms(word.forms, course)) pool.push('CONJUGATION')
+  if (termExercises && hasExamples(word.examples)) pool.push('CLOZE')
   return pool[Math.floor(Math.random() * pool.length)]
 }
 
@@ -33,13 +44,17 @@ export async function GET(req: NextRequest) {
   if (!session?.user?.id) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   const userId = session.user.id
-  const user = await db.user.findUnique({ where: { id: userId }, select: { nativeLanguage: true } })
-  const canConjugate = user?.nativeLanguage !== 'sv'
+  const course = await getCourse(userId)
+  const pair = course.pair
+  // Conjugation and cloze drill the pair's `term` language: only its learners get them
+  const termExercises = learnsTermLanguage(course)
 
-  const direction = req.nextUrl.searchParams.get('direction') === 'FR_SV' ? 'FR_SV' : 'SV_FR'
+  const requested = req.nextUrl.searchParams.get('direction')
+  const direction: Direction = courseDirections(course).find(d => d === requested)
+    ?? defaultDirection(course)
   const modeParam = req.nextUrl.searchParams.get('mode') as ExerciseType | null
-  const frNativeOnly = modeParam === 'CONJUGATION' || modeParam === 'CLOZE'
-  const forcedMode = modeParam && FORCED_MODES.includes(modeParam) && (!frNativeOnly || canConjugate)
+  const termOnlyMode = modeParam === 'CONJUGATION' || modeParam === 'CLOZE'
+  const forcedMode = modeParam && FORCED_MODES.includes(modeParam) && (!termOnlyMode || termExercises)
     ? modeParam
     : null
 
@@ -48,8 +63,8 @@ export async function GET(req: NextRequest) {
   const clozeOnly = forcedMode === 'CLOZE'
   const needsEligibility = conjugationOnly || clozeOnly
   const isEligible = (word: Word) =>
-    conjugationOnly ? hasFullVerbForms(word.forms) : clozeOnly ? hasExamples(word.examples) : true
-  const wordFilter = conjugationOnly ? { wordType: 'VERB' as const } : {}
+    conjugationOnly ? hasFullVerbForms(word.forms, course) : clozeOnly ? hasExamples(word.examples) : true
+  const wordFilter = { pair, ...(conjugationOnly ? { wordType: 'VERB' as const } : {}) }
 
   // 1. Due words (SM-2 scheduled for today, in the session's direction)
   const dueUserWords = (await db.userWord.findMany({
@@ -88,7 +103,7 @@ export async function GET(req: NextRequest) {
     ...dueUserWords.map(uw => ({
       word: uw.word,
       userWord: uw,
-      exerciseType: forcedMode ?? selectExerciseType(uw, uw.word, canConjugate),
+      exerciseType: forcedMode ?? selectExerciseType(uw, uw.word, course, termExercises),
     })),
     ...newWords.map(w => ({
       word: w,
@@ -104,14 +119,18 @@ export async function GET(req: NextRequest) {
   }
 
   // Pre-compute QCM distractors in one query (avoids a network round trip per question)
-  const answerField = direction === 'FR_SV' ? ('swedish' as const) : ('french' as const)
+  const answerField = promptLang(direction) === pairOf(pair).term ? ('translation' as const) : ('term' as const)
   const distractorsByWordId = new Map<string, string[]>()
+  const DISTRACTOR_POOL_SIZE = 150
   if (exercises.some(e => e.exerciseType === 'QCM')) {
+    // Random window into the pair's vocabulary — bounded by its actual size, or a
+    // small pair would be skipped past entirely and yield no distractors
+    const pairTotal = await db.word.count({ where: { pair } })
     const pool = await db.word.findMany({
-      where: { id: { notIn: exercises.map(e => e.word.id) } },
-      select: { swedish: true, french: true, wordType: true },
-      take: 150,
-      skip: Math.floor(Math.random() * 2000),
+      where: { pair, id: { notIn: exercises.map(e => e.word.id) } },
+      select: { term: true, translation: true, wordType: true },
+      take: DISTRACTOR_POOL_SIZE,
+      skip: Math.floor(Math.random() * Math.max(1, pairTotal - DISTRACTOR_POOL_SIZE)),
     })
     for (const ex of exercises) {
       if (ex.exerciseType !== 'QCM') continue

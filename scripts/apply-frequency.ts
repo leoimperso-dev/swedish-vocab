@@ -1,20 +1,15 @@
 // Assigns Word.frequencyRank from a real frequency list (OpenSubtitles "word count" per line).
 // Matches headword + inflected forms, keeps the best (lowest) rank.
-// Usage: pnpm tsx scripts/apply-frequency.ts <path-to-sv_50k.txt>
+// Usage: pnpm tsx scripts/apply-frequency.ts <path-to-xx_50k.txt> [pair]
 import 'dotenv/config'
 import fs from 'fs'
 import { db } from '../lib/db'
+import { PAIRS, asPairId, type Lang } from '../lib/courses'
+import { headwordKey, isSuffixShorthand } from '../lib/morphology'
 
-// Personal-file forms are often ending shorthands ("ar", "ade"), not real words
-const SUFFIX_SHORTHANDS = new Set([
-  'r', 'ar', 'er', 'a', 'de', 'ade', 'dde', 'te', 't', 'at', 'tt', 'it',
-  'en', 'n', 'na', 'are', 'ast', 'aste',
-])
-
-function buildKeys(swedish: string, forms: unknown): string[] {
+function buildKeys(term: string, forms: unknown, lang: Lang): string[] {
   const keys = new Set<string>()
-  let base = swedish.toLowerCase().replace(/\//g, '').replace(/\(.*?\)/g, '').trim()
-  base = base.replace(/^(en|ett|att)\s+/, '')
+  const base = headwordKey(term, lang)
   if (base) keys.add(base)
   const tokens = base.split(/\s+/)
   if (tokens.length > 1 && tokens[0]) keys.add(tokens[0])
@@ -22,7 +17,7 @@ function buildKeys(swedish: string, forms: unknown): string[] {
     for (const value of Object.values(forms as Record<string, unknown>)) {
       if (typeof value !== 'string') continue
       const form = value.toLowerCase().trim()
-      if (form.length >= 3 && !SUFFIX_SHORTHANDS.has(form)) keys.add(form)
+      if (form.length >= 3 && !isSuffixShorthand(form, lang)) keys.add(form)
     }
   }
   return [...keys]
@@ -30,7 +25,9 @@ function buildKeys(swedish: string, forms: unknown): string[] {
 
 async function main() {
   const listPath = process.argv[2]
-  if (!listPath) { console.error('Usage: tsx scripts/apply-frequency.ts <sv_50k.txt>'); process.exit(1) }
+  if (!listPath) { console.error('Usage: tsx scripts/apply-frequency.ts <xx_50k.txt> [pair]'); process.exit(1) }
+  const pair = asPairId(process.argv[3])
+  const lang = PAIRS[pair].term
 
   const rankByToken = new Map<string, number>()
   fs.readFileSync(listPath, 'utf-8').trim().split('\n').forEach((line, i) => {
@@ -39,12 +36,12 @@ async function main() {
   })
   console.log(`Frequency list: ${rankByToken.size} tokens`)
 
-  const words = await db.word.findMany({ select: { id: true, swedish: true, forms: true } })
+  const words = await db.word.findMany({ where: { pair }, select: { id: true, term: true, forms: true } })
   const updates: Array<{ id: string; rank: number }> = []
   const allKeys = new Set<string>()
 
   for (const word of words) {
-    const keys = buildKeys(word.swedish, word.forms)
+    const keys = buildKeys(word.term, word.forms, lang)
     keys.forEach(k => allKeys.add(k))
     let best: number | null = null
     for (const key of keys) {

@@ -2,10 +2,10 @@
 
 import type { ReactNode } from 'react'
 import { Flame, Snowflake, Zap } from 'lucide-react'
-import { getStrings } from '@/lib/i18n'
-import { useLang } from '@/components/LangProvider'
+import { localeOf } from '@/lib/courses'
+import { useCourse } from '@/components/CourseProvider'
 import { useStats } from '@/components/StatsProvider'
-import { toggleLanguage } from '@/app/(app)/actions'
+import { CoursePicker } from '@/components/CoursePicker'
 import { Chip } from '@/components/ui/primitives'
 
 export function AppShell({
@@ -17,8 +17,7 @@ export function AppShell({
   subtitle?: string
   children: ReactNode
 }) {
-  const lang = useLang()
-  const t = getStrings(lang)
+  const course = useCourse()
   const { streak, freezes, xp } = useStats()
 
   return (
@@ -33,16 +32,7 @@ export function AppShell({
               <p className="truncate text-xs text-muted-foreground">{subtitle}</p>
             ) : null}
           </div>
-          <form action={toggleLanguage}>
-            <button
-              type="submit"
-              title={t.switchMode}
-              aria-label={t.switchMode}
-              className="pressable flex h-9 w-11 shrink-0 items-center justify-center overflow-hidden rounded-lg border border-border bg-surface"
-            >
-              {lang === 'fr' ? <SwedishFlag /> : <FrenchFlag />}
-            </button>
-          </form>
+          <CoursePicker course={course} />
         </div>
         <div className="mt-3 flex items-center gap-2 overflow-x-auto pb-0.5 [scrollbar-width:none]">
           <Chip tone="streak">
@@ -54,7 +44,7 @@ export function AppShell({
             </Chip>
           ) : null}
           <Chip tone="warning">
-            <Zap size={13} /> {xp.toLocaleString('fr-FR')} XP
+            <Zap size={13} /> {xp.toLocaleString(localeOf(course.native))} XP
           </Chip>
         </div>
       </header>
@@ -64,22 +54,3 @@ export function AppShell({
   )
 }
 
-export function SwedishFlag() {
-  return (
-    <svg viewBox="0 0 16 10" className="h-4 w-6" aria-hidden="true">
-      <rect width="16" height="10" fill="#005293" />
-      <rect x="5" width="2" height="10" fill="#FECB00" />
-      <rect y="4" width="16" height="2" fill="#FECB00" />
-    </svg>
-  )
-}
-
-export function FrenchFlag() {
-  return (
-    <svg viewBox="0 0 16 10" className="h-4 w-6" aria-hidden="true">
-      <rect width="16" height="10" fill="#FFFFFF" />
-      <rect width="5.33" height="10" fill="#002395" />
-      <rect x="10.67" width="5.33" height="10" fill="#ED2939" />
-    </svg>
-  )
-}
