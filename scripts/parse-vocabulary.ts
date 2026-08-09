@@ -41,21 +41,24 @@ function detectSwedish(term: string): WordTypeName {
 }
 
 // English has no article prefix, and verbs and adjectives both carry two forms
-// ("speak (spoke, spoken)" vs "good (better, best)"), so the section header
-// decides. Generated files must group entries under === VERBS ===, === NOUNS … ===,
-// === ADJECTIVES ===, === ADVERBS ===, === FUNCTION WORDS ===.
+// ("speak (spoke, spoken)" vs "good (better, best)"), so the section header states
+// the type: "=== VERBES ===" or "=== NOMS | MAISON & LOGEMENT ===", where the part
+// after the pipe is the themed category shown in the UI.
 const ENGLISH_SECTIONS: Array<[RegExp, WordTypeName]> = [
-  [/^VERB/i, 'VERB'],
-  [/^NOUN/i, 'NOUN'],
-  [/^ADJ/i, 'ADJECTIVE'],
-  [/^ADV/i, 'ADVERB'],
-  [/^(FUNCTION|GRAMMAR)/i, 'FUNCTION'],
-  [/^PHRASE/i, 'PHRASE'],
+  [/^VERBE/i, 'VERB'],
+  [/^NOM/i, 'NOUN'],
+  [/^ADJECTIF/i, 'ADJECTIVE'],
+  [/^ADVERBE/i, 'ADVERB'],
+  [/^(MOTS?[- ]OUTILS?|GRAMMAIRE)/i, 'FUNCTION'],
+  [/^EXPRESSION/i, 'PHRASE'],
 ]
 
-function detectEnglish(category: string | null): WordTypeName {
-  if (!category) return 'OTHER'
-  return ENGLISH_SECTIONS.find(([re]) => re.test(category.trim()))?.[1] ?? 'OTHER'
+function splitEnglishHeader(header: string): { type: WordTypeName; category: string } {
+  const [typePart, ...rest] = header.split('|').map(s => s.trim())
+  return {
+    type: ENGLISH_SECTIONS.find(([re]) => re.test(typePart))?.[1] ?? 'OTHER',
+    category: rest.length > 0 ? rest.join(' | ') : typePart,
+  }
 }
 
 function extractForms(term: string, wordType: WordTypeName, lang: Lang): Record<string, string> | null {
@@ -87,6 +90,7 @@ function parseFile(filePath: string, pair: PairId): ParsedWord[] {
   const lines = fs.readFileSync(filePath, 'utf-8').split('\n')
   const words: ParsedWord[] = []
   let currentCategory: string | null = null
+  let sectionType: WordTypeName = 'OTHER'
 
   for (const rawLine of lines) {
     const line = rawLine.trim()
@@ -94,7 +98,14 @@ function parseFile(filePath: string, pair: PairId): ParsedWord[] {
     // Detect category headers like "[Famille]" or "=== VERBES ==="
     const categoryMatch = line.match(/^\[([^\]]+)\]$/) || line.match(/^===\s*(.+?)\s*===$/)
     if (categoryMatch) {
-      currentCategory = categoryMatch[1].trim()
+      const header = categoryMatch[1].trim()
+      if (lang === 'sv') {
+        currentCategory = header
+      } else {
+        const parsed = splitEnglishHeader(header)
+        sectionType = parsed.type
+        currentCategory = parsed.category
+      }
       continue
     }
 
@@ -116,7 +127,7 @@ function parseFile(filePath: string, pair: PairId): ParsedWord[] {
     // Skip obvious grammar notes
     if (term.includes('->') || term.includes('→') || translation.length > 200) continue
 
-    const wordType = lang === 'sv' ? detectSwedish(term) : detectEnglish(currentCategory)
+    const wordType = lang === 'sv' ? detectSwedish(term) : sectionType
     const forms = extractForms(term, wordType, lang)
     // Keep only the base word once the forms are extracted
     if (forms) term = term.replace(/\s*\([^)]+\)/, '').trim()
