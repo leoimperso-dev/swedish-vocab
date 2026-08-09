@@ -2,19 +2,22 @@ import { NextResponse } from 'next/server'
 import { auth } from '@/auth'
 import { db } from '@/lib/db'
 import { knowledgeLevel } from '@/lib/sm2'
+import { getCourse } from '@/lib/current-course'
 
 export async function GET() {
   const session = await auth()
   if (!session?.user?.id) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   const userId = session.user.id
+  const course = await getCourse(userId)
   const [words, progress, favorites] = await Promise.all([
     db.word.findMany({
+      where: { pair: course.pair },
       select: {
-        id: true, swedish: true, french: true, category: true, source: true,
+        id: true, term: true, translation: true, category: true, source: true,
         forms: true, details: true, frequencyRank: true, examples: true,
       },
-      orderBy: { swedish: 'asc' },
+      orderBy: { term: 'asc' },
     }),
     db.userWord.findMany({ where: { userId }, select: { wordId: true, interval: true } }),
     db.favorite.findMany({ where: { userId }, select: { wordId: true } }),

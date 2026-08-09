@@ -20,18 +20,21 @@ import { Button } from '@/components/ui/button'
 import { EmptyState } from '@/components/ui/feedback'
 import { cn } from '@/lib/utils'
 import { getStrings } from '@/lib/i18n'
-import { useLang } from '@/components/LangProvider'
-import { defaultDirection, type Direction } from '@/lib/word-display'
+import { useCourse, useLang } from '@/components/CourseProvider'
+import {
+  courseDirections, defaultDirection, flagOf, learnsTermLanguage, promptLang, answerLang,
+  type Course, type Direction,
+} from '@/lib/courses'
 import type { ExerciseWord, AnswerResult, ExerciseType } from '@/types'
 
 type StudyMode = 'MIX' | ExerciseType
 
 export default function StudyPage() {
   const router = useRouter()
-  const lang = useLang()
-  const t = getStrings(lang)
+  const course = useCourse()
+  const t = getStrings(course.native)
   const [mode, setMode] = useState<StudyMode | null>(null)
-  const [direction, setDirection] = useState<Direction>(defaultDirection(lang))
+  const [direction, setDirection] = useState<Direction>(defaultDirection(course))
   const [sessionId, setSessionId] = useState<string | null>(null)
   const [exercises, setExercises] = useState<ExerciseWord[]>([])
   const [currentIndex, setCurrentIndex] = useState(0)
@@ -117,10 +120,10 @@ export default function StudyPage() {
   if (!mode) {
     return (
       <ModePicker
+        course={course}
         onPick={setMode}
         direction={direction}
         onDirectionChange={setDirection}
-        conjugationAvailable={lang === 'fr'}
       />
     )
   }
@@ -200,26 +203,35 @@ const MODE_ICONS: Record<StudyMode, LucideIcon> = {
   CONJUGATION: Repeat2,
 }
 
-function ModePicker({ onPick, direction, onDirectionChange, conjugationAvailable }: {
+function ModePicker({ course, onPick, direction, onDirectionChange }: {
+  course: Course
   onPick: (mode: StudyMode) => void
   direction: Direction
   onDirectionChange: (d: Direction) => void
-  conjugationAvailable: boolean
 }) {
-  const t = getStrings(useLang())
+  const t = getStrings(course.native)
+  // Cloze, conjugation, reading and grammar are authored for the pair's `term`
+  // language — they only make sense to someone learning that side
+  const termContent = learnsTermLanguage(course)
+  const learnedName = t.languageName[course.learned]
 
   const modes: Array<{ mode: StudyMode; label: string; desc: string }> = [
     { mode: 'MIX', label: t.modeMix, desc: t.modeMixDesc },
     { mode: 'FLASHCARD', label: t.modeFlashcard, desc: t.modeFlashcardDesc },
     { mode: 'QCM', label: t.modeQcm, desc: t.modeQcmDesc },
     { mode: 'TYPING', label: t.modeTyping, desc: t.modeTypingDesc },
-    ...(conjugationAvailable
+    ...(termContent
       ? [
-          { mode: 'CLOZE' as StudyMode, label: t.modeCloze, desc: t.modeClozeDesc },
+          { mode: 'CLOZE' as StudyMode, label: t.modeCloze, desc: t.modeClozeDesc(learnedName) },
           { mode: 'CONJUGATION' as StudyMode, label: t.modeConjugation, desc: t.modeConjugationDesc },
         ]
       : []),
   ]
+
+  const directionOptions = courseDirections(course).map(d => ({
+    value: d,
+    label: `${flagOf(promptLang(d))} → ${flagOf(answerLang(d))}`,
+  }))
 
   return (
     <AppShell title={t.chooseExercise}>
@@ -231,10 +243,7 @@ function ModePicker({ onPick, direction, onDirectionChange, conjugationAvailable
             className="mt-2"
             value={direction}
             onChange={v => onDirectionChange(v as Direction)}
-            options={[
-              { value: 'SV_FR', label: t.directionSvFr },
-              { value: 'FR_SV', label: t.directionFrSv },
-            ]}
+            options={directionOptions}
           />
         </div>
 
@@ -267,7 +276,7 @@ function ModePicker({ onPick, direction, onDirectionChange, conjugationAvailable
           })}
         </div>
 
-        {conjugationAvailable && (
+        {termContent && (
           <div className="space-y-2">
             <Link href="/reading" className="pressable card-surface flex items-center gap-3 p-4">
               <span className="grid size-11 shrink-0 place-items-center rounded-xl bg-warning-soft text-warning">
@@ -285,7 +294,9 @@ function ModePicker({ onPick, direction, onDirectionChange, conjugationAvailable
               </span>
               <span className="min-w-0 flex-1">
                 <span className="block truncate font-display text-base font-semibold">{t.grammarTitle}</span>
-                <span className="block truncate text-xs text-muted-foreground">{t.grammarDesc}</span>
+                <span className="block truncate text-xs text-muted-foreground">
+                  {t.grammarDesc(learnedName)}
+                </span>
               </span>
               <ChevronRight size={18} className="shrink-0 text-muted-foreground" />
             </Link>

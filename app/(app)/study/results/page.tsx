@@ -16,7 +16,7 @@ import {
   Home,
 } from 'lucide-react'
 import { getStrings } from '@/lib/i18n'
-import { useLang } from '@/components/LangProvider'
+import { useLang } from '@/components/CourseProvider'
 import { Card, CardTitle, Chip, SectionLabel } from '@/components/ui/primitives'
 import { Button } from '@/components/ui/button'
 

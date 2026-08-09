@@ -3,9 +3,10 @@
 import { useEffect, useState } from 'react'
 import { motion } from 'framer-motion'
 import { speak, unlock } from '@/lib/tts'
-import { directionPrompt, directionAnswer, learnedText, learnedLocale, type Direction } from '@/lib/word-display'
+import { directionPrompt, directionAnswer, learnedText, learnedLocale } from '@/lib/word-display'
+import { answerLang, type Direction } from '@/lib/courses'
 import { getStrings } from '@/lib/i18n'
-import { useLang } from '@/components/LangProvider'
+import { useCourse } from '@/components/CourseProvider'
 import { Card } from '@/components/ui/primitives'
 import { cn } from '@/lib/utils'
 import type { Word } from '@prisma/client'
@@ -22,10 +23,10 @@ export default function MultipleChoice({ word, direction, distractors, onAnswer 
   const [options, setOptions] = useState<string[]>([])
   const [selected, setSelected] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
-  const lang = useLang()
-  const t = getStrings(lang)
+  const course = useCourse()
+  const t = getStrings(course.native)
   const correctOption = directionAnswer(word, direction)
-  const answerLang = direction === 'FR_SV' ? 'sv' : 'fr'
+  const optionsLang = answerLang(direction)
 
   useEffect(() => {
     const applyOptions = (list: string[]) => {
@@ -40,7 +41,7 @@ export default function MultipleChoice({ word, direction, distractors, onAnswer 
       applyOptions(distractors)
       return
     }
-    fetch(`/api/words/distractors?wordId=${word.id}&wordType=${word.wordType}&lang=${answerLang}`)
+    fetch(`/api/words/distractors?wordId=${word.id}&wordType=${word.wordType}&lang=${optionsLang}`)
       .then(r => r.json())
       .then(data => applyOptions(Array.isArray(data?.distractors) ? data.distractors : []))
       .catch(() => applyOptions([]))
@@ -51,7 +52,7 @@ export default function MultipleChoice({ word, direction, distractors, onAnswer 
     if (selected) return
     setSelected(option)
     unlock()
-    speak(learnedText(word, lang), learnedLocale(lang))
+    speak(learnedText(word, course), learnedLocale(course))
 
     setTimeout(() => {
       const result: AnswerResult = option === correctOption ? 'correct' : 'incorrect'

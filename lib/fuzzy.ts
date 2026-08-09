@@ -50,18 +50,24 @@ export interface VerbForms {
   supine: string
 }
 
-export type VerbEvaluation = Record<keyof VerbForms, AnswerResult>
+export type VerbEvaluation = Record<string, AnswerResult>
 
+// `keys` are the forms drilled for the language at hand (see verbFormsFor in lib/courses.ts)
 export function evaluateVerbForms(
-  inputs: Partial<VerbForms>,
-  forms: Partial<VerbForms>
+  inputs: Record<string, string | undefined>,
+  forms: Record<string, string | undefined>,
+  keys: readonly string[]
 ): VerbEvaluation {
-  // A missing expected form counts as correct (the field isn't part of the exercise)
-  const evalForm = (key: keyof VerbForms): AnswerResult => {
-    if (!forms[key]) return 'correct'
-    return inputs[key] ? evaluateAnswer(inputs[key]!, forms[key]!) : 'incorrect'
+  const evaluation: VerbEvaluation = {}
+  for (const key of keys) {
+    // A missing expected form counts as correct (the field isn't part of the exercise)
+    evaluation[key] = !forms[key]
+      ? 'correct'
+      : inputs[key]
+      ? evaluateAnswer(inputs[key]!, forms[key]!)
+      : 'incorrect'
   }
-  return { present: evalForm('present'), preterit: evalForm('preterit'), supine: evalForm('supine') }
+  return evaluation
 }
 
 // Parse verb forms from string like "går, gick, gått" or "(går, gick, gått)"

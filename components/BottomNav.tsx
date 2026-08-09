@@ -4,7 +4,7 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { Home, Dumbbell, Layers, BarChart3, Trophy, User } from 'lucide-react'
 import { getStrings } from '@/lib/i18n'
-import { useLang } from '@/components/LangProvider'
+import { useLang } from '@/components/CourseProvider'
 import { cn } from '@/lib/utils'
 
 export default function BottomNav() {

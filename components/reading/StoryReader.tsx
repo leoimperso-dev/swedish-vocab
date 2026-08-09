@@ -5,20 +5,23 @@ import Link from 'next/link'
 import { Volume2 } from 'lucide-react'
 import { speak, unlock } from '@/lib/tts'
 import { getStrings } from '@/lib/i18n'
-import { useLang } from '@/components/LangProvider'
+import { useCourse } from '@/components/CourseProvider'
+import { localeOf } from '@/lib/courses'
 import { AppShell } from '@/components/AppShell'
 import { Card } from '@/components/ui/primitives'
 import type { Story } from '@prisma/client'
 
 interface DictResult {
   found: boolean
-  swedish?: string
-  french?: string
+  term?: string
+  translation?: string
   forms?: string | null
 }
 
 export default function StoryReader({ story }: { story: Story }) {
-  const t = getStrings(useLang())
+  const course = useCourse()
+  const t = getStrings(course.native)
+  const locale = localeOf(course.learned)
   const [active, setActive] = useState<string | null>(null) // "para-token" position key
   const [entry, setEntry] = useState<DictResult | null>(null)
   const cacheRef = useRef(new Map<string, DictResult>())
@@ -55,7 +58,7 @@ export default function StoryReader({ story }: { story: Story }) {
   }
 
   return (
-    <AppShell title={story.title} subtitle={story.titleFrench}>
+    <AppShell title={story.title} subtitle={story.titleTranslated}>
       {/* Closes the popover on any outside tap — mirrors the old <main onClick> behavior */}
       <div onClick={() => setActive(null)}>
         <Link
@@ -93,10 +96,10 @@ export default function StoryReader({ story }: { story: Story }) {
                           ) : entry.found ? (
                             <span className="block">
                               <span className="block font-display text-lg font-semibold leading-tight text-foreground">
-                                {entry.swedish}
+                                {entry.term}
                               </span>
                               <span className="mt-0.5 block text-sm leading-snug text-muted-foreground">
-                                {entry.french}
+                                {entry.translation}
                               </span>
                               {entry.forms && (
                                 <span className="mt-1 block text-[11px] italic leading-snug text-muted-foreground/80">
@@ -107,7 +110,7 @@ export default function StoryReader({ story }: { story: Story }) {
                                 onClick={e => {
                                   e.stopPropagation()
                                   unlock()
-                                  speak(entry.swedish!, 'sv-SE')
+                                  speak(entry.term!, locale)
                                 }}
                                 className="pressable mt-2.5 inline-flex items-center gap-1.5 rounded-lg border border-border bg-surface px-2.5 py-1.5 text-xs font-semibold text-primary"
                               >

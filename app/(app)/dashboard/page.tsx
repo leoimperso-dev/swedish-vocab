@@ -2,7 +2,8 @@ import { auth } from '@/auth'
 import { db } from '@/lib/db'
 import { getLevelForXp, getNextLevel, xpToNextLevel } from '@/lib/xp'
 import { toLocalDateString } from '@/lib/streak'
-import { asLang, getStrings } from '@/lib/i18n'
+import { getStrings } from '@/lib/i18n'
+import { getCourse } from '@/lib/current-course'
 import { cn } from '@/lib/utils'
 import { AppShell } from '@/components/AppShell'
 import { Card, CardTitle, Chip, ProgressBar, SectionLabel } from '@/components/ui/primitives'
@@ -13,13 +14,16 @@ import { Flame, Snowflake, Zap, Target, CheckCircle2, BookOpen, Trophy, ArrowRig
 export default async function DashboardPage() {
   const session = await auth()
   const userId = session!.user!.id
+  const course = await getCourse(userId)
+  // Word counts are per course; XP, streak and level stay global
+  const inCourse = { word: { pair: course.pair } }
 
   const [user, masteredCount] = await Promise.all([
     db.user.findUnique({
       where: { id: userId },
       include: {
         wordProgress: {
-          where: { nextReview: { lte: new Date() } },
+          where: { ...inCourse, nextReview: { lte: new Date() } },
           select: { id: true },
         },
         studySessions: {
@@ -28,13 +32,12 @@ export default async function DashboardPage() {
         },
       },
     }),
-    db.userWord.count({ where: { userId, interval: { gt: 21 } } }),
+    db.userWord.count({ where: { userId, ...inCourse, interval: { gt: 21 } } }),
   ])
 
   if (!user) return null
 
-  const lang = asLang(user.nativeLanguage)
-  const t = getStrings(lang)
+  const t = getStrings(course.native)
   const level = getLevelForXp(user.xp)
   const nextLevel = getNextLevel(level.level)
   const { current, needed, progress } = xpToNextLevel(user.xp)
@@ -57,7 +60,7 @@ export default async function DashboardPage() {
   return (
     <AppShell
       title={`${t.hello} ${user.name?.split(' ')[0]}`}
-      subtitle={t.dashboardSubtitle}
+      subtitle={t.dashboardSubtitle(t.languageName[course.learned])}
     >
       <div className="space-y-4">
         {/* Objectif du jour */}

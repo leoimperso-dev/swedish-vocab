@@ -5,9 +5,9 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { Check, Minus, X, Lightbulb } from 'lucide-react'
 import { speak, unlock } from '@/lib/tts'
 import { evaluateAnswer } from '@/lib/fuzzy'
-import { parseDetails } from '@/lib/word-display'
+import { learnedLocale, parseDetails } from '@/lib/word-display'
 import { getStrings } from '@/lib/i18n'
-import { useLang } from '@/components/LangProvider'
+import { useCourse } from '@/components/CourseProvider'
 import { Card, TextField } from '@/components/ui/primitives'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
@@ -15,9 +15,9 @@ import type { Word } from '@prisma/client'
 import type { AnswerResult } from '@/types'
 
 interface ClozeExample {
-  sv: string
-  fr?: string
-  blank: string
+  term: string // sentence in the language being learned
+  translation?: string
+  blank: string // surface form to hide
 }
 
 interface Props {
@@ -44,14 +44,14 @@ const FEEDBACK_CLASS: Record<AnswerResult, string> = {
 export default function ClozeExercise({ word, onAnswer }: Props) {
   const [input, setInput] = useState('')
   const [result, setResult] = useState<AnswerResult | null>(null)
-  const lang = useLang()
-  const t = getStrings(lang)
+  const course = useCourse()
+  const t = getStrings(course.native)
 
   const example = useMemo(() => {
     const examples = (Array.isArray(word.examples) ? word.examples : []) as unknown as ClozeExample[]
-    const valid = examples.filter(e => e?.sv && e?.blank)
+    const valid = examples.filter(e => e?.term && e?.blank)
     if (valid.length === 0) return null
-    const translated = valid.filter(e => e.fr)
+    const translated = valid.filter(e => e.translation)
     const pool = translated.length > 0 ? translated : valid
     return pool[Math.floor(Math.random() * pool.length)]
   }, [word])
@@ -61,15 +61,19 @@ export default function ClozeExercise({ word, onAnswer }: Props) {
   const match = useMemo(() => {
     if (!example) return null
     const re = new RegExp(`(?<=^|[^\\p{L}])${escapeRegex(example.blank)}(?=$|[^\\p{L}])`, 'iu')
-    const m = re.exec(example.sv)
+    const m = re.exec(example.term)
     if (!m) return null
-    return { before: example.sv.slice(0, m.index), word: m[0], after: example.sv.slice(m.index + m[0].length) }
+    return {
+      before: example.term.slice(0, m.index),
+      word: m[0],
+      after: example.term.slice(m.index + m[0].length),
+    }
   }, [example])
 
   if (!example || !match) return null
 
   const details = parseDetails(word.details)
-  const hint = details?.translations ? details.translations.join(', ') : word.french
+  const hint = details?.translations ? details.translations.join(', ') : word.translation
 
   const resultLabel: Record<AnswerResult, string> = {
     correct: t.resultCorrect,
@@ -80,7 +84,7 @@ export default function ClozeExercise({ word, onAnswer }: Props) {
   const handleSubmit = () => {
     if (!input.trim() || result) return
     unlock()
-    speak(example.sv, 'sv-SE')
+    speak(example.term, learnedLocale(course))
 
     const evaluation = evaluateAnswer(input, example.blank)
     setResult(evaluation)
@@ -101,17 +105,19 @@ export default function ClozeExercise({ word, onAnswer }: Props) {
           )}
           {match.after}
         </p>
-        {example.fr && <p className="text-sm italic text-muted-foreground">{example.fr}</p>}
+        {example.translation && (
+          <p className="text-sm italic text-muted-foreground">{example.translation}</p>
+        )}
       </Card>
 
       <div className="flex items-start gap-2 rounded-xl border border-border bg-surface p-3">
         <Lightbulb size={14} className="mt-0.5 shrink-0 text-warning" />
         <p className="text-xs text-muted-foreground">
-          {/* The Swedish headword is the answer — only reveal it after answering */}
+          {/* The headword is the answer — only reveal it after answering */}
           {result ? (
             <>
               <span className="font-semibold text-foreground">
-                {word.swedish.replace(/\(.*?\)/g, '').trim()}
+                {word.term.replace(/\(.*?\)/g, '').trim()}
               </span>{' '}
               — {hint}
             </>

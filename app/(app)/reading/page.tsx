@@ -1,9 +1,15 @@
+import { auth } from '@/auth'
 import { db } from '@/lib/db'
+import { getCourse } from '@/lib/current-course'
 import ReadingBrowser from '@/components/reading/ReadingBrowser'
 
 export default async function ReadingPage() {
+  const session = await auth()
+  const course = await getCourse(session!.user!.id)
+
   const stories = await db.story.findMany({
-    select: { slug: true, title: true, titleFrench: true, level: true, wordCount: true },
+    where: { pair: course.pair },
+    select: { slug: true, title: true, titleTranslated: true, level: true, wordCount: true },
     orderBy: { createdAt: 'asc' },
   })
 

@@ -1,7 +1,9 @@
 import { auth } from '@/auth'
 import { db } from '@/lib/db'
 import { getLevelForXp, xpToNextLevel } from '@/lib/xp'
-import { asLang, getStrings } from '@/lib/i18n'
+import { getStrings } from '@/lib/i18n'
+import { getCourse } from '@/lib/current-course'
+import { localeOf, type PairId } from '@/lib/courses'
 import { cn } from '@/lib/utils'
 import { AppShell } from '@/components/AppShell'
 import { Card, CardTitle, Chip, ProgressBar, SectionLabel } from '@/components/ui/primitives'
@@ -9,56 +11,59 @@ import { BookOpen, CheckCircle2, Target, Flame } from 'lucide-react'
 
 const MASTERY_MILESTONES = [50, 100, 250, 500, 1000, 2000, 5000]
 
-// The vocabulary size changes rarely — memoize per lambda for an hour
-let vocabTotalCache: { value: number; at: number } | null = null
-async function getVocabTotal(): Promise<number> {
-  if (vocabTotalCache && Date.now() - vocabTotalCache.at < 3600000) return vocabTotalCache.value
-  const value = await db.word.count()
-  vocabTotalCache = { value, at: Date.now() }
+// The vocabulary size changes rarely — memoize per pair, per lambda, for an hour
+const vocabTotalCache = new Map<PairId, { value: number; at: number }>()
+async function getVocabTotal(pair: PairId): Promise<number> {
+  const cached = vocabTotalCache.get(pair)
+  if (cached && Date.now() - cached.at < 3600000) return cached.value
+  const value = await db.word.count({ where: { pair } })
+  vocabTotalCache.set(pair, { value, at: Date.now() })
   return value
 }
 
 export default async function StatsPage() {
   const session = await auth()
   const userId = session!.user!.id
+  const course = await getCourse(userId)
+  // Vocabulary figures are per course; XP, streak and achievements stay global
+  const inCourse = { userId, word: { pair: course.pair } }
   const now = new Date()
   const thirtyDaysAgo = new Date(now.getTime() - 30 * 86400000)
 
   const [user, seenRows, masteredRows, dueCount, recentSessions, hardestWords, achievements, vocabTotal] =
     await Promise.all([
       db.user.findUnique({ where: { id: userId } }),
-      db.userWord.findMany({ where: { userId }, select: { wordId: true }, distinct: ['wordId'] }),
+      db.userWord.findMany({ where: inCourse, select: { wordId: true }, distinct: ['wordId'] }),
       db.userWord.findMany({
-        where: { userId, interval: { gt: 21 } },
+        where: { ...inCourse, interval: { gt: 21 } },
         select: { wordId: true },
         distinct: ['wordId'],
       }),
-      db.userWord.count({ where: { userId, nextReview: { lte: now } } }),
+      db.userWord.count({ where: { ...inCourse, nextReview: { lte: now } } }),
       db.studySession.findMany({
         where: { userId, startedAt: { gte: thirtyDaysAgo }, endedAt: { not: null } },
         orderBy: { startedAt: 'asc' },
         select: { startedAt: true, wordsStudied: true, wordsCorrect: true, xpGained: true },
       }),
       db.userWord.findMany({
-        where: { userId, incorrectCount: { gt: 0 } },
+        where: { ...inCourse, incorrectCount: { gt: 0 } },
         orderBy: { incorrectCount: 'desc' },
         take: 10,
-        include: { word: { select: { swedish: true, french: true } } },
+        include: { word: { select: { term: true, translation: true } } },
       }),
       db.userAchievement.findMany({
         where: { userId },
         include: { achievement: true },
         orderBy: { unlockedAt: 'desc' },
       }),
-      getVocabTotal(),
+      getVocabTotal(course.pair),
     ])
 
   if (!user) return null
 
   const totalWords = seenRows.length
   const masteredCount = masteredRows.length
-  const lang = asLang(user.nativeLanguage)
-  const t = getStrings(lang)
+  const t = getStrings(course.native)
   const level = getLevelForXp(user.xp)
   const { progress } = xpToNextLevel(user.xp)
 
@@ -66,7 +71,7 @@ export default async function StatsPage() {
   const weekActivity = Array.from({ length: 7 }, (_, i) => {
     const day = new Date(now.getTime() - (6 - i) * 86400000)
     const dayStr = day.toISOString().split('T')[0]
-    const label = day.toLocaleDateString(lang === 'sv' ? 'sv-SE' : 'fr-FR', { weekday: 'short' })
+    const label = day.toLocaleDateString(localeOf(course.native), { weekday: 'short' })
     const sessions = recentSessions.filter(s => s.startedAt.toISOString().startsWith(dayStr))
     return {
       label,
@@ -215,8 +220,8 @@ export default async function StatsPage() {
               {hardestWords.map(uw => (
                 <Card key={uw.id} className="flex items-center gap-3 p-3.5">
                   <div className="min-w-0 flex-1">
-                    <p className="truncate font-display text-[15px] font-semibold">{uw.word.swedish}</p>
-                    <p className="truncate text-xs text-muted-foreground">{uw.word.french}</p>
+                    <p className="truncate font-display text-[15px] font-semibold">{uw.word.term}</p>
+                    <p className="truncate text-xs text-muted-foreground">{uw.word.translation}</p>
                   </div>
                   <span className="shrink-0 text-xs font-semibold tabular-nums text-danger">
                     ✗ {uw.incorrectCount}

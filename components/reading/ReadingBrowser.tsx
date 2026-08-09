@@ -4,7 +4,7 @@ import { useState } from 'react'
 import Link from 'next/link'
 import { ChevronRight } from 'lucide-react'
 import { getStrings } from '@/lib/i18n'
-import { useLang } from '@/components/LangProvider'
+import { useLang } from '@/components/CourseProvider'
 import { AppShell } from '@/components/AppShell'
 import { SectionLabel } from '@/components/ui/primitives'
 import { cn } from '@/lib/utils'
@@ -14,7 +14,7 @@ export type StoryLevel = 'beginner' | 'intermediate' | 'expert' | 'dialogue'
 interface StoryMeta {
   slug: string
   title: string
-  titleFrench: string
+  titleTranslated: string
   level: string
   wordCount: number
 }
@@ -80,7 +80,7 @@ export default function ReadingBrowser({ stories }: { stories: StoryMeta[] }) {
           >
             <span className="min-w-0 flex-1">
               <span className="block truncate font-display text-base font-semibold">{story.title}</span>
-              <span className="block truncate text-xs italic text-muted-foreground">{story.titleFrench}</span>
+              <span className="block truncate text-xs italic text-muted-foreground">{story.titleTranslated}</span>
               <span className="mt-1 block text-[11px] tabular-nums text-muted-foreground/80">
                 {t.storyWordCount(story.wordCount)}
               </span>

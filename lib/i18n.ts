@@ -1,11 +1,13 @@
-// UI strings for both app modes:
-// fr = French speaker learning Swedish | sv = Swedish speaker learning French
+// UI strings, keyed by the user's interface language (Course.native).
+// Every block is typed against `fr`, so a missing key is a compile error.
+import { DEFAULT_COURSE, type Lang } from '@/lib/courses'
 
-export type Lang = 'fr' | 'sv'
-
-export const DEFAULT_LANG: Lang = 'fr'
+export const DEFAULT_LANG: Lang = DEFAULT_COURSE.native
 
 const fr = {
+  // Language names — injected into the parametric strings below
+  languageName: { fr: 'français', sv: 'suédois', en: 'anglais' } as Record<Lang, string>,
+  interfaceLabel: 'Interface en français',
   // Nav
   navHome: 'Accueil',
   navStudy: 'Étudier',
@@ -15,7 +17,7 @@ const fr = {
   navProfile: 'Profil',
   // Dashboard
   hello: 'Bonjour,',
-  dashboardSubtitle: 'Dags att plugga svenska',
+  dashboardSubtitle: (language: string) => `L'heure de réviser ton ${language}`,
   streakDays: 'jours de suite',
   goalReached: 'Objectif atteint',
   dailyGoal: 'Objectif du jour',
@@ -28,6 +30,10 @@ const fr = {
   studyDue: (n: number) => `Étudier (${n} mots dus)`,
   studyNew: 'Apprendre de nouveaux mots',
   recentActivity: 'Activité récente',
+  // Course picker
+  chooseCourse: "J'apprends",
+  knownWords: (n: number) => `${n} mot${n > 1 ? 's' : ''} connu${n > 1 ? 's' : ''}`,
+  startCourse: 'Commencer',
   // Study
   preparingSession: 'Préparation de ta session...',
   noWordsDue: 'Aucun mot à réviser',
@@ -35,8 +41,6 @@ const fr = {
   loading: 'Chargement...',
   chooseExercise: 'Choisis ton exercice',
   chooseDirection: 'Sens de traduction',
-  directionSvFr: '🇸🇪 → 🇫🇷',
-  directionFrSv: '🇫🇷 → 🇸🇪',
   modeMix: 'Mix',
   modeMixDesc: 'Le meilleur exercice pour chaque mot (recommandé)',
   recommended: 'Recommandé',
@@ -47,9 +51,9 @@ const fr = {
   modeTyping: 'Écriture',
   modeTypingDesc: 'Tape la traduction (fautes tolérées)',
   modeConjugation: 'Conjugaison',
-  modeConjugationDesc: 'Présent, prétérit, supin des verbes',
+  modeConjugationDesc: 'Les temps des verbes',
   modeCloze: 'Phrase à trous',
-  modeClozeDesc: 'Complète de vraies phrases suédoises',
+  modeClozeDesc: (language: string) => `Complète de vraies phrases en ${language}`,
   clozePrompt: 'Complète la phrase',
   // Reading
   readingTitle: 'Lecture',
@@ -71,7 +75,7 @@ const fr = {
   back: '← Retour',
   // Grammar
   grammarTitle: 'Grammaire',
-  grammarDesc: 'La mécanique du suédois, leçon par leçon',
+  grammarDesc: (language: string) => `La mécanique du ${language}, leçon par leçon`,
   grammarSubtitle: (n: number) => `${n} leçons`,
   quit: 'Quitter',
   confirmQuit: 'Quitter ? La progression des mots répondus est sauvegardée.',
@@ -92,8 +96,7 @@ const fr = {
   // QCM
   whichTranslation: 'Quelle est la traduction ?',
   // Typing
-  translateToFrench: 'Traduis en français',
-  translateToSwedish: 'Traduis en suédois',
+  translateTo: (language: string) => `Traduis en ${language}`,
   yourAnswer: 'Ta traduction...',
   submit: 'Valider',
   resultCorrect: 'Correct !',
@@ -105,6 +108,8 @@ const fr = {
   present: 'Présent',
   preterit: 'Prétérit',
   supine: 'Supin',
+  past: 'Prétérit',
+  pastParticiple: 'Participe passé',
   // Results
   sessionDone: 'Session terminée 🎉',
   correct: 'Correct',
@@ -157,18 +162,20 @@ const fr = {
     `Streak freezes : ${count} / ${max} — un freeze protège ta série si tu rates un jour ; tu en regagnes un tous les ${every} jours de suite.`,
   badges: 'Badges',
   signOut: 'Se déconnecter',
-  switchMode: 'Apprendre le français (interface en suédois)',
   // Words list
   vocabularyTitle: 'Vocabulaire',
   wordsAndCategories: (words: number, cats: number) => `${words} mots · ${cats} catégories`,
   personalList: 'Ma liste personnelle',
   misc: 'Divers',
   tabCategories: 'Catégories',
-  tabTop: 'Top 3000',
+  tabTop: (n: number) => `Top ${n}`,
   topWordsHint: 'Les mots les plus fréquents',
   tabFavorites: '★ Favoris',
   showMore: 'Afficher plus',
   noFavorites: 'Aucun favori — appuie sur ☆ à côté d\'un mot pour l\'ajouter',
+  addFavorite: (word: string) => `Ajouter ${word} aux favoris`,
+  removeFavorite: (word: string) => `Retirer ${word} des favoris`,
+  examplesFor: (word: string) => `Exemples pour ${word}`,
   // Global progress
   globalProgress: 'Progression globale',
   knownOf: (known: number, total: number) => `${known} / ${total} mots connus`,
@@ -178,6 +185,8 @@ const fr = {
 }
 
 const sv: typeof fr = {
+  languageName: { fr: 'franska', sv: 'svenska', en: 'engelska' },
+  interfaceLabel: 'Gränssnitt på svenska',
   // Nav
   navHome: 'Hem',
   navStudy: 'Studera',
@@ -187,7 +196,7 @@ const sv: typeof fr = {
   navProfile: 'Profil',
   // Dashboard
   hello: 'Hej,',
-  dashboardSubtitle: 'Dags att plugga franska',
+  dashboardSubtitle: language => `Dags att plugga ${language}`,
   streakDays: 'dagar i rad',
   goalReached: 'Målet uppnått',
   dailyGoal: 'Dagens mål',
@@ -200,6 +209,10 @@ const sv: typeof fr = {
   studyDue: n => `Studera (${n} ord att repetera)`,
   studyNew: 'Lär dig nya ord',
   recentActivity: 'Senaste aktivitet',
+  // Course picker
+  chooseCourse: 'Jag lär mig',
+  knownWords: n => `${n} kända ord`,
+  startCourse: 'Börja',
   // Study
   preparingSession: 'Förbereder din session...',
   noWordsDue: 'Inga ord att repetera',
@@ -207,8 +220,6 @@ const sv: typeof fr = {
   loading: 'Laddar...',
   chooseExercise: 'Välj övning',
   chooseDirection: 'Översättningsriktning',
-  directionSvFr: '🇸🇪 → 🇫🇷',
-  directionFrSv: '🇫🇷 → 🇸🇪',
   modeMix: 'Mix',
   modeMixDesc: 'Bästa övningen för varje ord (rekommenderas)',
   recommended: 'Rekommenderas',
@@ -219,11 +230,11 @@ const sv: typeof fr = {
   modeTyping: 'Skriva',
   modeTypingDesc: 'Skriv översättningen (stavfel tolereras)',
   modeConjugation: 'Böjning',
-  modeConjugationDesc: 'Presens, preteritum, supinum',
+  modeConjugationDesc: 'Verbens tempus',
   modeCloze: 'Lucktext',
-  modeClozeDesc: 'Fyll i riktiga svenska meningar',
+  modeClozeDesc: language => `Fyll i riktiga meningar på ${language}`,
   clozePrompt: 'Fyll i ordet',
-  // Reading (fr-native only, kept for type parity)
+  // Reading
   readingTitle: 'Läsning',
   readingDesc: 'Korta berättelser per nivå, klickbara ord',
   chooseLevel: 'Välj nivå',
@@ -241,9 +252,9 @@ const sv: typeof fr = {
   tapAnyWord: 'Tryck på ett ord för att se översättningen',
   wordNotFound: 'Ordet finns inte i ordboken',
   back: '← Tillbaka',
-  // Grammar (fr-native only, kept for type parity)
+  // Grammar
   grammarTitle: 'Grammatik',
-  grammarDesc: 'Svenskans mekanik, lektion för lektion',
+  grammarDesc: language => `${language}ns mekanik, lektion för lektion`,
   grammarSubtitle: n => `${n} lektioner`,
   quit: 'Avsluta',
   confirmQuit: 'Avsluta? Framsteg för besvarade ord sparas.',
@@ -264,19 +275,20 @@ const sv: typeof fr = {
   // QCM
   whichTranslation: 'Vad är översättningen?',
   // Typing
-  translateToFrench: 'Översätt till franska',
-  translateToSwedish: 'Översätt till svenska',
+  translateTo: language => `Översätt till ${language}`,
   yourAnswer: 'Din översättning...',
   submit: 'Svara',
   resultCorrect: 'Rätt!',
   resultAlmost: 'Nästan — stavfel',
   resultIncorrect: 'Fel',
   expectedAnswer: 'Rätt svar:',
-  // Conjugation (not used in sv mode, kept for type parity)
+  // Conjugation
   infinitive: 'Infinitiv',
   present: 'Presens',
   preterit: 'Preteritum',
   supine: 'Supinum',
+  past: 'Preteritum',
+  pastParticiple: 'Perfektparticip',
   // Results
   sessionDone: 'Sessionen är klar 🎉',
   correct: 'Rätt',
@@ -329,18 +341,20 @@ const sv: typeof fr = {
     `Streak freezes: ${count} / ${max} — en freeze skyddar din svit om du missar en dag; du får tillbaka en var ${every}:e dag i rad.`,
   badges: 'Utmärkelser',
   signOut: 'Logga ut',
-  switchMode: 'Apprendre le suédois (interface en français)',
   // Words list
   vocabularyTitle: 'Ordförråd',
   wordsAndCategories: (words, cats) => `${words} ord · ${cats} kategorier`,
   personalList: 'Personlig lista',
   misc: 'Övrigt',
   tabCategories: 'Kategorier',
-  tabTop: 'Topp 3000',
+  tabTop: n => `Topp ${n}`,
   topWordsHint: 'De vanligaste orden',
   tabFavorites: '★ Favoriter',
   showMore: 'Visa fler',
   noFavorites: 'Inga favoriter — tryck på ☆ bredvid ett ord för att lägga till det',
+  addFavorite: word => `Lägg till ${word} bland favoriter`,
+  removeFavorite: word => `Ta bort ${word} från favoriter`,
+  examplesFor: word => `Exempel för ${word}`,
   // Global progress
   globalProgress: 'Total utveckling',
   knownOf: (known, total) => `${known} / ${total} ord du kan`,
@@ -349,12 +363,193 @@ const sv: typeof fr = {
   retry: 'Försök igen',
 }
 
-const STRINGS: Record<Lang, typeof fr> = { fr, sv }
+const en: typeof fr = {
+  languageName: { fr: 'French', sv: 'Swedish', en: 'English' },
+  interfaceLabel: 'Interface in English',
+  // Nav
+  navHome: 'Home',
+  navStudy: 'Study',
+  navWords: 'Words',
+  navStats: 'Stats',
+  navLeaderboard: 'Leaderboard',
+  navProfile: 'Profile',
+  // Dashboard
+  hello: 'Hi,',
+  dashboardSubtitle: language => `Time to practise your ${language}`,
+  streakDays: 'day streak',
+  goalReached: 'Goal reached',
+  dailyGoal: 'Daily goal',
+  level: 'Level',
+  xpBeforeLevel: (xp, title) => `${xp} XP to go before “${title}”`,
+  toReview: 'To review',
+  masteredWords: 'Mastered words',
+  totalXp: 'Total XP',
+  bestStreak: 'Best streak',
+  studyDue: n => `Study (${n} words due)`,
+  studyNew: 'Learn new words',
+  recentActivity: 'Recent activity',
+  // Course picker
+  chooseCourse: "I'm learning",
+  knownWords: n => `${n} word${n > 1 ? 's' : ''} known`,
+  startCourse: 'Start',
+  // Study
+  preparingSession: 'Preparing your session...',
+  noWordsDue: 'No words to review',
+  comeBackTomorrow: 'Come back tomorrow for your next session!',
+  loading: 'Loading...',
+  chooseExercise: 'Choose your exercise',
+  chooseDirection: 'Translation direction',
+  modeMix: 'Mix',
+  modeMixDesc: 'The best exercise for each word (recommended)',
+  recommended: 'Recommended',
+  modeFlashcard: 'Flashcards',
+  modeFlashcardDesc: 'Discovery and self-assessment',
+  modeQcm: 'Multiple choice',
+  modeQcmDesc: '4 options, one right',
+  modeTyping: 'Typing',
+  modeTypingDesc: 'Type the translation (typos forgiven)',
+  modeConjugation: 'Conjugation',
+  modeConjugationDesc: 'Verb tenses',
+  modeCloze: 'Fill in the blank',
+  modeClozeDesc: language => `Complete real ${language} sentences`,
+  clozePrompt: 'Complete the sentence',
+  // Reading
+  readingTitle: 'Reading',
+  readingDesc: 'Short graded stories, every word tappable',
+  chooseLevel: 'Choose your level',
+  levelBeginner: 'Beginner',
+  levelBeginnerDesc: 'Short sentences, present tense, everyday words',
+  levelIntermediate: 'Intermediate',
+  levelIntermediateDesc: 'Varied tenses, richer stories',
+  levelExpert: 'Expert',
+  levelExpertDesc: 'Rich, idiomatic language',
+  levelDialogue: 'Dialogues',
+  levelDialogueDesc: 'Everyday conversations',
+  storyWordCount: n => `${n} words`,
+  storiesLabel: 'Stories',
+  listen: 'Listen',
+  tapAnyWord: 'Tap any word to see its translation',
+  wordNotFound: 'Word not in the dictionary',
+  back: '← Back',
+  // Grammar
+  grammarTitle: 'Grammar',
+  grammarDesc: language => `How ${language} works, lesson by lesson`,
+  grammarSubtitle: n => `${n} lessons`,
+  quit: 'Quit',
+  confirmQuit: 'Quit? Progress on answered words is saved.',
+  cancel: 'Cancel',
+  skipWord: 'Skip this word',
+  exerciseError: 'This word cannot be displayed',
+  // FlashCard
+  tapToReveal: 'Tap to see the translation',
+  flip: 'Flip',
+  usageNote: 'Usage note',
+  answerNo: 'No',
+  answerNoSub: "I didn't know",
+  answerAlmost: 'Almost',
+  answerAlmostSub: 'Not quite',
+  answerYes: 'Yes',
+  answerYesSub: 'I knew it',
+  swipeHint: "← I didn't know · I knew it →",
+  // QCM
+  whichTranslation: 'What is the translation?',
+  // Typing
+  translateTo: language => `Translate into ${language}`,
+  yourAnswer: 'Your translation...',
+  submit: 'Check',
+  resultCorrect: 'Correct!',
+  resultAlmost: 'Almost — spelling mistake',
+  resultIncorrect: 'Incorrect',
+  expectedAnswer: 'Expected answer:',
+  // Conjugation
+  infinitive: 'Infinitive',
+  present: 'Present',
+  preterit: 'Preterite',
+  supine: 'Supine',
+  past: 'Past',
+  pastParticiple: 'Past participle',
+  // Results
+  sessionDone: 'Session complete 🎉',
+  correct: 'Correct',
+  almost: 'Almost',
+  incorrect: 'Incorrect',
+  levelUnlocked: level => `Level ${level} unlocked!`,
+  freezeSaved: 'Streak saved by a freeze!',
+  sessionWordsReviewed: n => `${n} word${n > 1 ? 's' : ''} reviewed`,
+  xpGainedLabel: 'Experience earned',
+  newBadges: 'New badges!',
+  newSession: 'New session',
+  backHome: 'Back home',
+  // Stats
+  statsTitle: 'Statistics',
+  wordsSeen: 'Words seen',
+  toReviewSub: n => `${n} to review`,
+  mastered: 'Mastered',
+  wordsSub: n => `${n} words`,
+  accuracy30d: 'Accuracy 30d',
+  answersSub: n => `${n} answers`,
+  currentStreak: 'Current streak',
+  recordSub: n => `record: ${n}`,
+  nextMilestone: 'Next mastery milestone',
+  milestoneWords: (current, next) => `${current} / ${next} words`,
+  masteredDef: 'A word is mastered once its SM-2 interval passes 21 days',
+  activity7d: 'Activity — last 7 days',
+  wordsPerDay: 'words/day',
+  max: 'max',
+  streak30d: 'Streak — 30 days',
+  statsHeatLess: 'Less',
+  statsHeatMore: 'More',
+  studied: 'Studied',
+  notStudied: 'Not studied',
+  hardestWords: 'Hardest words',
+  badgesEarned: n => `Badges earned (${n})`,
+  // Leaderboard
+  leaderboardTitle: 'Leaderboard',
+  thisWeek: 'This week',
+  allTime: 'All time',
+  weeklyReset: 'XP earned since Monday — resets every week',
+  you: '(you)',
+  words: 'words',
+  beFirst: 'Be the first to study!',
+  // Profile
+  progression: 'Progress',
+  streak: 'Streak',
+  record: 'Record',
+  dailyGoalSetting: 'Daily goal',
+  freezeInfo: (count, max, every) =>
+    `Streak freezes: ${count} / ${max} — a freeze protects your streak if you miss a day; you earn one back every ${every} days in a row.`,
+  badges: 'Badges',
+  signOut: 'Sign out',
+  // Words list
+  vocabularyTitle: 'Vocabulary',
+  wordsAndCategories: (words, cats) => `${words} words · ${cats} categories`,
+  personalList: 'My personal list',
+  misc: 'Misc',
+  tabCategories: 'Categories',
+  tabTop: n => `Top ${n}`,
+  topWordsHint: 'The most frequent words',
+  tabFavorites: '★ Favorites',
+  showMore: 'Show more',
+  noFavorites: 'No favorites — tap ☆ next to a word to add it',
+  addFavorite: word => `Add ${word} to favorites`,
+  removeFavorite: word => `Remove ${word} from favorites`,
+  examplesFor: word => `Examples for ${word}`,
+  // Global progress
+  globalProgress: 'Overall progress',
+  knownOf: (known, total) => `${known} / ${total} words known`,
+  // Errors
+  errorTitle: 'Oops, something went wrong',
+  retry: 'Try again',
+}
 
-export function getStrings(lang: string | null | undefined): typeof fr {
-  return STRINGS[(lang === 'sv' ? 'sv' : 'fr') as Lang]
+export type Strings = typeof fr
+
+const STRINGS: Record<Lang, Strings> = { fr, sv, en }
+
+export function getStrings(lang: string | null | undefined): Strings {
+  return STRINGS[asLang(lang)]
 }
 
 export function asLang(value: string | null | undefined): Lang {
-  return value === 'sv' ? 'sv' : 'fr'
+  return value === 'sv' || value === 'en' || value === 'fr' ? value : DEFAULT_LANG
 }

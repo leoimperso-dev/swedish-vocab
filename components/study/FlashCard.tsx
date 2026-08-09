@@ -6,10 +6,11 @@ import { Check, X, Volume2, Lightbulb } from 'lucide-react'
 import { speak, unlock } from '@/lib/tts'
 import {
   formatForms, parseDetails, directionPrompt, directionAnswer,
-  learnedText, learnedLocale, type Direction,
+  learnedText, learnedLocale, promptIsTerm, showsEnrichedAnswer,
 } from '@/lib/word-display'
+import type { Direction } from '@/lib/courses'
 import { getStrings } from '@/lib/i18n'
-import { useLang } from '@/components/LangProvider'
+import { useCourse } from '@/components/CourseProvider'
 import { SectionLabel } from '@/components/ui/primitives'
 import { Button } from '@/components/ui/button'
 import type { Word } from '@prisma/client'
@@ -26,8 +27,8 @@ interface Props {
 export default function FlashCard({ word, direction, onAnswer }: Props) {
   const [flipped, setFlipped] = useState(false)
   const [answered, setAnswered] = useState(false)
-  const lang = useLang()
-  const t = getStrings(lang)
+  const course = useCourse()
+  const t = getStrings(course.native)
 
   const x = useMotionValue(0)
   const rotate = useTransform(x, [-250, 250], [-14, 14])
@@ -42,7 +43,7 @@ export default function FlashCard({ word, direction, onAnswer }: Props) {
 
   const handleFlip = () => {
     unlock()
-    speak(learnedText(word, lang), learnedLocale(lang))
+    speak(learnedText(word, course), learnedLocale(course))
     setFlipped(true)
   }
 
@@ -136,12 +137,14 @@ export default function FlashCard({ word, direction, onAnswer }: Props) {
 }
 
 function FlashCardBack({ word, direction }: { word: Word; direction: Direction }) {
-  const lang = useLang()
-  const t = getStrings(lang)
+  const course = useCourse()
+  const t = getStrings(course.native)
   const forms = formatForms(word.forms)
   const details = parseDetails(word.details)
-  // Multiple translations and context notes are written in French — only useful in fr mode
-  const mainAnswer = lang === 'fr' && direction === 'SV_FR' && details?.translations
+  const enriched = showsEnrichedAnswer(word, course, direction)
+  // Inflected forms belong to the `term` side, so they follow wherever it is shown
+  const formsOnPrompt = promptIsTerm(word, direction)
+  const mainAnswer = enriched && details?.translations
     ? details.translations.join(' · ')
     : directionAnswer(word, direction)
 
@@ -149,13 +152,13 @@ function FlashCardBack({ word, direction }: { word: Word; direction: Direction }
     <div className="animate-rise space-y-3">
       <p className="text-sm text-muted-foreground">
         {directionPrompt(word, direction)}
-        {lang === 'fr' && direction === 'SV_FR' && forms && <span> ({forms})</span>}
+        {formsOnPrompt && forms && <span> ({forms})</span>}
       </p>
       <p className="font-display text-2xl font-semibold text-primary">{mainAnswer}</p>
-      {(lang === 'sv' || direction === 'FR_SV') && forms && (
+      {!formsOnPrompt && forms && (
         <p className="text-xs text-muted-foreground">({forms})</p>
       )}
-      {lang === 'fr' && details?.context && (
+      {enriched && details?.context && (
         <p className="text-xs italic text-muted-foreground">{details.context}</p>
       )}
       {details?.usage && (
@@ -165,8 +168,8 @@ function FlashCardBack({ word, direction }: { word: Word; direction: Direction }
           </SectionLabel>
           <div className="mt-1.5 space-y-1">
             {details.usage.map(u => (
-              <p key={u.sv} className="text-sm">
-                <span className="font-semibold">{u.sv}</span> — {u.fr}
+              <p key={u.term} className="text-sm">
+                <span className="font-semibold">{u.term}</span> — {u.translation}
               </p>
             ))}
           </div>

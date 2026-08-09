@@ -4,8 +4,9 @@ import { useEffect, useMemo, useState } from 'react'
 import { ChevronDown, MessageSquare, Star } from 'lucide-react'
 import { formatForms, parseDetails } from '@/lib/word-display'
 import { MAX_KNOWLEDGE_LEVEL } from '@/lib/sm2'
-import { getStrings, type Lang } from '@/lib/i18n'
-import { useLang } from '@/components/LangProvider'
+import { getStrings } from '@/lib/i18n'
+import { learnsTermLanguage, localeOf, type Course } from '@/lib/courses'
+import { useCourse } from '@/components/CourseProvider'
 import { cn } from '@/lib/utils'
 import { AppShell } from '@/components/AppShell'
 import { LevelDots, Segmented, SectionLabel } from '@/components/ui/primitives'
@@ -17,8 +18,8 @@ const PAGE_STEP = 300
 
 interface ApiWord {
   id: string
-  swedish: string
-  french: string
+  term: string
+  translation: string
   category: string | null
   source: string | null
   forms: unknown
@@ -30,15 +31,15 @@ interface ApiWord {
 }
 
 interface WordExample {
-  sv: string
-  fr?: string
+  term: string
+  translation?: string
 }
 
 type Tab = 'categories' | 'top' | 'favorites'
 
 export default function WordsPage() {
-  const lang = useLang()
-  const t = getStrings(lang)
+  const course = useCourse()
+  const t = getStrings(course.native)
   const [words, setWords] = useState<ApiWord[]>([])
   const [loading, setLoading] = useState(true)
   const [tab, setTab] = useState<Tab>('categories')
@@ -46,9 +47,12 @@ export default function WordsPage() {
   const [topVisible, setTopVisible] = useState(PAGE_STEP)
 
   useEffect(() => {
+    // Cache key carries the pair — switching course must not flash the other vocabulary
+    const cacheKey = `words-cache-v2-${course.pair}`
+    setLoading(true)
     // Stale-while-revalidate: show the cached list instantly, refresh in the background
     try {
-      const cached = sessionStorage.getItem('words-cache-v1')
+      const cached = sessionStorage.getItem(cacheKey)
       if (cached) {
         const parsed = JSON.parse(cached)
         if (Array.isArray(parsed.words)) {
@@ -65,11 +69,11 @@ export default function WordsPage() {
         setWords(data.words)
         setLoading(false)
         try {
-          sessionStorage.setItem('words-cache-v1', JSON.stringify({ words: data.words }))
+          sessionStorage.setItem(cacheKey, JSON.stringify({ words: data.words }))
         } catch {}
       })
       .catch(() => setLoading(false))
-  }, [])
+  }, [course.pair])
 
   const groups = useMemo(() => {
     const labels = { personal: t.personalList, misc: t.misc }
@@ -85,9 +89,9 @@ export default function WordsPage() {
     return [...map.entries()].sort(([a], [b]) => {
       if (a === labels.personal) return -1
       if (b === labels.personal) return 1
-      return a.localeCompare(b, 'fr')
+      return a.localeCompare(b, localeOf(course.native))
     })
-  }, [words, t])
+  }, [words, t, course.native])
 
   const topWords = useMemo(
     () => words
@@ -123,7 +127,7 @@ export default function WordsPage() {
 
   const tabOptions = [
     { value: 'categories', label: t.tabCategories },
-    { value: 'top', label: t.tabTop },
+    { value: 'top', label: t.tabTop(TOP_LIST_SIZE) },
     { value: 'favorites', label: t.tabFavorites },
   ]
 
@@ -165,7 +169,7 @@ export default function WordsPage() {
                   {open ? (
                     <div className="animate-rise space-y-2 border-t border-border bg-background/40 p-2">
                       {groupWords.map(word => (
-                        <WordRow key={word.id} word={word} lang={lang} onToggleFavorite={toggleFavorite} />
+                        <WordRow key={word.id} word={word} course={course} onToggleFavorite={toggleFavorite} />
                       ))}
                     </div>
                   ) : null}
@@ -177,7 +181,7 @@ export default function WordsPage() {
           <div className="space-y-2">
             <SectionLabel>{t.topWordsHint}</SectionLabel>
             {topWords.slice(0, topVisible).map(word => (
-              <WordRow key={word.id} word={word} lang={lang} onToggleFavorite={toggleFavorite} showRank />
+              <WordRow key={word.id} word={word} course={course} onToggleFavorite={toggleFavorite} showRank />
             ))}
             {topVisible < topWords.length ? (
               <Button variant="secondary" className="w-full" onClick={() => setTopVisible(v => v + PAGE_STEP)}>
@@ -188,7 +192,7 @@ export default function WordsPage() {
         ) : favoriteWords.length > 0 ? (
           <div className="space-y-2">
             {favoriteWords.map(word => (
-              <WordRow key={word.id} word={word} lang={lang} onToggleFavorite={toggleFavorite} />
+              <WordRow key={word.id} word={word} course={course} onToggleFavorite={toggleFavorite} />
             ))}
           </div>
         ) : (
@@ -199,12 +203,16 @@ export default function WordsPage() {
   )
 }
 
-function WordRow({ word, lang, onToggleFavorite, showRank }: {
+function WordRow({ word, course, onToggleFavorite, showRank }: {
   word: ApiWord
-  lang: Lang
+  course: Course
   onToggleFavorite: (id: string) => void
   showRank?: boolean
 }) {
+  const t = getStrings(course.native)
+  // Enrichment (alternative translations, context) is written in the pair's
+  // `translation` language, which is the native one exactly when `term` is learned
+  const learnsTerm = learnsTermLanguage(course)
   const forms = formatForms(word.forms)
   const details = parseDetails(word.details)
   const [examples, setExamples] = useState<WordExample[] | null>(null)
@@ -224,17 +232,19 @@ function WordRow({ word, lang, onToggleFavorite, showRank }: {
     }
   }
 
-  const frenchLabel = lang === 'fr' && details?.translations ? details.translations.join(', ') : word.french
-  // fr-native: show the known language (French) as primary, Swedish to learn as secondary
-  const primaryWord = lang === 'fr' ? frenchLabel : word.swedish
-  const secondaryWord = lang === 'fr' ? word.swedish : frenchLabel
+  const translationLabel = learnsTerm && details?.translations
+    ? details.translations.join(', ')
+    : word.translation
+  // The native language reads as primary, the one being learned as secondary
+  const primaryWord = learnsTerm ? translationLabel : word.term
+  const secondaryWord = learnsTerm ? word.term : translationLabel
 
   return (
     <div className="card-surface overflow-hidden">
       <div className="flex items-start gap-2.5 p-3.5">
         <button
           onClick={() => onToggleFavorite(word.id)}
-          aria-label={word.favorite ? `Retirer ${word.swedish} des favoris` : `Ajouter ${word.swedish} aux favoris`}
+          aria-label={word.favorite ? t.removeFavorite(word.term) : t.addFavorite(word.term)}
           aria-pressed={word.favorite}
           className="pressable mt-0.5 shrink-0 rounded-lg p-1"
         >
@@ -252,17 +262,18 @@ function WordRow({ word, lang, onToggleFavorite, showRank }: {
               {primaryWord}
             </p>
           </div>
-          {lang !== 'fr' && forms && <p className="truncate text-xs text-muted-foreground/80">({forms})</p>}
+          {/* Inflected forms belong to the `term` side — shown wherever it sits */}
+          {!learnsTerm && forms && <p className="truncate text-xs text-muted-foreground/80">({forms})</p>}
           <p className="mt-1 text-sm text-muted-foreground">
             {secondaryWord}
-            {lang === 'fr' && forms && <span className="ml-1 text-xs opacity-70">({forms})</span>}
+            {learnsTerm && forms && <span className="ml-1 text-xs opacity-70">({forms})</span>}
           </p>
-          {lang === 'fr' && details?.context && (
+          {learnsTerm && details?.context && (
             <p className="mt-1 text-xs italic text-muted-foreground">{details.context}</p>
           )}
           {details?.usage?.map(u => (
-            <p key={u.sv} className="mt-0.5 text-xs text-muted-foreground">
-              <span className="text-foreground/80">{u.sv}</span> — {u.fr}
+            <p key={u.term} className="mt-0.5 text-xs text-muted-foreground">
+              <span className="text-foreground/80">{u.term}</span> — {u.translation}
             </p>
           ))}
           <LevelDots level={word.level} total={MAX_KNOWLEDGE_LEVEL} className="mt-2" />
@@ -272,7 +283,7 @@ function WordRow({ word, lang, onToggleFavorite, showRank }: {
           <button
             onClick={toggleExamples}
             aria-expanded={showExamples}
-            aria-label={`Exemples pour ${word.swedish}`}
+            aria-label={t.examplesFor(word.term)}
             className={cn(
               'pressable mt-0.5 grid size-9 shrink-0 place-items-center rounded-xl border',
               showExamples
@@ -293,9 +304,11 @@ function WordRow({ word, lang, onToggleFavorite, showRank }: {
             <p className="text-xs text-muted-foreground">—</p>
           ) : (
             examples.map(ex => (
-              <div key={ex.sv}>
-                <p className="text-sm leading-snug text-foreground">{ex.sv}</p>
-                {ex.fr && <p className="text-xs italic leading-snug text-muted-foreground">{ex.fr}</p>}
+              <div key={ex.term}>
+                <p className="text-sm leading-snug text-foreground">{ex.term}</p>
+                {ex.translation && (
+                  <p className="text-xs italic leading-snug text-muted-foreground">{ex.translation}</p>
+                )}
               </div>
             ))
           )}

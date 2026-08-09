@@ -1,4 +1,5 @@
-// Web Speech API wrapper for TTS (Swedish or French depending on app mode)
+// Web Speech API wrapper for TTS — the caller passes the locale of the language
+// being learned (see localeOf in lib/courses.ts).
 // iOS requires a user gesture before first use — call unlock() on first tap
 
 let unlocked = false
@@ -10,7 +11,7 @@ export function unlock() {
   unlocked = true
 }
 
-export function speak(text: string, locale = 'sv-SE', rate = 0.9): void {
+export function speak(text: string, locale: string, rate = 0.9): void {
   if (typeof window === 'undefined') return
   window.speechSynthesis.cancel()
   const utterance = new SpeechSynthesisUtterance(text)
@@ -24,8 +25,8 @@ export function isSupported(): boolean {
   return typeof window !== 'undefined' && 'speechSynthesis' in window
 }
 
-export function getSwedishVoice(): SpeechSynthesisVoice | null {
+export function getVoiceFor(locale: string): SpeechSynthesisVoice | null {
   if (!isSupported()) return null
-  const voices = window.speechSynthesis.getVoices()
-  return voices.find(v => v.lang.startsWith('sv')) ?? null
+  const prefix = locale.split('-')[0]
+  return window.speechSynthesis.getVoices().find(v => v.lang.startsWith(prefix)) ?? null
 }
