@@ -83,9 +83,13 @@ Vocabulary files live in `C:\Users\Arnau\Desktop\pro\` and are declared in `SOUR
 - `English_core_5000.txt` — same for English
 
 Format is `headword (forms) - translation` under `=== SECTION ===` headers. Swedish infers the word
-type from the headword (article prefix, number of parenthesised forms); **English infers it from the
-section header** (`=== VERBS ===`, `=== NOUNS … ===`, `=== ADJECTIVES ===`, …) because its verbs and
-adjectives both carry two forms. Chunks are merged with `merge-core.ts`, then `pnpm db:seed`.
+type from the headword (article prefix, number of parenthesised forms). **English states it in the
+section header**, because its verbs and adjectives both carry two forms: `=== VERBES ===` or
+`=== NOMS | MAISON & LOGEMENT ===`, where the part after the pipe is the themed category shown in
+the UI. Parenthesised forms are the verb's `(past, pastParticiple)`, the adjective's
+`(comparative, superlative)`, or a noun plural worth noting (`city (cities)`) — a plain `+s` is
+left out. `pnpm db:seed` is idempotent: `[pair, term, wordType, source]` is unique, so re-running it
+only inserts what's new (which also means two senses of one word must share a single entry).
 
 ## Commands
 ```
