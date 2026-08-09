@@ -123,6 +123,11 @@ Content scripts take the pair as their last argument (default `sv-fr`):
 `build-examples.ts <tatoeba-dir> [pair]`, `apply-frequency.ts <xx_50k.txt> [pair]`,
 `import-stories.ts <dir> [pair]`, `import-grammar.ts <dir> [pair]`.
 
+Story and grammar sources live in `Desktop\pro\english-content\{stories,grammar}\`. Slugs are
+globally unique across pairs, hence the `en-` prefix. Rerun `apply-frequency` and `build-examples`
+after every vocabulary batch — they process the whole pair, not just the new rows.
+Their inputs (`en_50k.txt`, `tatoeba\`) are downloads, not repo content.
+
 ## SM-2 quality scores
 - 0 = incorrect (resets interval)
 - 3 = approximate (partial credit, doesn't advance)
