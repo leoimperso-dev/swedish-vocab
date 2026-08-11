@@ -23,6 +23,8 @@ const SOURCES: Array<{ file: string; pair: PairId }> = [
   { file: 'Swedish_core_5000.txt', pair: 'sv-fr' },
   { file: 'English_core_5000.txt', pair: 'en-fr' },
   { file: 'Dutch_core_2000.txt', pair: 'nl-fr' },
+  // Wiktionary-extracted bulk vocabulary (kaikki.org, CC BY-SA), frequency-filtered
+  { file: 'Dutch_wiki.txt', pair: 'nl-fr' },
 ]
 
 function parenthesised(term: string): string[] | null {
