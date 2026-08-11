@@ -1,19 +1,19 @@
 export const LEVELS = [
-  { level: 1, minXp: 0,     title: 'Nybörjare' },
-  { level: 2, minXp: 200,   title: 'Elev' },
-  { level: 3, minXp: 600,   title: 'Student' },
-  { level: 4, minXp: 1500,  title: 'Talare' },
-  { level: 5, minXp: 3500,  title: 'Avancerad' },
-  { level: 6, minXp: 7000,  title: 'Expert' },
-  { level: 7, minXp: 15000, title: 'Mästare' },
+  { level: 1, minXp: 0,    title: 'Nybörjare' },
+  { level: 2, minXp: 20,   title: 'Elev' },
+  { level: 3, minXp: 60,   title: 'Student' },
+  { level: 4, minXp: 150,  title: 'Talare' },
+  { level: 5, minXp: 350,  title: 'Avancerad' },
+  { level: 6, minXp: 700,  title: 'Expert' },
+  { level: 7, minXp: 1500, title: 'Mästare' },
 ] as const
 
 export const XP_REWARDS = {
-  correct: 10,
-  approximate: 5,
+  correct: 1,
+  approximate: 0.5,
   incorrect: 0,
-  firstStudyOfDay: 20,
-  perfectSession: 50,
+  firstStudyOfDay: 2,
+  perfectSession: 5,
   comboMultiplier: 1.5, // applied after 3 consecutive correct
 } as const
 
@@ -50,11 +50,14 @@ export function calculateSessionXp(
     base += xp
     if (result === 'correct') {
       consecutive++
-      if (consecutive > 3) combo += Math.floor(xp * (XP_REWARDS.comboMultiplier - 1))
+      if (consecutive > 3) combo += xp * (XP_REWARDS.comboMultiplier - 1)
     } else {
       consecutive = 0
     }
   }
+  // Rewards are fractional at this scale — the stored total stays an integer
+  base = Math.round(base)
+  combo = Math.round(combo)
 
   const allCorrect = results.every(r => r === 'correct')
   const perfectBonus = allCorrect && results.length >= 15 ? XP_REWARDS.perfectSession : 0

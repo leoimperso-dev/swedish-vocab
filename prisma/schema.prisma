@@ -37,7 +37,7 @@ model User {
   streakCurrent Int       @default(0)
   streakBest    Int       @default(0)
   freezeCount   Int       @default(2) // streak freezes available (max 2, +1 every 7-day milestone)
-  dailyGoalXp   Int       @default(30)
+  dailyGoalXp   Int       @default(3)
   lastStudiedAt DateTime?
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt

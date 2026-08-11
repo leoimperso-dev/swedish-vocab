@@ -1,7 +1,9 @@
 'use client'
 
 import { useEffect, useMemo, useState } from 'react'
-import { ChevronDown, Eye, EyeOff, MessageSquare, Star } from 'lucide-react'
+import { useRouter } from 'next/navigation'
+import { motion, useMotionValue, useTransform } from 'framer-motion'
+import { Check, ChevronDown, Eye, EyeOff, MessageSquare, Star, X } from 'lucide-react'
 import { formatForms, parseDetails } from '@/lib/word-display'
 import { MAX_KNOWLEDGE_LEVEL } from '@/lib/sm2'
 import { getStrings } from '@/lib/i18n'
@@ -27,6 +29,7 @@ interface ApiWord {
   frequencyRank: number | null
   hasExamples: boolean
   level: number
+  known: boolean
   favorite: boolean
 }
 
@@ -63,9 +66,33 @@ export default function WordsPage() {
     })
   }
 
+  // Swipe self-assessment: feeds SM-2 (both directions) and plain per-word XP
+  const [knownFilter, setKnownFilter] = useState<'all' | 'toLearn' | 'known'>('all')
+  const router = useRouter()
+
+  const swipeWord = (wordId: string, known: boolean) => {
+    // Optimistic — the row moves between filters immediately
+    setWords(ws => ws.map(w => (w.id === wordId ? { ...w, known } : w)))
+    fetch('/api/words/review', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ wordId, known }),
+    })
+      .then(r => r.json())
+      .then(data => {
+        if (typeof data?.level !== 'number') return
+        setWords(ws => ws.map(w => (w.id === wordId ? { ...w, known: data.known, level: data.level } : w)))
+        // The header XP chip comes from the server layout
+        router.refresh()
+      })
+      .catch(() => {
+        setWords(ws => ws.map(w => (w.id === wordId ? { ...w, known: !known } : w)))
+      })
+  }
+
   useEffect(() => {
     // Cache key carries the pair — switching course must not flash the other vocabulary
-    const cacheKey = `words-cache-v2-${course.pair}`
+    const cacheKey = `words-cache-v3-${course.pair}`
     setLoading(true)
     // Stale-while-revalidate: show the cached list instantly, refresh in the background
     try {
@@ -92,10 +119,17 @@ export default function WordsPage() {
       .catch(() => setLoading(false))
   }, [course.pair])
 
+  const visibleWords = useMemo(
+    () => knownFilter === 'all'
+      ? words
+      : words.filter(w => (knownFilter === 'known' ? w.known : !w.known)),
+    [words, knownFilter],
+  )
+
   const groups = useMemo(() => {
     const labels = { personal: t.personalList, misc: t.misc }
     const map = new Map<string, ApiWord[]>()
-    for (const word of words) {
+    for (const word of visibleWords) {
       const label = word.source === 'Swedish.txt'
         ? labels.personal
         : (word.category ?? labels.misc).replace(/\s+2$/, '')
@@ -108,16 +142,16 @@ export default function WordsPage() {
       if (b === labels.personal) return 1
       return a.localeCompare(b, localeOf(course.native))
     })
-  }, [words, t, course.native])
+  }, [visibleWords, t, course.native])
 
   const topWords = useMemo(
-    () => words
+    () => visibleWords
       .filter(w => w.frequencyRank !== null && w.frequencyRank <= TOP_LIST_SIZE)
       .sort((a, b) => a.frequencyRank! - b.frequencyRank!),
-    [words]
+    [visibleWords]
   )
 
-  const favoriteWords = useMemo(() => words.filter(w => w.favorite), [words])
+  const favoriteWords = useMemo(() => visibleWords.filter(w => w.favorite), [visibleWords])
 
   const toggleFavorite = (wordId: string) => {
     const word = words.find(w => w.id === wordId)
@@ -177,6 +211,17 @@ export default function WordsPage() {
           </button>
         </div>
 
+        <Segmented
+          options={[
+            { value: 'all', label: t.filterAll },
+            { value: 'toLearn', label: t.filterToLearn },
+            { value: 'known', label: t.filterKnown },
+          ]}
+          value={knownFilter}
+          onChange={v => setKnownFilter(v as typeof knownFilter)}
+        />
+        <p className="text-center text-[11px] text-muted-foreground/70">{t.swipeListHint}</p>
+
         {loading ? (
           <ListSkeleton rows={5} />
         ) : tab === 'categories' ? (
@@ -207,7 +252,7 @@ export default function WordsPage() {
                   {open ? (
                     <div className="animate-rise space-y-2 border-t border-border bg-background/40 p-2">
                       {groupWords.map(word => (
-                        <WordRow key={word.id} word={word} course={course} onToggleFavorite={toggleFavorite} masked={flashcards && !revealed.has(word.id)} onFlip={flashcards ? () => flipCard(word.id) : undefined} />
+                        <WordRow key={word.id} word={word} course={course} onToggleFavorite={toggleFavorite} masked={flashcards && !revealed.has(word.id)} onFlip={flashcards ? () => flipCard(word.id) : undefined} onSwipe={known => swipeWord(word.id, known)} />
                       ))}
                     </div>
                   ) : null}
@@ -219,7 +264,7 @@ export default function WordsPage() {
           <div className="space-y-2">
             <SectionLabel>{t.topWordsHint}</SectionLabel>
             {topWords.slice(0, topVisible).map(word => (
-              <WordRow key={word.id} word={word} course={course} onToggleFavorite={toggleFavorite} showRank masked={flashcards && !revealed.has(word.id)} onFlip={flashcards ? () => flipCard(word.id) : undefined} />
+              <WordRow key={word.id} word={word} course={course} onToggleFavorite={toggleFavorite} showRank masked={flashcards && !revealed.has(word.id)} onFlip={flashcards ? () => flipCard(word.id) : undefined} onSwipe={known => swipeWord(word.id, known)} />
             ))}
             {topVisible < topWords.length ? (
               <Button variant="secondary" className="w-full" onClick={() => setTopVisible(v => v + PAGE_STEP)}>
@@ -230,7 +275,7 @@ export default function WordsPage() {
         ) : favoriteWords.length > 0 ? (
           <div className="space-y-2">
             {favoriteWords.map(word => (
-              <WordRow key={word.id} word={word} course={course} onToggleFavorite={toggleFavorite} masked={flashcards && !revealed.has(word.id)} onFlip={flashcards ? () => flipCard(word.id) : undefined} />
+              <WordRow key={word.id} word={word} course={course} onToggleFavorite={toggleFavorite} masked={flashcards && !revealed.has(word.id)} onFlip={flashcards ? () => flipCard(word.id) : undefined} onSwipe={known => swipeWord(word.id, known)} />
             ))}
           </div>
         ) : (
@@ -241,7 +286,9 @@ export default function WordsPage() {
   )
 }
 
-function WordRow({ word, course, onToggleFavorite, showRank, masked, onFlip }: {
+const SWIPE_THRESHOLD = 90
+
+function WordRow({ word, course, onToggleFavorite, showRank, masked, onFlip, onSwipe }: {
   word: ApiWord
   course: Course
   onToggleFavorite: (id: string) => void
@@ -249,7 +296,12 @@ function WordRow({ word, course, onToggleFavorite, showRank, masked, onFlip }: {
   // Flashcard mode: masked hides the translation side; onFlip toggles the reveal
   masked?: boolean
   onFlip?: () => void
+  // Swipe self-assessment: right = I know it, left = I don't
+  onSwipe?: (known: boolean) => void
 }) {
+  const x = useMotionValue(0)
+  const knownOpacity = useTransform(x, [30, SWIPE_THRESHOLD], [0, 1])
+  const unknownOpacity = useTransform(x, [-SWIPE_THRESHOLD, -30], [1, 0])
   const t = getStrings(course.native)
   // Enrichment (alternative translations, context) is written in the pair's
   // `translation` language, which is the native one exactly when `term` is learned
@@ -281,10 +333,36 @@ function WordRow({ word, course, onToggleFavorite, showRank, masked, onFlip }: {
   const secondaryWord = learnsTerm ? word.term : translationLabel
 
   return (
-    <div
-      onClick={onFlip}
-      className={cn('card-surface overflow-hidden', onFlip && 'pressable cursor-pointer')}
-    >
+    <div className="relative">
+      {/* Swipe hints revealed behind the row while dragging */}
+      <motion.div
+        style={{ opacity: knownOpacity }}
+        className="absolute left-3 top-1/2 -translate-y-1/2 grid size-9 place-items-center rounded-full border-2 border-success/50 bg-success-soft text-success"
+        aria-hidden="true"
+      >
+        <Check size={18} />
+      </motion.div>
+      <motion.div
+        style={{ opacity: unknownOpacity }}
+        className="absolute right-3 top-1/2 -translate-y-1/2 grid size-9 place-items-center rounded-full border-2 border-danger/50 bg-danger-soft text-danger"
+        aria-hidden="true"
+      >
+        <X size={18} />
+      </motion.div>
+
+      <motion.div
+        onClick={onFlip}
+        drag={onSwipe ? 'x' : false}
+        dragSnapToOrigin
+        dragElastic={0.6}
+        style={{ x }}
+        onDragEnd={(_, info) => {
+          if (!onSwipe) return
+          if (info.offset.x > SWIPE_THRESHOLD) onSwipe(true)
+          else if (info.offset.x < -SWIPE_THRESHOLD) onSwipe(false)
+        }}
+        className={cn('card-surface overflow-hidden', onFlip && 'pressable cursor-pointer')}
+      >
       <div className={cn('flex items-start gap-2.5', masked ? 'p-2.5 px-3.5' : 'p-3.5')}>
         <button
           onClick={e => { e.stopPropagation(); onToggleFavorite(word.id) }}
@@ -362,6 +440,7 @@ function WordRow({ word, course, onToggleFavorite, showRank, masked, onFlip }: {
           )}
         </div>
       )}
+      </motion.div>
     </div>
   )
 }

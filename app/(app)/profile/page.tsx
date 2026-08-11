@@ -12,7 +12,7 @@ import { Card, CardTitle, Chip, ProgressBar, SectionLabel } from '@/components/u
 import { Button } from '@/components/ui/button'
 import { Check, Flame, Lock, LogOut, Snowflake, Trophy, Zap } from 'lucide-react'
 
-const DAILY_GOAL_OPTIONS = [10, 20, 30, 50]
+const DAILY_GOAL_OPTIONS = [1, 2, 3, 5]
 
 async function setDailyGoal(formData: FormData) {
   'use server'
