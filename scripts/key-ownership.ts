@@ -4,12 +4,15 @@
 // homograph inherits sentences and a rank that belong to the frequent one.
 //
 // Heuristics, in order:
-//   1. On a hot token (corpus rank <= HOT_RANK), nouns lose to any other part
-//      of speech: top-of-corpus tokens are function words and verb forms almost
-//      by definition ("vad", "får", "was", "bij").
-//   2. A word whose headword IS the key beats one that only reaches it through
+//   1. The claimant whose own headword is the most frequent token wins: "found"
+//      belongs to find (headword rank ~300), not to the verb "found/fonder"
+//      (headword rank ~700), even though the latter matches it as a headword.
+//   2. Among ties, on a hot token (corpus rank <= HOT_RANK) nouns lose to any
+//      other part of speech: top-of-corpus tokens are function words and verb
+//      forms almost by definition ("vad", "får", "was", "bij").
+//   3. A word whose headword IS the key beats one that only reaches it through
 //      an inflected form.
-//   3. Deterministic tie-break by part-of-speech priority, then id.
+//   4. Deterministic tie-break by part-of-speech priority, then id.
 // Losers simply drop the key: no rank, no examples from it. Better nothing
 // than wrong — the rest of their keys (other forms) still work.
 
@@ -25,6 +28,9 @@ export interface KeyClaimant {
   wordType: string
   headKey: string // normalized headword
   keys: string[] // every surface key this word would claim (headword + forms)
+  // Corpus rank of the claimant's own lemma, when the caller knows it better
+  // than tokenRank(headKey) — e.g. the stored frequencyRank after apply-frequency
+  lemmaRank?: number
 }
 
 export function resolveKeyOwnership(
@@ -46,11 +52,17 @@ export function resolveKeyOwnership(
       continue
     }
     let candidates = pool
+    // 1. Most frequent lemma first (measured by its own headword's corpus rank)
+    const lemmaRank = (c: KeyClaimant) => c.lemmaRank ?? tokenRank(c.headKey) ?? Number.MAX_SAFE_INTEGER
+    const bestLemma = Math.min(...candidates.map(lemmaRank))
+    candidates = candidates.filter(c => lemmaRank(c) === bestLemma)
+    // 2. Hot tokens are almost never nouns
     const rank = tokenRank(key)
     if (rank !== undefined && rank <= HOT_RANK) {
       const nonNouns = candidates.filter(c => !c.wordType.startsWith('NOUN'))
       if (nonNouns.length > 0) candidates = nonNouns
     }
+    // 3. Direct headword beats inflected-form reach
     const headwordOwners = candidates.filter(c => c.headKey === key)
     if (headwordOwners.length > 0) candidates = headwordOwners
     candidates = [...candidates].sort(

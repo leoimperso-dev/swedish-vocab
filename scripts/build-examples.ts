@@ -125,6 +125,11 @@ async function main() {
       wordType: w.wordType,
       headKey: headwordKey(w.term, termLang),
       keys: wordKeysById.get(w.id)!.keys,
+      // Ranks were just assigned with the same ownership rules: a word's stored
+      // rank is its own lemma's rank, never an inherited homograph rank
+      // MAX_SAFE_INTEGER, not undefined: the tokenRank fallback here is the
+      // min-claimant rank, which would hand an unranked homograph its rival's rank
+      lemmaRank: w.frequencyRank ?? Number.MAX_SAFE_INTEGER,
     })),
     k => minRankByKey.get(k),
   )

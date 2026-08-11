@@ -22,8 +22,10 @@ const SOURCES: Array<{ file: string; pair: PairId }> = [
   { file: 'Swedish.txt', pair: 'sv-fr' },
   { file: 'Swedish_core_5000.txt', pair: 'sv-fr' },
   { file: 'English_core_5000.txt', pair: 'en-fr' },
+  { file: 'English_wiki.txt', pair: 'en-fr' },
   { file: 'Dutch_core_2000.txt', pair: 'nl-fr' },
-  // Wiktionary-extracted bulk vocabulary (kaikki.org, CC BY-SA), frequency-filtered
+  // *_wiki.txt: bulk vocabulary from kaikki.org Wiktionary extracts (CC BY-SA),
+  // frequency-filtered — regenerate with Desktop\pro\generate-wiki-vocab.py
   { file: 'Dutch_wiki.txt', pair: 'nl-fr' },
 ]
 
