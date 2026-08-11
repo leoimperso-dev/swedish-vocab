@@ -1,7 +1,7 @@
 # Vocab App
 
-Next.js app for learning vocabulary with spaced repetition. Swedish↔French and
-English↔French today; see "Languages" below before adding another.
+Next.js app for learning vocabulary with spaced repetition. Swedish↔French,
+English↔French and Dutch→French today; see "Languages" below before adding another.
 
 ## Stack
 - Next.js 16 App Router, TypeScript, Tailwind CSS v4
@@ -81,6 +81,7 @@ Vocabulary files live in `C:\Users\Arnau\Desktop\pro\` and are declared in `SOUR
 - `Swedish.txt` — personal vocab list (~930 entries, mixed format)
 - `Swedish_core_5000.txt` — core ~5000 most common Swedish words
 - `English_core_5000.txt` — same for English
+- `Dutch_core_2000.txt` — same for Dutch (nouns keep their `de`/`het` article in the term)
 
 Format is `headword (forms) - translation` under `=== SECTION ===` headers. Swedish infers the word
 type from the headword (article prefix, number of parenthesised forms). **English states it in the
@@ -97,7 +98,11 @@ pnpm dev                      # dev server
 pnpm db:apply <file.sql>      # apply SQL to Supabase via node-postgres
 pnpm db:seed                  # parse .txt files and seed DB
 pnpm parse                    # test vocabulary parser
+pnpm tsx scripts/check-story-coverage.ts   # QA: every story token must resolve
 ```
+After touching stories or vocabulary, run the coverage check — only proper
+nouns and numbers may stay unresolved (the reader shows « Nom propre » for
+capitalised unknowns and leaves letterless tokens untappable).
 
 ## DB connectivity (critical on this machine)
 The Prisma Rust engine **cannot** reach Supabase from this machine (P1001 on direct
@@ -108,8 +113,10 @@ host and poolers), while node-postgres connects fine. Consequences:
 - Schema changes: edit `schema.prisma`, then generate SQL offline with
   `prisma migrate diff --from-empty --to-schema-datamodel prisma/schema.prisma --script`
   (or write the ALTER by hand for incremental changes) and apply with `pnpm db:apply`
-- Supabase direct host is IPv6-only; node reaches it, and the pooler hostnames
-  answered "tenant not found" for this project — use the direct URL locally
+- Local `DATABASE_URL` targets the Supabase **session pooler**
+  (`postgres.<ref>@aws-0-eu-west-1.pooler.supabase.com:5432`) — IPv4, works on
+  every network, unlike the direct host which is IPv6-only. The old "tenant not
+  found" pooler note was a wrong-username issue.
 
 ## TLS note
 This machine requires `NODE_OPTIONS=--use-system-ca` for Prisma binary downloads. All `db:*` scripts already include it. `next.config.ts` sets `experimental.turbopackUseSystemTlsCerts` for the same reason (Google Fonts fetch at build time).
@@ -123,8 +130,8 @@ Content scripts take the pair as their last argument (default `sv-fr`):
 `build-examples.ts <tatoeba-dir> [pair]`, `apply-frequency.ts <xx_50k.txt> [pair]`,
 `import-stories.ts <dir> [pair]`, `import-grammar.ts <dir> [pair]`.
 
-Story and grammar sources live in `Desktop\pro\english-content\{stories,grammar}\`. Slugs are
-globally unique across pairs, hence the `en-` prefix. Rerun `apply-frequency` and `build-examples`
+Story and grammar sources live in `Desktop\pro\{english,dutch}-content\{stories,grammar}\`. Slugs
+are globally unique across pairs, hence the `en-`/`nl-` prefixes. Rerun `apply-frequency` and `build-examples`
 after every vocabulary batch — they process the whole pair, not just the new rows.
 Their inputs (`en_50k.txt`, `tatoeba\`) are downloads, not repo content.
 
