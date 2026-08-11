@@ -1,14 +1,15 @@
 'use client'
 
-import { useRef, useState } from 'react'
+import { useLayoutEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import { Volume2 } from 'lucide-react'
 import { speak, unlock } from '@/lib/tts'
-import { getStrings } from '@/lib/i18n'
+import { getStrings, type Strings } from '@/lib/i18n'
 import { useCourse } from '@/components/CourseProvider'
 import { localeOf } from '@/lib/courses'
 import { AppShell } from '@/components/AppShell'
 import { Card } from '@/components/ui/primitives'
+import { cn } from '@/lib/utils'
 import type { Story } from '@prisma/client'
 
 interface DictResult {
@@ -16,6 +17,99 @@ interface DictResult {
   term?: string
   translation?: string
   forms?: string | null
+}
+
+const EDGE_MARGIN = 8
+
+// Anchored above its word by default; measures itself after render, then
+// shifts back inside the viewport and flips below the word when the sticky
+// header would cover it. The arrow compensates so it keeps pointing at the word.
+function WordPopover({ entry, token, locale, t }: {
+  entry: DictResult | null
+  token: string
+  locale: string
+  t: Strings
+}) {
+  const popRef = useRef<HTMLSpanElement>(null)
+  const arrowRef = useRef<HTMLSpanElement>(null)
+  const [below, setBelow] = useState(false)
+
+  useLayoutEffect(() => {
+    const el = popRef.current
+    if (!el) return
+    // Measure from the neutral position — the effect re-runs when the entry
+    // loads (size changes) and when the popover flips sides
+    el.style.transform = 'translateX(-50%)'
+    const rect = el.getBoundingClientRect()
+    let dx = 0
+    if (rect.left < EDGE_MARGIN) dx = EDGE_MARGIN - rect.left
+    else if (rect.right > window.innerWidth - EDGE_MARGIN) {
+      dx = window.innerWidth - EDGE_MARGIN - rect.right
+    }
+    el.style.transform = `translateX(calc(-50% + ${dx}px))`
+    if (arrowRef.current) {
+      arrowRef.current.style.transform = `translateX(calc(-50% - ${dx}px)) rotate(45deg)`
+    }
+    // Under the sticky header (or clipped by the viewport top): flip below the word
+    if (!below) {
+      const headerBottom = document.querySelector('header')?.getBoundingClientRect().bottom ?? 0
+      if (rect.top < headerBottom + 4) setBelow(true)
+    }
+  }, [entry, below])
+
+  // The headword may be a proper noun: unknown and capitalised in the text
+  const isName = !entry?.found && /^\p{Lu}/u.test(token)
+
+  return (
+    <span
+      ref={popRef}
+      onClick={e => e.stopPropagation()}
+      className={cn(
+        'animate-rise absolute left-1/2 z-50 w-[min(16rem,78vw)] -translate-x-1/2 rounded-2xl border border-border-strong bg-popover p-3.5 text-left shadow-[0_18px_45px_-12px_oklch(0_0_0/70%)]',
+        below ? 'top-full mt-2' : 'bottom-full mb-2',
+      )}
+    >
+      {!entry ? (
+        <span className="block text-sm text-muted-foreground">…</span>
+      ) : entry.found ? (
+        <span className="block">
+          <span className="block font-display text-lg font-semibold leading-tight text-foreground">
+            {entry.term}
+          </span>
+          <span className="mt-0.5 block text-sm leading-snug text-muted-foreground">
+            {entry.translation}
+          </span>
+          {entry.forms && (
+            <span className="mt-1 block text-[11px] italic leading-snug text-muted-foreground/80">
+              ({entry.forms})
+            </span>
+          )}
+          <button
+            onClick={e => {
+              e.stopPropagation()
+              unlock()
+              speak(entry.term!, locale)
+            }}
+            className="pressable mt-2.5 inline-flex items-center gap-1.5 rounded-lg border border-border bg-surface px-2.5 py-1.5 text-xs font-semibold text-primary"
+          >
+            <Volume2 size={13} /> {t.listen}
+          </button>
+        </span>
+      ) : (
+        <span className="block text-xs text-muted-foreground">
+          {isName ? t.properNoun : t.wordNotFound}
+        </span>
+      )}
+      <span
+        ref={arrowRef}
+        aria-hidden="true"
+        className={cn(
+          'absolute left-1/2 size-3 -translate-x-1/2 rotate-45 border-border-strong bg-popover',
+          below ? '-top-1.5 border-l border-t' : '-bottom-1.5 border-b border-r',
+        )}
+      />
+    </span>
+  )
 }
 
 export default function StoryReader({ story }: { story: Story }) {
@@ -74,6 +168,8 @@ export default function StoryReader({ story }: { story: Story }) {
               <p key={pIdx}>
                 {paragraph.split(/(\s+)/).map((token, tIdx) => {
                   if (/^\s*$/.test(token)) return token
+                  // Numbers, dashes, bare punctuation: nothing to look up
+                  if (!/\p{L}/u.test(token)) return token
                   const positionKey = `${pIdx}-${tIdx}`
                   const isActive = active === positionKey
                   return (
@@ -87,44 +183,13 @@ export default function StoryReader({ story }: { story: Story }) {
                         {token}
                       </button>
                       {isActive && (
-                        <span
-                          onClick={e => e.stopPropagation()}
-                          className="animate-rise absolute bottom-full left-1/2 z-50 mb-2 w-[min(16rem,78vw)] -translate-x-1/2 rounded-2xl border border-border-strong bg-popover p-3.5 text-left shadow-[0_18px_45px_-12px_oklch(0_0_0/70%)]"
-                        >
-                          {!entry ? (
-                            <span className="block text-sm text-muted-foreground">…</span>
-                          ) : entry.found ? (
-                            <span className="block">
-                              <span className="block font-display text-lg font-semibold leading-tight text-foreground">
-                                {entry.term}
-                              </span>
-                              <span className="mt-0.5 block text-sm leading-snug text-muted-foreground">
-                                {entry.translation}
-                              </span>
-                              {entry.forms && (
-                                <span className="mt-1 block text-[11px] italic leading-snug text-muted-foreground/80">
-                                  ({entry.forms})
-                                </span>
-                              )}
-                              <button
-                                onClick={e => {
-                                  e.stopPropagation()
-                                  unlock()
-                                  speak(entry.term!, locale)
-                                }}
-                                className="pressable mt-2.5 inline-flex items-center gap-1.5 rounded-lg border border-border bg-surface px-2.5 py-1.5 text-xs font-semibold text-primary"
-                              >
-                                <Volume2 size={13} /> {t.listen}
-                              </button>
-                            </span>
-                          ) : (
-                            <span className="block text-xs text-muted-foreground">{t.wordNotFound}</span>
-                          )}
-                          <span
-                            aria-hidden="true"
-                            className="absolute -bottom-1.5 left-1/2 size-3 -translate-x-1/2 rotate-45 border-b border-r border-border-strong bg-popover"
-                          />
-                        </span>
+                        <WordPopover
+                          key={positionKey}
+                          entry={entry}
+                          token={token.replace(/^["'«„(]+/, '')}
+                          locale={locale}
+                          t={t}
+                        />
                       )}
                     </span>
                   )

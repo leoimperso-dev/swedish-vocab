@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useMemo, useState } from 'react'
-import { ChevronDown, MessageSquare, Star } from 'lucide-react'
+import { ChevronDown, Eye, EyeOff, MessageSquare, Star } from 'lucide-react'
 import { formatForms, parseDetails } from '@/lib/word-display'
 import { MAX_KNOWLEDGE_LEVEL } from '@/lib/sm2'
 import { getStrings } from '@/lib/i18n'
@@ -45,6 +45,23 @@ export default function WordsPage() {
   const [tab, setTab] = useState<Tab>('categories')
   const [openCategories, setOpenCategories] = useState<Set<string>>(new Set())
   const [topVisible, setTopVisible] = useState(PAGE_STEP)
+  // Flashcard mode: rows show only the native side; tapping one reveals its translation
+  const [flashcards, setFlashcards] = useState(false)
+  const [revealed, setRevealed] = useState<Set<string>>(new Set())
+
+  const toggleFlashcards = () => {
+    setFlashcards(v => !v)
+    setRevealed(new Set())
+  }
+
+  const flipCard = (wordId: string) => {
+    setRevealed(prev => {
+      const next = new Set(prev)
+      if (next.has(wordId)) next.delete(wordId)
+      else next.add(wordId)
+      return next
+    })
+  }
 
   useEffect(() => {
     // Cache key carries the pair — switching course must not flash the other vocabulary
@@ -137,7 +154,28 @@ export default function WordsPage() {
       subtitle={loading ? undefined : t.wordsAndCategories(words.length, groups.length)}
     >
       <div className="space-y-4">
-        <Segmented options={tabOptions} value={tab} onChange={v => setTab(v as Tab)} />
+        <div className="flex items-center gap-2">
+          <Segmented
+            className="min-w-0 flex-1"
+            options={tabOptions}
+            value={tab}
+            onChange={v => setTab(v as Tab)}
+          />
+          <button
+            onClick={toggleFlashcards}
+            title={t.flashcardMode}
+            aria-label={t.flashcardMode}
+            aria-pressed={flashcards}
+            className={cn(
+              'pressable grid size-10 shrink-0 place-items-center rounded-xl border',
+              flashcards
+                ? 'border-primary/40 bg-info-soft text-primary'
+                : 'border-border bg-surface text-muted-foreground',
+            )}
+          >
+            {flashcards ? <EyeOff size={17} /> : <Eye size={17} />}
+          </button>
+        </div>
 
         {loading ? (
           <ListSkeleton rows={5} />
@@ -169,7 +207,7 @@ export default function WordsPage() {
                   {open ? (
                     <div className="animate-rise space-y-2 border-t border-border bg-background/40 p-2">
                       {groupWords.map(word => (
-                        <WordRow key={word.id} word={word} course={course} onToggleFavorite={toggleFavorite} />
+                        <WordRow key={word.id} word={word} course={course} onToggleFavorite={toggleFavorite} masked={flashcards && !revealed.has(word.id)} onFlip={flashcards ? () => flipCard(word.id) : undefined} />
                       ))}
                     </div>
                   ) : null}
@@ -181,7 +219,7 @@ export default function WordsPage() {
           <div className="space-y-2">
             <SectionLabel>{t.topWordsHint}</SectionLabel>
             {topWords.slice(0, topVisible).map(word => (
-              <WordRow key={word.id} word={word} course={course} onToggleFavorite={toggleFavorite} showRank />
+              <WordRow key={word.id} word={word} course={course} onToggleFavorite={toggleFavorite} showRank masked={flashcards && !revealed.has(word.id)} onFlip={flashcards ? () => flipCard(word.id) : undefined} />
             ))}
             {topVisible < topWords.length ? (
               <Button variant="secondary" className="w-full" onClick={() => setTopVisible(v => v + PAGE_STEP)}>
@@ -192,7 +230,7 @@ export default function WordsPage() {
         ) : favoriteWords.length > 0 ? (
           <div className="space-y-2">
             {favoriteWords.map(word => (
-              <WordRow key={word.id} word={word} course={course} onToggleFavorite={toggleFavorite} />
+              <WordRow key={word.id} word={word} course={course} onToggleFavorite={toggleFavorite} masked={flashcards && !revealed.has(word.id)} onFlip={flashcards ? () => flipCard(word.id) : undefined} />
             ))}
           </div>
         ) : (
@@ -203,11 +241,14 @@ export default function WordsPage() {
   )
 }
 
-function WordRow({ word, course, onToggleFavorite, showRank }: {
+function WordRow({ word, course, onToggleFavorite, showRank, masked, onFlip }: {
   word: ApiWord
   course: Course
   onToggleFavorite: (id: string) => void
   showRank?: boolean
+  // Flashcard mode: masked hides the translation side; onFlip toggles the reveal
+  masked?: boolean
+  onFlip?: () => void
 }) {
   const t = getStrings(course.native)
   // Enrichment (alternative translations, context) is written in the pair's
@@ -240,10 +281,13 @@ function WordRow({ word, course, onToggleFavorite, showRank }: {
   const secondaryWord = learnsTerm ? word.term : translationLabel
 
   return (
-    <div className="card-surface overflow-hidden">
-      <div className="flex items-start gap-2.5 p-3.5">
+    <div
+      onClick={onFlip}
+      className={cn('card-surface overflow-hidden', onFlip && 'pressable cursor-pointer')}
+    >
+      <div className={cn('flex items-start gap-2.5', masked ? 'p-2.5 px-3.5' : 'p-3.5')}>
         <button
-          onClick={() => onToggleFavorite(word.id)}
+          onClick={e => { e.stopPropagation(); onToggleFavorite(word.id) }}
           aria-label={word.favorite ? t.removeFavorite(word.term) : t.addFavorite(word.term)}
           aria-pressed={word.favorite}
           className="pressable mt-0.5 shrink-0 rounded-lg p-1"
@@ -262,26 +306,30 @@ function WordRow({ word, course, onToggleFavorite, showRank }: {
               {primaryWord}
             </p>
           </div>
-          {/* Inflected forms belong to the `term` side — shown wherever it sits */}
-          {!learnsTerm && forms && <p className="truncate text-xs text-muted-foreground/80">({forms})</p>}
-          <p className="mt-1 text-sm text-muted-foreground">
-            {secondaryWord}
-            {learnsTerm && forms && <span className="ml-1 text-xs opacity-70">({forms})</span>}
-          </p>
-          {learnsTerm && details?.context && (
-            <p className="mt-1 text-xs italic text-muted-foreground">{details.context}</p>
+          {masked ? null : (
+            <div className={onFlip ? 'animate-rise' : undefined}>
+              {/* Inflected forms belong to the `term` side — shown wherever it sits */}
+              {!learnsTerm && forms && <p className="truncate text-xs text-muted-foreground/80">({forms})</p>}
+              <p className="mt-1 text-sm text-muted-foreground">
+                {secondaryWord}
+                {learnsTerm && forms && <span className="ml-1 text-xs opacity-70">({forms})</span>}
+              </p>
+              {learnsTerm && details?.context && (
+                <p className="mt-1 text-xs italic text-muted-foreground">{details.context}</p>
+              )}
+              {details?.usage?.map(u => (
+                <p key={u.term} className="mt-0.5 text-xs text-muted-foreground">
+                  <span className="text-foreground/80">{u.term}</span> — {u.translation}
+                </p>
+              ))}
+            </div>
           )}
-          {details?.usage?.map(u => (
-            <p key={u.term} className="mt-0.5 text-xs text-muted-foreground">
-              <span className="text-foreground/80">{u.term}</span> — {u.translation}
-            </p>
-          ))}
-          <LevelDots level={word.level} total={MAX_KNOWLEDGE_LEVEL} className="mt-2" />
+          <LevelDots level={word.level} total={MAX_KNOWLEDGE_LEVEL} className={masked ? 'mt-1.5' : 'mt-2'} />
         </div>
 
-        {word.hasExamples && (
+        {word.hasExamples && !masked && (
           <button
-            onClick={toggleExamples}
+            onClick={e => { e.stopPropagation(); toggleExamples() }}
             aria-expanded={showExamples}
             aria-label={t.examplesFor(word.term)}
             className={cn(

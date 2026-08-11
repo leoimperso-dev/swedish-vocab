@@ -72,6 +72,7 @@ const fr = {
   listen: 'Écouter',
   tapAnyWord: 'Appuie sur un mot pour voir sa traduction',
   wordNotFound: 'Mot inconnu du dictionnaire',
+  properNoun: 'Nom propre',
   back: '← Retour',
   // Grammar
   grammarTitle: 'Grammaire',
@@ -171,6 +172,7 @@ const fr = {
   tabTop: (n: number) => `Top ${n}`,
   topWordsHint: 'Les mots les plus fréquents',
   tabFavorites: '★ Favoris',
+  flashcardMode: 'Mode flashcard : masquer les traductions',
   showMore: 'Afficher plus',
   noFavorites: 'Aucun favori — appuie sur ☆ à côté d\'un mot pour l\'ajouter',
   addFavorite: (word: string) => `Ajouter ${word} aux favoris`,
@@ -251,6 +253,7 @@ const sv: typeof fr = {
   listen: 'Lyssna',
   tapAnyWord: 'Tryck på ett ord för att se översättningen',
   wordNotFound: 'Ordet finns inte i ordboken',
+  properNoun: 'Egennamn',
   back: '← Tillbaka',
   // Grammar
   grammarTitle: 'Grammatik',
@@ -350,6 +353,7 @@ const sv: typeof fr = {
   tabTop: n => `Topp ${n}`,
   topWordsHint: 'De vanligaste orden',
   tabFavorites: '★ Favoriter',
+  flashcardMode: 'Flashcardläge: dölj översättningarna',
   showMore: 'Visa fler',
   noFavorites: 'Inga favoriter — tryck på ☆ bredvid ett ord för att lägga till det',
   addFavorite: word => `Lägg till ${word} bland favoriter`,
@@ -430,6 +434,7 @@ const en: typeof fr = {
   listen: 'Listen',
   tapAnyWord: 'Tap any word to see its translation',
   wordNotFound: 'Word not in the dictionary',
+  properNoun: 'Proper noun',
   back: '← Back',
   // Grammar
   grammarTitle: 'Grammar',
@@ -529,6 +534,7 @@ const en: typeof fr = {
   tabTop: n => `Top ${n}`,
   topWordsHint: 'The most frequent words',
   tabFavorites: '★ Favorites',
+  flashcardMode: 'Flashcard mode: hide translations',
   showMore: 'Show more',
   noFavorites: 'No favorites — tap ☆ next to a word to add it',
   addFavorite: word => `Add ${word} to favorites`,
