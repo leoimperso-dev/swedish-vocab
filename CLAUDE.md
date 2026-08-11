@@ -1,7 +1,8 @@
 # Vocab App
 
 Next.js app for learning vocabulary with spaced repetition. Swedish↔French,
-English↔French and Dutch→French today; see "Languages" below before adding another.
+English↔French, Dutch→French and Spanish→French today; see "Languages" below
+before adding another.
 
 ## Stack
 - Next.js 16 App Router, TypeScript, Tailwind CSS v4
@@ -84,6 +85,8 @@ Vocabulary files live in `C:\Users\Arnau\Desktop\pro\` and are declared in `SOUR
 - `English_wiki.txt` — Wiktionary bulk vocabulary for English
 - `Dutch_core_2000.txt` — same for Dutch (nouns keep their `de`/`het` article in the term)
 - `Dutch_wiki.txt` — Wiktionary bulk vocabulary for Dutch
+- `Spanish_core.txt` — agent-written Spanish core (nouns keep their `el`/`la` article)
+- `Spanish_wiki.txt` — Wiktionary bulk vocabulary for Spanish
 
 `*_wiki.txt` files come from `Desktop\pro\generate-wiki-vocab.py <lang>` (kaikki.org
 extracts, CC BY-SA, frequency-filtered to the top 20k): regenerate + reseed rather
@@ -138,8 +141,8 @@ Content scripts take the pair as their last argument (default `sv-fr`):
 `build-examples.ts <tatoeba-dir> [pair]`, `apply-frequency.ts <xx_50k.txt> [pair]`,
 `import-stories.ts <dir> [pair]`, `import-grammar.ts <dir> [pair]`.
 
-Story and grammar sources live in `Desktop\pro\{english,dutch}-content\{stories,grammar}\`. Slugs
-are globally unique across pairs, hence the `en-`/`nl-` prefixes. Rerun `apply-frequency` and `build-examples`
+Story and grammar sources live in `Desktop\pro\{english,dutch,spanish}-content\{stories,grammar}\`.
+Slugs are globally unique across pairs, hence the `en-`/`nl-`/`es-` prefixes. Rerun `apply-frequency` and `build-examples`
 after every vocabulary batch — they process the whole pair, not just the new rows.
 Their inputs (`en_50k.txt`, `tatoeba\`) are downloads, not repo content.
 

@@ -101,7 +101,7 @@ export async function lookupWord(raw: string, pair: PairId): Promise<DictEntry |
     caches.set(pair, cache)
   }
 
-  const token = raw.toLowerCase().replace(/[.,!?;:"«»()[\]…'’„“”–—]/g, '').trim()
+  const token = raw.toLowerCase().replace(/[.,!?¿¡;:"«»()[\]…'’„“”–—]/g, '').trim()
   if (!token) return null
 
   const lang = pairOf(pair).term

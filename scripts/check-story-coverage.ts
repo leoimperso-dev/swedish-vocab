@@ -9,12 +9,12 @@ import type { PairId } from '../lib/courses'
 function tokenize(body: string): string[] {
   return body.split(/(\s+)/)
     .filter(t => !/^\s*$/.test(t))
-    .map(t => t.toLowerCase().replace(/[.,!?;:"«»()[\]…'’„“”–—]/g, '').trim())
+    .map(t => t.toLowerCase().replace(/[.,!?¿¡;:"«»()[\]…'’„“”–—]/g, '').trim())
     .filter(Boolean)
 }
 
 async function main() {
-  for (const pair of ['sv-fr', 'en-fr', 'nl-fr'] as PairId[]) {
+  for (const pair of ['sv-fr', 'en-fr', 'nl-fr', 'es-fr'] as PairId[]) {
     const stories = await db.story.findMany({ where: { pair }, select: { slug: true, body: true } })
     const missing = new Map<string, Set<string>>() // token -> slugs
     let total = 0, ok = 0

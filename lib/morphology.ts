@@ -272,20 +272,37 @@ const ES_IRREGULARS: Record<string, string> = {
   durmió: 'dormir', durmieron: 'dormir', sintió: 'sentir', sintieron: 'sentir',
   pidió: 'pedir', pidieron: 'pedir', siguió: 'seguir', siguieron: 'seguir',
   consiguió: 'conseguir', prefirió: 'preferir', repitió: 'repetir',
+  del: 'de', al: 'a',
+  hubiera: 'haber', hubieran: 'haber', pudiera: 'poder', pudieran: 'poder',
+  propusiera: 'proponer', hiciera: 'hacer', hicieran: 'hacer',
+  diera: 'dar', dieran: 'dar',
+  siga: 'seguir', sigan: 'seguir', sigue: 'seguir',
+  vemos: 'ver', ves: 'ver',
+  sonríe: 'sonreír', sonrió: 'sonreír', sonriera: 'sonreír', sonriendo: 'sonreír',
+  ríe: 'reír', rió: 'reír', rieron: 'reír', riendo: 'reír',
+  asintió: 'asentir', asintieron: 'asentir',
+  descubierto: 'descubrir', descubierta: 'descubrir',
 }
 
 // Verb endings, longest first (present, pretérito, imperfecto, futuro,
 // condicional, subjunctive, gerund, participle, plural nouns)
 const ES_STRIP_SUFFIXES = [
-  'aríamos', 'eríamos', 'iríamos', 'ábamos', 'íamos', 'aremos', 'eremos', 'iremos',
+  'aríamos', 'eríamos', 'iríamos', 'iéramos', 'ábamos', 'éramos', 'íamos', 'aremos', 'eremos', 'iremos',
   'asteis', 'isteis', 'ierais', 'áramos', 'iendo', 'ieron', 'ieran', 'ieras', 'iera',
   'aban', 'abas', 'aba', 'ando', 'aron', 'aran', 'aras', 'ara', 'aría', 'ería', 'iría',
   'arías', 'erías', 'irías', 'arían', 'erían', 'irían',
   'aré', 'arás', 'ará', 'arán', 'eré', 'erás', 'erá', 'erán', 'iré', 'irás', 'irá', 'irán',
   'emos', 'amos', 'imos', 'áis', 'éis', 'ados', 'adas', 'idos', 'idas',
-  'ado', 'ada', 'ido', 'ida', 'ían', 'ías', 'ía', 'aste', 'iste',
-  'an', 'en', 'as', 'es', 'a', 'e', 'o', 'ó', 'é', 'í', 'ís', 's',
+  'ado', 'ada', 'ido', 'ida', 'ían', 'ías', 'ía', 'ió', 'aste', 'iste',
+  'an', 'en', 'as', 'es', 'a', 'e', 'o', 'ó', 'é', 'í', 'á', 'ás', 'ís', 's',
 ]
+
+// Future/conditional stems of the common irregular verbs
+const ES_COND_STEMS: Record<string, string> = {
+  podr: 'poder', saldr: 'salir', dir: 'decir', har: 'hacer', tendr: 'tener',
+  vendr: 'venir', habr: 'haber', sabr: 'saber', querr: 'querer', pondr: 'poner',
+  valdr: 'valer', cabr: 'caber',
+}
 
 const ES_CLITICS = /(me|te|se|le|la|lo|nos|os|les|las|los)$/
 
@@ -300,13 +317,19 @@ function spanishStemVariants(stem: string): string[] {
   const ie = stem.lastIndexOf('ie')
   if (ie >= 0) out.add(stem.slice(0, ie) + 'e' + stem.slice(ie + 2))
   const ue = stem.lastIndexOf('ue')
-  if (ue >= 0) out.add(stem.slice(0, ue) + 'o' + stem.slice(ue + 2))
+  if (ue >= 0) {
+    out.add(stem.slice(0, ue) + 'o' + stem.slice(ue + 2))
+    out.add(stem.slice(0, ue) + 'u' + stem.slice(ue + 2))
+  }
   const i = stem.lastIndexOf('i')
   if (i >= 1) out.add(stem.slice(0, i) + 'e' + stem.slice(i + 1))
   if (stem.endsWith('qu')) out.add(stem.slice(0, -2) + 'c')
   if (stem.endsWith('gu')) out.add(stem.slice(0, -1))
   if (stem.endsWith('c')) out.add(stem.slice(0, -1) + 'z')
   if (stem.endsWith('z')) out.add(stem.slice(0, -1) + 'c')
+  if (stem.endsWith('j')) out.add(stem.slice(0, -1) + 'g')
+  // "-ción" nouns lose their accent in the plural stem: "construccion(es)"
+  if (stem.endsWith('ion')) out.add(stem.slice(0, -3) + 'ión')
   return [...out]
 }
 
@@ -315,15 +338,22 @@ function spanishCandidates(token: string, depth = 0): string[] {
   if (ES_IRREGULARS[token]) out.push(ES_IRREGULARS[token])
   const plain = deaccent(token)
   if (plain !== token && ES_IRREGULARS[plain]) out.push(ES_IRREGULARS[plain])
+  // Apocopes: "buen" → "bueno", "primer" → "primero", "algún" → "alguno"
+  out.push(token + 'o', token + 'a', plain + 'o', plain + 'a')
   for (const suffix of ES_STRIP_SUFFIXES) {
     if (!token.endsWith(suffix)) continue
     const stem = token.slice(0, -suffix.length)
     if (stem.length < 2) continue
+    if (ES_COND_STEMS[stem]) out.push(ES_COND_STEMS[stem])
     for (const variant of spanishStemVariants(stem)) {
       // Infinitives (incl. reflexive), bare stem for nouns ("veces" → "vez")
       out.push(variant + 'ar', variant + 'er', variant + 'ir', variant)
       out.push(variant + 'arse', variant + 'erse', variant + 'irse')
     }
+    // Feminine and plural adjectives resolve to the masculine headword:
+    // "pequeña(s)" → "pequeño". After the infinitives — "trabaja" must reach
+    // "trabajar" before the related noun "trabajo".
+    if (suffix === 'a' || suffix === 'as') out.push(stem + 'o')
   }
   // Attached clitics: "levantarse", "dámelo", "dime" — strip up to two and retry
   if (depth < 2) {

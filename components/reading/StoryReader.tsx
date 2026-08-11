@@ -134,7 +134,7 @@ export default function StoryReader({ story }: { story: Story }) {
     setActive(positionKey)
     setEntry(null)
 
-    const token = rawToken.toLowerCase().replace(/[.,!?;:"«»()[\]…'’„“”–—]/g, '').trim()
+    const token = rawToken.toLowerCase().replace(/[.,!?¿¡;:"«»()[\]…'’„“”–—]/g, '').trim()
     if (!token) { activeRef.current = null; setActive(null); return }
 
     const cached = cacheRef.current.get(token)
@@ -186,7 +186,7 @@ export default function StoryReader({ story }: { story: Story }) {
                         <WordPopover
                           key={positionKey}
                           entry={entry}
-                          token={token.replace(/^["'«„(]+/, '')}
+                          token={token.replace(/^["'«„(¿¡]+/, '')}
                           locale={locale}
                           t={t}
                         />
