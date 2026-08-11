@@ -77,6 +77,10 @@ function extractForms(term: string, wordType: WordTypeName, lang: Lang): Record<
   if (wordType === 'ADJECTIVE') {
     return parts.length === 2 ? { comparative: parts[0], superlative: parts[1] } : null
   }
+  // English function words note their variant in parentheses ("this (these)") —
+  // store it so the dictionary can look it up. Swedish OTHER entries keep their
+  // historic behavior: parentheses there are free-form usage notes.
+  if (lang === 'en') return { plural: parts.join(', ') }
   return null
 }
 
@@ -122,15 +126,20 @@ function parseFile(filePath: string, pair: PairId): ParsedWord[] {
 
     const translation = parts.slice(1).join(' — ').trim()
 
-    if (!term || !translation || term.length < 2 || translation.length < 2) continue
+    // English has real one-letter words ("a", "I") — only Swedish keeps the
+    // 2-char floor, where single letters are list numbering noise.
+    const minTerm = lang === 'en' ? 1 : 2
+    if (!term || !translation || term.length < minTerm || translation.length < 2) continue
 
     // Skip obvious grammar notes
     if (term.includes('->') || term.includes('→') || translation.length > 200) continue
 
     const wordType = lang === 'sv' ? detectSwedish(term) : sectionType
     const forms = extractForms(term, wordType, lang)
-    // Keep only the base word once the forms are extracted
-    if (forms) term = term.replace(/\s*\([^)]+\)/, '').trim()
+    // Keep only the base word once the forms are extracted. English strips the
+    // parenthesised part unconditionally — leaving it in would make it part of
+    // the stored headword ("this (these)").
+    if (forms || lang === 'en') term = term.replace(/\s*\([^)]+\)/, '').trim()
 
     words.push({
       pair,

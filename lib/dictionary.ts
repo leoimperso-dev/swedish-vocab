@@ -4,7 +4,7 @@
 import { db } from '@/lib/db'
 import { parseDetails } from '@/lib/word-display'
 import { headwordKey, isSuffixShorthand, lemmaCandidates } from '@/lib/morphology'
-import { pairOf, type PairId } from '@/lib/courses'
+import { pairOf, type Lang, type PairId } from '@/lib/courses'
 
 export interface DictEntry {
   term: string // display headword ("en kvinna")
@@ -46,7 +46,9 @@ async function buildCache(pair: PairId): Promise<Map<string, DictEntry>> {
       for (const v of Object.values(formsRecord)) {
         if (typeof v === 'string') {
           const form = v.toLowerCase().trim()
-          if (form.length >= 3 && !isSuffixShorthand(form, lang)) keys.add(form)
+          // >= 2, not 3: "är" and "sa" are real, very frequent stored forms.
+          // Bare-ending shorthands from the personal file are filtered separately.
+          if (form.length >= 2 && !isSuffixShorthand(form, lang)) keys.add(form)
         }
       }
     }
@@ -55,6 +57,40 @@ async function buildCache(pair: PairId): Promise<Map<string, DictEntry>> {
     }
   }
   return map
+}
+
+function resolve(cache: Map<string, DictEntry>, token: string, lang: Lang): DictEntry | null {
+  const direct = cache.get(token)
+  if (direct) return direct
+  for (const candidate of lemmaCandidates(token, lang)) {
+    const hit = cache.get(candidate)
+    if (hit) return hit
+  }
+  return null
+}
+
+// Swedish compounds are open-ended ("köksbordet", "konferensrummet"): when both
+// halves are known, surface the head — "köksbordet" resolves to "ett bord".
+// Longest head wins, and both sides must be real entries so junk stays unmatched.
+// Recursion covers stacked compounds ("hundratrettiotvå", "femhundrakronorssedel").
+function resolveCompound(cache: Map<string, DictEntry>, token: string, lang: Lang, depth = 0): DictEntry | null {
+  if (lang !== 'sv' || token.length < 6 || depth > 2) return null
+  // Prefixes down to 2 letters: real short words compose too ("urverk", "elbolag")
+  for (let i = token.length - 3; i >= 2; i--) {
+    let prefix = token.slice(0, i)
+    // Linking -s- : "arbetstimmar" = arbete+s+timmar
+    if (prefix.endsWith('s') && !cache.has(prefix)) prefix = prefix.slice(0, -1)
+    // The prefix may drop the lemma's final vowel ("samhälls-" for "samhälle")
+    // or be an inflected form itself ("kronor" of "krona") — full resolve last
+    if (
+      !cache.has(prefix) && !cache.has(prefix + 'a') && !cache.has(prefix + 'e') &&
+      !resolve(cache, prefix, lang)
+    ) continue
+    const rest = token.slice(i)
+    const head = resolve(cache, rest, lang) ?? resolveCompound(cache, rest, lang, depth + 1)
+    if (head) return head
+  }
+  return null
 }
 
 export async function lookupWord(raw: string, pair: PairId): Promise<DictEntry | null> {
@@ -67,12 +103,16 @@ export async function lookupWord(raw: string, pair: PairId): Promise<DictEntry |
   const token = raw.toLowerCase().replace(/[.,!?;:"«»()[\]…'’„“”–—]/g, '').trim()
   if (!token) return null
 
-  const direct = cache.get(token)
-  if (direct) return direct
+  const lang = pairOf(pair).term
+  const hit = resolve(cache, token, lang) ?? resolveCompound(cache, token, lang)
+  if (hit) return hit
 
-  for (const candidate of lemmaCandidates(token, pairOf(pair).term)) {
-    const hit = cache.get(candidate)
-    if (hit) return hit
+  // Hyphenated compounds ("thirty-one", "band-sidan"): surface the first known part
+  if (token.includes('-')) {
+    for (const part of token.split('-')) {
+      const partHit = part.length >= 1 ? resolve(cache, part, lang) : null
+      if (partHit) return partHit
+    }
   }
   return null
 }
