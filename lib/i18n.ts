@@ -6,7 +6,7 @@ export const DEFAULT_LANG: Lang = DEFAULT_COURSE.native
 
 const fr = {
   // Language names — injected into the parametric strings below
-  languageName: { fr: 'français', sv: 'suédois', en: 'anglais' } as Record<Lang, string>,
+  languageName: { fr: 'français', sv: 'suédois', en: 'anglais', nl: 'néerlandais' } as Record<Lang, string>,
   interfaceLabel: 'Interface en français',
   // Nav
   navHome: 'Accueil',
@@ -191,7 +191,7 @@ const fr = {
 }
 
 const sv: typeof fr = {
-  languageName: { fr: 'franska', sv: 'svenska', en: 'engelska' },
+  languageName: { fr: 'franska', sv: 'svenska', en: 'engelska', nl: 'nederländska' },
   interfaceLabel: 'Gränssnitt på svenska',
   // Nav
   navHome: 'Hem',
@@ -376,7 +376,7 @@ const sv: typeof fr = {
 }
 
 const en: typeof fr = {
-  languageName: { fr: 'French', sv: 'Swedish', en: 'English' },
+  languageName: { fr: 'French', sv: 'Swedish', en: 'English', nl: 'Dutch' },
   interfaceLabel: 'Interface in English',
   // Nav
   navHome: 'Home',
@@ -562,12 +562,14 @@ const en: typeof fr = {
 
 export type Strings = typeof fr
 
-const STRINGS: Record<Lang, Strings> = { fr, sv, en }
+type InterfaceLang = 'fr' | 'sv' | 'en'
+
+const STRINGS: Record<InterfaceLang, Strings> = { fr, sv, en }
 
 export function getStrings(lang: string | null | undefined): Strings {
   return STRINGS[asLang(lang)]
 }
 
-export function asLang(value: string | null | undefined): Lang {
-  return value === 'sv' || value === 'en' || value === 'fr' ? value : DEFAULT_LANG
+export function asLang(value: string | null | undefined): InterfaceLang {
+  return value === 'sv' || value === 'en' || value === 'fr' ? value : (DEFAULT_LANG as InterfaceLang)
 }

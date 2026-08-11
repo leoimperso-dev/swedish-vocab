@@ -73,8 +73,9 @@ function resolve(cache: Map<string, DictEntry>, token: string, lang: Lang): Dict
 // halves are known, surface the head — "köksbordet" resolves to "ett bord".
 // Longest head wins, and both sides must be real entries so junk stays unmatched.
 // Recursion covers stacked compounds ("hundratrettiotvå", "femhundrakronorssedel").
+// Dutch composes the same way ("keukentafel").
 function resolveCompound(cache: Map<string, DictEntry>, token: string, lang: Lang, depth = 0): DictEntry | null {
-  if (lang !== 'sv' || token.length < 6 || depth > 2) return null
+  if ((lang !== 'sv' && lang !== 'nl') || token.length < 6 || depth > 2) return null
   // Prefixes down to 2 letters: real short words compose too ("urverk", "elbolag")
   for (let i = token.length - 3; i >= 2; i--) {
     let prefix = token.slice(0, i)

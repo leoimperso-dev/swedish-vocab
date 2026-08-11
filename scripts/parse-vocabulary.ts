@@ -22,6 +22,7 @@ const SOURCES: Array<{ file: string; pair: PairId }> = [
   { file: 'Swedish.txt', pair: 'sv-fr' },
   { file: 'Swedish_core_5000.txt', pair: 'sv-fr' },
   { file: 'English_core_5000.txt', pair: 'en-fr' },
+  { file: 'Dutch_core_2000.txt', pair: 'nl-fr' },
 ]
 
 function parenthesised(term: string): string[] | null {
@@ -80,7 +81,7 @@ function extractForms(term: string, wordType: WordTypeName, lang: Lang): Record<
   // English function words note their variant in parentheses ("this (these)") —
   // store it so the dictionary can look it up. Swedish OTHER entries keep their
   // historic behavior: parentheses there are free-form usage notes.
-  if (lang === 'en') return { plural: parts.join(', ') }
+  if (lang !== 'sv') return { plural: parts.join(', ') }
   return null
 }
 
@@ -126,9 +127,9 @@ function parseFile(filePath: string, pair: PairId): ParsedWord[] {
 
     const translation = parts.slice(1).join(' — ').trim()
 
-    // English has real one-letter words ("a", "I") — only Swedish keeps the
-    // 2-char floor, where single letters are list numbering noise.
-    const minTerm = lang === 'en' ? 1 : 2
+    // English and Dutch have real one-letter words ("a", "I", "u") — only
+    // Swedish keeps the 2-char floor, where single letters are numbering noise.
+    const minTerm = lang === 'sv' ? 2 : 1
     if (!term || !translation || term.length < minTerm || translation.length < 2) continue
 
     // Skip obvious grammar notes
@@ -139,7 +140,7 @@ function parseFile(filePath: string, pair: PairId): ParsedWord[] {
     // Keep only the base word once the forms are extracted. English strips the
     // parenthesised part unconditionally — leaving it in would make it part of
     // the stored headword ("this (these)").
-    if (forms || lang === 'en') term = term.replace(/\s*\([^)]+\)/, '').trim()
+    if (forms || lang !== 'sv') term = term.replace(/\s*\([^)]+\)/, '').trim()
 
     words.push({
       pair,
