@@ -219,7 +219,9 @@
   }
   to {
     opacity: 1;
-    transform: translateY(0);
+    /* No transform here: with fill-mode "both" a retained transform would make
+       every .animate-rise element a containing block for fixed descendants
+       (the reader's word panel is position: fixed on phones) */
   }
 }
 

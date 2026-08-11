@@ -20,10 +20,13 @@ interface DictResult {
 }
 
 const EDGE_MARGIN = 8
+// Below this viewport width the popover becomes a fixed bottom panel
+const ANCHORED_MIN_WIDTH = 640
 
-// Anchored above its word by default; measures itself after render, then
-// shifts back inside the viewport and flips below the word when the sticky
-// header would cover it. The arrow compensates so it keeps pointing at the word.
+// On phones: a fixed panel pinned above the bottom nav — always fully on
+// screen, no measurement involved. On wider screens: a bubble anchored to the
+// word, measured after render and shifted back into the viewport (flipping
+// below the word when the sticky header would cover it).
 function WordPopover({ entry, token, locale, t }: {
   entry: DictResult | null
   token: string
@@ -37,6 +40,11 @@ function WordPopover({ entry, token, locale, t }: {
   useLayoutEffect(() => {
     const el = popRef.current
     if (!el) return
+    // Fixed panel on phones: CSS owns the position, no clamping to do
+    if (window.innerWidth < ANCHORED_MIN_WIDTH) {
+      el.style.transform = ''
+      return
+    }
     // Measure from the neutral position — the effect re-runs when the entry
     // loads (size changes) and when the popover flips sides
     el.style.transform = 'translateX(-50%)'
@@ -65,8 +73,12 @@ function WordPopover({ entry, token, locale, t }: {
       ref={popRef}
       onClick={e => e.stopPropagation()}
       className={cn(
-        'animate-rise absolute left-1/2 z-50 w-[min(16rem,78vw)] -translate-x-1/2 rounded-2xl border border-border-strong bg-popover p-3.5 text-left shadow-[0_18px_45px_-12px_oklch(0_0_0/70%)]',
-        below ? 'top-full mt-2' : 'bottom-full mb-2',
+        'animate-rise z-50 rounded-2xl border border-border-strong bg-popover p-3.5 text-left shadow-[0_18px_45px_-12px_oklch(0_0_0/70%)]',
+        // Phone: fixed sheet above the bottom nav, full width minus margins
+        'fixed inset-x-3 bottom-24 max-h-[45vh] overflow-y-auto',
+        // sm+: bubble anchored to the word
+        'sm:absolute sm:inset-x-auto sm:bottom-auto sm:left-1/2 sm:max-h-none sm:w-[min(16rem,78vw)] sm:-translate-x-1/2 sm:overflow-visible',
+        below ? 'sm:top-full sm:mt-2' : 'sm:bottom-full sm:mb-2',
       )}
     >
       {!entry ? (
@@ -100,11 +112,12 @@ function WordPopover({ entry, token, locale, t }: {
           {isName ? t.properNoun : t.wordNotFound}
         </span>
       )}
+      {/* The arrow only makes sense when the bubble is anchored to its word */}
       <span
         ref={arrowRef}
         aria-hidden="true"
         className={cn(
-          'absolute left-1/2 size-3 -translate-x-1/2 rotate-45 border-border-strong bg-popover',
+          'absolute left-1/2 hidden size-3 -translate-x-1/2 rotate-45 border-border-strong bg-popover sm:block',
           below ? '-top-1.5 border-l border-t' : '-bottom-1.5 border-b border-r',
         )}
       />
