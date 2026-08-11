@@ -8,6 +8,7 @@ import path from 'path'
 import { db } from '../lib/db'
 import { PAIRS, asPairId, type Lang } from '../lib/courses'
 import { headwordKey, isSuffixShorthand } from '../lib/morphology'
+import { resolveKeyOwnership } from './key-ownership'
 
 const MAX_EXAMPLES = 3
 const MIN_LEN = 12
@@ -100,12 +101,38 @@ async function main() {
     }
   }
 
-  const words = await db.word.findMany({ where: { pair }, select: { id: true, term: true, forms: true } })
+  const words = await db.word.findMany({
+    where: { pair },
+    select: { id: true, term: true, forms: true, wordType: true, frequencyRank: true },
+  })
   console.log(`Matching ${words.length} words...`)
 
-  const updates: Array<{ id: string; examples: Example[] }> = []
+  // Homographs: a surface key feeds the examples of exactly one word.
+  // Token hotness is approximated by the best stored rank among the claimants
+  // (run apply-frequency before this script).
+  const wordKeysById = new Map(words.map(w => [w.id, wordKeys(w.term, w.forms, termLang)]))
+  const minRankByKey = new Map<string, number>()
+  for (const w of words) {
+    if (w.frequencyRank == null) continue
+    for (const k of wordKeysById.get(w.id)!.keys) {
+      const cur = minRankByKey.get(k)
+      if (cur === undefined || w.frequencyRank < cur) minRankByKey.set(k, w.frequencyRank)
+    }
+  }
+  const allowed = resolveKeyOwnership(
+    words.map(w => ({
+      id: w.id,
+      wordType: w.wordType,
+      headKey: headwordKey(w.term, termLang),
+      keys: wordKeysById.get(w.id)!.keys,
+    })),
+    k => minRankByKey.get(k),
+  )
+
+  const updates: Array<{ id: string; examples: Example[] | null }> = []
   for (const word of words) {
-    const { keys, phrases } = wordKeys(word.term, word.forms, termLang)
+    const { phrases } = wordKeysById.get(word.id)!
+    const keys = [...(allowed.get(word.id) ?? [])]
     const candidates = new Map<string, string>() // sentenceId -> blank surface form
 
     for (const key of keys) {
@@ -121,7 +148,11 @@ async function main() {
         }
       }
     }
-    if (candidates.size === 0) continue
+    if (candidates.size === 0) {
+      // Clear examples this word may have inherited from a key it no longer owns
+      updates.push({ id: word.id, examples: null })
+      continue
+    }
 
     const scored = [...candidates.entries()].map(([sid, blank]) => {
       const text = termSentences.get(sid)!
@@ -150,9 +181,9 @@ async function main() {
     updates.push({ id: word.id, examples })
   }
 
-  const withTranslation = updates.filter(u => u.examples[0]?.translation).length
+  const withTranslation = updates.filter(u => u.examples?.[0]?.translation).length
   console.log(
-    `Words with examples: ${updates.length} / ${words.length} (${withTranslation} with a translated best example)`
+    `Words with examples: ${updates.filter(u => u.examples).length} / ${words.length} (${withTranslation} with a translated best example)`
   )
 
   const CHUNK = 200
@@ -165,7 +196,8 @@ async function main() {
       params.push(u.id, JSON.stringify(u.examples))
     })
     await db.$executeRawUnsafe(
-      `UPDATE "Word" AS w SET "examples" = v.examples FROM (VALUES ${values.join(',')}) AS v(id, examples) WHERE w.id = v.id`,
+      // JSON.stringify(null) arrives as jsonb 'null' — store SQL NULL instead
+      `UPDATE "Word" AS w SET "examples" = NULLIF(v.examples, 'null'::jsonb) FROM (VALUES ${values.join(',')}) AS v(id, examples) WHERE w.id = v.id`,
       ...params
     )
   }

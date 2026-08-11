@@ -6,6 +6,7 @@ import fs from 'fs'
 import { db } from '../lib/db'
 import { PAIRS, asPairId, type Lang } from '../lib/courses'
 import { headwordKey, isSuffixShorthand } from '../lib/morphology'
+import { resolveKeyOwnership } from './key-ownership'
 
 function buildKeys(term: string, forms: unknown, lang: Lang): string[] {
   const keys = new Set<string>()
@@ -36,29 +37,42 @@ async function main() {
   })
   console.log(`Frequency list: ${rankByToken.size} tokens`)
 
-  const words = await db.word.findMany({ where: { pair }, select: { id: true, term: true, forms: true } })
-  const updates: Array<{ id: string; rank: number }> = []
+  const words = await db.word.findMany({
+    where: { pair },
+    select: { id: true, term: true, forms: true, wordType: true },
+  })
+
+  // Homographs: a surface key feeds the rank of exactly one word (see key-ownership.ts)
+  const claimants = words.map(w => ({
+    id: w.id,
+    wordType: w.wordType,
+    headKey: headwordKey(w.term, lang),
+    keys: buildKeys(w.term, w.forms, lang),
+  }))
+  const allowed = resolveKeyOwnership(claimants, k => rankByToken.get(k))
+
+  const updates: Array<{ id: string; rank: number | null }> = []
   const allKeys = new Set<string>()
 
-  for (const word of words) {
-    const keys = buildKeys(word.term, word.forms, lang)
-    keys.forEach(k => allKeys.add(k))
+  for (const c of claimants) {
+    c.keys.forEach(k => allKeys.add(k))
     let best: number | null = null
-    for (const key of keys) {
+    for (const key of allowed.get(c.id) ?? []) {
       const rank = rankByToken.get(key)
       if (rank !== undefined && (best === null || rank < best)) best = rank
     }
-    if (best !== null) updates.push({ id: word.id, rank: best })
+    // Also reset ranks a word no longer owns (from earlier runs of this script)
+    updates.push({ id: c.id, rank: best })
   }
 
-  console.log(`Matched ${updates.length} / ${words.length} words`)
+  console.log(`Matched ${updates.filter(u => u.rank !== null).length} / ${words.length} words`)
 
   const CHUNK = 1000
   for (let i = 0; i < updates.length; i += CHUNK) {
     const chunk = updates.slice(i, i + CHUNK)
-    const values = chunk.map(u => `('${u.id}', ${u.rank})`).join(',')
+    const values = chunk.map(u => `('${u.id}', ${u.rank ?? 'NULL'})`).join(',')
     await db.$executeRawUnsafe(
-      `UPDATE "Word" AS w SET "frequencyRank" = v.rank FROM (VALUES ${values}) AS v(id, rank) WHERE w.id = v.id`
+      `UPDATE "Word" AS w SET "frequencyRank" = v.rank::int FROM (VALUES ${values}) AS v(id, rank) WHERE w.id = v.id`
     )
     console.log(`Updated ${Math.min(i + CHUNK, updates.length)} / ${updates.length}`)
   }
