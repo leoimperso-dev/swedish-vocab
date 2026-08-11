@@ -81,6 +81,7 @@ Vocabulary files live in `C:\Users\Arnau\Desktop\pro\` and are declared in `SOUR
 `scripts/parse-vocabulary.ts`:
 - `Swedish.txt` — personal vocab list (~930 entries, mixed format)
 - `Swedish_core_5000.txt` — core ~5000 most common Swedish words
+- `Swedish_wiki.txt` — Wiktionary bulk vocabulary for Swedish
 - `English_core_5000.txt` — same for English
 - `English_wiki.txt` — Wiktionary bulk vocabulary for English
 - `Dutch_core_2000.txt` — same for Dutch (nouns keep their `de`/`het` article in the term)

@@ -21,6 +21,7 @@ const SEPARATOR_RE = /\s[—-]\s/
 const SOURCES: Array<{ file: string; pair: PairId }> = [
   { file: 'Swedish.txt', pair: 'sv-fr' },
   { file: 'Swedish_core_5000.txt', pair: 'sv-fr' },
+  { file: 'Swedish_wiki.txt', pair: 'sv-fr' },
   { file: 'English_core_5000.txt', pair: 'en-fr' },
   { file: 'English_wiki.txt', pair: 'en-fr' },
   { file: 'Dutch_core_2000.txt', pair: 'nl-fr' },
