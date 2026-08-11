@@ -46,11 +46,21 @@ function DutchFlag() {
   )
 }
 
+function SpanishFlag() {
+  return (
+    <svg viewBox="0 0 16 10" className={CLASS} aria-hidden="true">
+      <rect width="16" height="10" fill="#AA151B" />
+      <rect y="2.5" width="16" height="5" fill="#F1BF00" />
+    </svg>
+  )
+}
+
 const FLAGS: Record<Lang, () => React.JSX.Element> = {
   sv: SwedishFlag,
   fr: FrenchFlag,
   en: UkFlag,
   nl: DutchFlag,
+  es: SpanishFlag,
 }
 
 export function Flag({ lang }: { lang: Lang }) {

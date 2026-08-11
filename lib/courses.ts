@@ -8,9 +8,9 @@
 //   speaks (native) and which one is being learned. It is derived from
 //   User.nativeLanguage + User.learningLanguage, not stored as its own entity.
 
-export type Lang = 'fr' | 'sv' | 'en' | 'nl'
+export type Lang = 'fr' | 'sv' | 'en' | 'nl' | 'es'
 
-export type PairId = 'sv-fr' | 'en-fr' | 'nl-fr'
+export type PairId = 'sv-fr' | 'en-fr' | 'nl-fr' | 'es-fr'
 
 export interface Pair {
   term: Lang // language of Word.term / Story.title
@@ -21,13 +21,14 @@ export const PAIRS: Record<PairId, Pair> = {
   'sv-fr': { term: 'sv', translation: 'fr' },
   'en-fr': { term: 'en', translation: 'fr' },
   'nl-fr': { term: 'nl', translation: 'fr' },
+  'es-fr': { term: 'es', translation: 'fr' },
 }
 
 export const DEFAULT_PAIR: PairId = 'sv-fr'
 
 // Rows carry `pair` as a plain string, so narrow it before use
 export function asPairId(value: string | null | undefined): PairId {
-  return value === 'sv-fr' || value === 'en-fr' || value === 'nl-fr' ? value : DEFAULT_PAIR
+  return value === 'sv-fr' || value === 'en-fr' || value === 'nl-fr' || value === 'es-fr' ? value : DEFAULT_PAIR
 }
 
 export function pairOf(value: string | null | undefined): Pair {
@@ -45,6 +46,7 @@ export const COURSES: Course[] = [
   { native: 'fr', learned: 'sv', pair: 'sv-fr' },
   { native: 'fr', learned: 'en', pair: 'en-fr' },
   { native: 'fr', learned: 'nl', pair: 'nl-fr' },
+  { native: 'fr', learned: 'es', pair: 'es-fr' },
   { native: 'sv', learned: 'fr', pair: 'sv-fr' },
   { native: 'en', learned: 'fr', pair: 'en-fr' },
 ]
@@ -115,6 +117,7 @@ const LOCALES: Record<Lang, string> = {
   sv: 'sv-SE',
   en: 'en-GB',
   nl: 'nl-NL',
+  es: 'es-ES',
 }
 
 export function localeOf(lang: Lang): string {
@@ -128,6 +131,7 @@ const FLAGS: Record<Lang, string> = {
   sv: '🇸🇪',
   en: '🇬🇧',
   nl: '🇳🇱',
+  es: '🇪🇸',
 }
 
 export function flagOf(lang: Lang): string {
@@ -140,6 +144,7 @@ const VERB_FORMS: Partial<Record<Lang, readonly string[]>> = {
   sv: ['present', 'preterit', 'supine'],
   en: ['past', 'pastParticiple'],
   nl: ['past', 'pastParticiple'],
+  es: ['past', 'pastParticiple'],
 }
 
 export function verbFormsFor(lang: Lang): readonly string[] {

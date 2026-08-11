@@ -232,11 +232,117 @@ function dutchCandidates(token: string): string[] {
   return out
 }
 
+// Spanish suppletive forms no rule can rebuild. Values are vocabulary headwords.
+const ES_IRREGULARS: Record<string, string> = {
+  soy: 'ser', eres: 'ser', es: 'ser', somos: 'ser', sois: 'ser', son: 'ser',
+  era: 'ser', eras: 'ser', eran: 'ser', éramos: 'ser',
+  fue: 'ser', fui: 'ser', fuiste: 'ser', fuimos: 'ser', fueron: 'ser', fuera: 'ser', fuese: 'ser',
+  sido: 'ser', sea: 'ser', sean: 'ser', seas: 'ser',
+  estoy: 'estar', estuve: 'estar', estuvo: 'estar', estuvieron: 'estar', estuviera: 'estar',
+  voy: 'ir', vas: 'ir', va: 'ir', vamos: 'ir', vais: 'ir', van: 'ir',
+  iba: 'ir', ibas: 'ir', iban: 'ir', íbamos: 'ir', ido: 'ir', vaya: 'ir', ve: 'ir',
+  he: 'haber', has: 'haber', ha: 'haber', hemos: 'haber', habéis: 'haber', han: 'haber',
+  hay: 'haber', había: 'haber', hubo: 'haber', habido: 'haber', haya: 'haber', habrá: 'haber',
+  tengo: 'tener', tuve: 'tener', tuvo: 'tener', tuvieron: 'tener', tenga: 'tener', ten: 'tener',
+  hago: 'hacer', hice: 'hacer', hizo: 'hacer', hicieron: 'hacer', hecho: 'hacer',
+  haga: 'hacer', haz: 'hacer', haría: 'hacer', hará: 'hacer', haré: 'hacer',
+  digo: 'decir', dije: 'decir', dijo: 'decir', dijeron: 'decir', dicho: 'decir',
+  diga: 'decir', di: 'decir', dirá: 'decir', diría: 'decir',
+  puedo: 'poder', pude: 'poder', pudo: 'poder', pudieron: 'poder', pueda: 'poder',
+  podrá: 'poder', podría: 'poder',
+  quise: 'querer', quiso: 'querer', quisieron: 'querer', quiera: 'querer',
+  querrá: 'querer', querría: 'querer', quisiera: 'querer',
+  sé: 'saber', supe: 'saber', supo: 'saber', supieron: 'saber', sepa: 'saber', sabrá: 'saber',
+  vengo: 'venir', vine: 'venir', vino: 'venir', vinieron: 'venir', venga: 'venir', ven: 'venir',
+  vendrá: 'venir',
+  doy: 'dar', dio: 'dar', dieron: 'dar', dé: 'dar', dado: 'dar',
+  veo: 'ver', vi: 'ver', vio: 'ver', vieron: 'ver', visto: 'ver', vea: 'ver', veía: 'ver',
+  pongo: 'poner', puse: 'poner', puso: 'poner', pusieron: 'poner', puesto: 'poner',
+  ponga: 'poner', pon: 'poner', pondrá: 'poner',
+  salgo: 'salir', salga: 'salir', sal: 'salir', saldrá: 'salir',
+  traigo: 'traer', traje: 'traer', trajo: 'traer', trajeron: 'traer', traído: 'traer',
+  caigo: 'caer', cayó: 'caer', cayeron: 'caer', caído: 'caer',
+  oigo: 'oír', oye: 'oír', oyó: 'oír', oyeron: 'oír', oído: 'oír',
+  muerto: 'morir', murió: 'morir', murieron: 'morir',
+  vuelto: 'volver', abierto: 'abrir', escrito: 'escribir', roto: 'romper',
+  supongo: 'suponer', supuesto: 'suponer',
+  sabrás: 'saber', tendrá: 'tener', tendría: 'tener',
+  leyó: 'leer', leyeron: 'leer', leído: 'leer',
+  creyó: 'creer', creyeron: 'creer', creído: 'creer',
+  durmió: 'dormir', durmieron: 'dormir', sintió: 'sentir', sintieron: 'sentir',
+  pidió: 'pedir', pidieron: 'pedir', siguió: 'seguir', siguieron: 'seguir',
+  consiguió: 'conseguir', prefirió: 'preferir', repitió: 'repetir',
+}
+
+// Verb endings, longest first (present, pretérito, imperfecto, futuro,
+// condicional, subjunctive, gerund, participle, plural nouns)
+const ES_STRIP_SUFFIXES = [
+  'aríamos', 'eríamos', 'iríamos', 'ábamos', 'íamos', 'aremos', 'eremos', 'iremos',
+  'asteis', 'isteis', 'ierais', 'áramos', 'iendo', 'ieron', 'ieran', 'ieras', 'iera',
+  'aban', 'abas', 'aba', 'ando', 'aron', 'aran', 'aras', 'ara', 'aría', 'ería', 'iría',
+  'arías', 'erías', 'irías', 'arían', 'erían', 'irían',
+  'aré', 'arás', 'ará', 'arán', 'eré', 'erás', 'erá', 'erán', 'iré', 'irás', 'irá', 'irán',
+  'emos', 'amos', 'imos', 'áis', 'éis', 'ados', 'adas', 'idos', 'idas',
+  'ado', 'ada', 'ido', 'ida', 'ían', 'ías', 'ía', 'aste', 'iste',
+  'an', 'en', 'as', 'es', 'a', 'e', 'o', 'ó', 'é', 'í', 'ís', 's',
+]
+
+const ES_CLITICS = /(me|te|se|le|la|lo|nos|os|les|las|los)$/
+
+function deaccent(s: string): string {
+  return s.replace(/á/g, 'a').replace(/é/g, 'e').replace(/í/g, 'i').replace(/ó/g, 'o').replace(/ú/g, 'u')
+}
+
+// Spelling/diphthong variants of a verb stem: "pued-" → "pod-", "piens-" →
+// "pens-", "pid-" → "ped-", "saqu-" → "sac-", "llegu-" → "lleg-", "vec-" → "vez"
+function spanishStemVariants(stem: string): string[] {
+  const out = new Set<string>([stem])
+  const ie = stem.lastIndexOf('ie')
+  if (ie >= 0) out.add(stem.slice(0, ie) + 'e' + stem.slice(ie + 2))
+  const ue = stem.lastIndexOf('ue')
+  if (ue >= 0) out.add(stem.slice(0, ue) + 'o' + stem.slice(ue + 2))
+  const i = stem.lastIndexOf('i')
+  if (i >= 1) out.add(stem.slice(0, i) + 'e' + stem.slice(i + 1))
+  if (stem.endsWith('qu')) out.add(stem.slice(0, -2) + 'c')
+  if (stem.endsWith('gu')) out.add(stem.slice(0, -1))
+  if (stem.endsWith('c')) out.add(stem.slice(0, -1) + 'z')
+  if (stem.endsWith('z')) out.add(stem.slice(0, -1) + 'c')
+  return [...out]
+}
+
+function spanishCandidates(token: string, depth = 0): string[] {
+  const out: string[] = []
+  if (ES_IRREGULARS[token]) out.push(ES_IRREGULARS[token])
+  const plain = deaccent(token)
+  if (plain !== token && ES_IRREGULARS[plain]) out.push(ES_IRREGULARS[plain])
+  for (const suffix of ES_STRIP_SUFFIXES) {
+    if (!token.endsWith(suffix)) continue
+    const stem = token.slice(0, -suffix.length)
+    if (stem.length < 2) continue
+    for (const variant of spanishStemVariants(stem)) {
+      // Infinitives (incl. reflexive), bare stem for nouns ("veces" → "vez")
+      out.push(variant + 'ar', variant + 'er', variant + 'ir', variant)
+      out.push(variant + 'arse', variant + 'erse', variant + 'irse')
+    }
+  }
+  // Attached clitics: "levantarse", "dámelo", "dime" — strip up to two and retry
+  if (depth < 2) {
+    const m = token.match(ES_CLITICS)
+    if (m && token.length - m[1].length >= 2) {
+      const base = deaccent(token.slice(0, -m[1].length))
+      out.push(base, base + 'se')
+      out.push(...spanishCandidates(base, depth + 1))
+    }
+  }
+  return out
+}
+
 // Ordered lemma guesses for a token, best first. Callers stop at the first hit.
 export function lemmaCandidates(token: string, lang: Lang): string[] {
   if (lang === 'sv') return swedishCandidates(token)
   if (lang === 'en') return englishCandidates(token)
   if (lang === 'nl') return dutchCandidates(token)
+  if (lang === 'es') return spanishCandidates(token)
   return []
 }
 
@@ -245,6 +351,7 @@ const HEADWORD_PREFIX: Partial<Record<Lang, RegExp>> = {
   sv: /^(en|ett|att)\s+/,
   en: /^to\s+/,
   nl: /^(de|het)\s+/,
+  es: /^(el|la|los|las)\s+/,
 }
 
 export function headwordKey(raw: string, lang: Lang): string {

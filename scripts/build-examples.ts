@@ -15,7 +15,7 @@ const MIN_LEN = 12
 const MAX_LEN = 140
 
 // Tatoeba uses ISO 639-3 codes in its file names
-const TATOEBA_CODE: Record<Lang, string> = { sv: 'swe', fr: 'fra', en: 'eng', nl: 'nld' }
+const TATOEBA_CODE: Record<Lang, string> = { sv: 'swe', fr: 'fra', en: 'eng', nl: 'nld', es: 'spa' }
 
 interface Example { term: string; translation?: string; blank: string }
 

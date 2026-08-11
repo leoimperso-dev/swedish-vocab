@@ -27,6 +27,8 @@ const SOURCES: Array<{ file: string; pair: PairId }> = [
   // *_wiki.txt: bulk vocabulary from kaikki.org Wiktionary extracts (CC BY-SA),
   // frequency-filtered — regenerate with Desktop\pro\generate-wiki-vocab.py
   { file: 'Dutch_wiki.txt', pair: 'nl-fr' },
+  { file: 'Spanish_core.txt', pair: 'es-fr' },
+  { file: 'Spanish_wiki.txt', pair: 'es-fr' },
 ]
 
 function parenthesised(term: string): string[] | null {

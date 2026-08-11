@@ -6,7 +6,7 @@ export const DEFAULT_LANG: Lang = DEFAULT_COURSE.native
 
 const fr = {
   // Language names — injected into the parametric strings below
-  languageName: { fr: 'français', sv: 'suédois', en: 'anglais', nl: 'néerlandais' } as Record<Lang, string>,
+  languageName: { fr: 'français', sv: 'suédois', en: 'anglais', nl: 'néerlandais', es: 'espagnol' } as Record<Lang, string>,
   interfaceLabel: 'Interface en français',
   // Nav
   navHome: 'Accueil',
@@ -191,7 +191,7 @@ const fr = {
 }
 
 const sv: typeof fr = {
-  languageName: { fr: 'franska', sv: 'svenska', en: 'engelska', nl: 'nederländska' },
+  languageName: { fr: 'franska', sv: 'svenska', en: 'engelska', nl: 'nederländska', es: 'spanska' },
   interfaceLabel: 'Gränssnitt på svenska',
   // Nav
   navHome: 'Hem',
@@ -376,7 +376,7 @@ const sv: typeof fr = {
 }
 
 const en: typeof fr = {
-  languageName: { fr: 'French', sv: 'Swedish', en: 'English', nl: 'Dutch' },
+  languageName: { fr: 'French', sv: 'Swedish', en: 'English', nl: 'Dutch', es: 'Spanish' },
   interfaceLabel: 'Interface in English',
   // Nav
   navHome: 'Home',
