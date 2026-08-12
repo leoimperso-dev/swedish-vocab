@@ -1,9 +1,9 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { motion, useMotionValue, useTransform } from 'framer-motion'
-import { Check, ChevronDown, Eye, EyeOff, MessageSquare, Star, X } from 'lucide-react'
+import { Check, ChevronDown, Eye, EyeOff, MessageSquare, Search, Star, X } from 'lucide-react'
 import { formatForms, parseDetails } from '@/lib/word-display'
 import { MAX_KNOWLEDGE_LEVEL } from '@/lib/sm2'
 import { getStrings } from '@/lib/i18n'
@@ -12,11 +12,35 @@ import { useCourse } from '@/components/CourseProvider'
 import { cn } from '@/lib/utils'
 import { AppShell } from '@/components/AppShell'
 import { LevelDots, Segmented, SectionLabel } from '@/components/ui/primitives'
-import { Button } from '@/components/ui/button'
 import { EmptyState, ListSkeleton } from '@/components/ui/feedback'
+import TappableText from '@/components/TappableText'
 
 const TOP_LIST_SIZE = 3000
-const PAGE_STEP = 300
+// Rows rendered per batch — more stream in as the sentinel scrolls into view
+const PAGE_STEP = 60
+
+// Accent-insensitive haystack/needle normalisation for search
+function fold(s: string): string {
+  return s.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '')
+}
+
+// Invisible row that asks for the next batch when scrolled into view
+function LoadMoreSentinel({ onMore }: { onMore: () => void }) {
+  const ref = useRef<HTMLDivElement>(null)
+  const onMoreRef = useRef(onMore)
+  onMoreRef.current = onMore
+  useEffect(() => {
+    const el = ref.current
+    if (!el) return
+    const io = new IntersectionObserver(
+      entries => { if (entries[0].isIntersecting) onMoreRef.current() },
+      { rootMargin: '600px' },
+    )
+    io.observe(el)
+    return () => io.disconnect()
+  }, [])
+  return <div ref={ref} className="h-1" />
+}
 
 interface ApiWord {
   id: string
@@ -48,6 +72,11 @@ export default function WordsPage() {
   const [tab, setTab] = useState<Tab>('categories')
   const [openCategories, setOpenCategories] = useState<Set<string>>(new Set())
   const [topVisible, setTopVisible] = useState(PAGE_STEP)
+  // Instant search over the whole loaded vocabulary, both sides
+  const [query, setQuery] = useState('')
+  const [searchVisible, setSearchVisible] = useState(PAGE_STEP)
+  // Rows rendered per open category — batches stream in while scrolling
+  const [catVisible, setCatVisible] = useState<Record<string, number>>({})
   // Flashcard mode: rows show only the native side; tapping one reveals its translation
   const [flashcards, setFlashcards] = useState(false)
   const [revealed, setRevealed] = useState<Set<string>>(new Set())
@@ -153,6 +182,22 @@ export default function WordsPage() {
 
   const favoriteWords = useMemo(() => visibleWords.filter(w => w.favorite), [visibleWords])
 
+  const searchResults = useMemo(() => {
+    const q = fold(query.trim())
+    if (!q) return []
+    const starts: ApiWord[] = []
+    const contains: ApiWord[] = []
+    for (const w of visibleWords) {
+      const term = fold(w.term.replace(/^(en|ett|att|de|het|el|la|los|las|to)\s+/, ''))
+      const translation = fold(w.translation)
+      if (term.startsWith(q) || translation.startsWith(q)) starts.push(w)
+      else if (term.includes(q) || translation.includes(q)) contains.push(w)
+    }
+    const byRank = (a: ApiWord, b: ApiWord) =>
+      (a.frequencyRank ?? 1e9) - (b.frequencyRank ?? 1e9)
+    return [...starts.sort(byRank), ...contains.sort(byRank)]
+  }, [visibleWords, query])
+
   const toggleFavorite = (wordId: string) => {
     const word = words.find(w => w.id === wordId)
     if (!word) return
@@ -188,6 +233,27 @@ export default function WordsPage() {
       subtitle={loading ? undefined : t.wordsAndCategories(words.length, groups.length)}
     >
       <div className="space-y-4">
+        {/* Instant dictionary search — both languages, accent-insensitive */}
+        <div className="relative">
+          <Search size={16} className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-muted-foreground" />
+          <input
+            type="search"
+            value={query}
+            onChange={e => { setQuery(e.target.value); setSearchVisible(PAGE_STEP) }}
+            placeholder={t.searchPlaceholder}
+            className="h-11 w-full rounded-xl border border-border bg-surface pl-10 pr-9 text-[15px] text-foreground placeholder:text-muted-foreground/70 focus:border-primary/50 focus:outline-none"
+          />
+          {query && (
+            <button
+              onClick={() => setQuery('')}
+              aria-label="✕"
+              className="pressable absolute right-2 top-1/2 grid size-7 -translate-y-1/2 place-items-center rounded-lg text-muted-foreground"
+            >
+              <X size={15} />
+            </button>
+          )}
+        </div>
+
         <div className="flex items-center gap-2">
           <Segmented
             className="min-w-0 flex-1"
@@ -224,6 +290,20 @@ export default function WordsPage() {
 
         {loading ? (
           <ListSkeleton rows={5} />
+        ) : query.trim() ? (
+          searchResults.length === 0 ? (
+            <EmptyState icon={<Search size={22} />} title={t.searchNoResults} />
+          ) : (
+            <div className="space-y-2">
+              <SectionLabel>{t.searchResults(searchResults.length)}</SectionLabel>
+              {searchResults.slice(0, searchVisible).map(word => (
+                <WordRow key={word.id} word={word} course={course} onToggleFavorite={toggleFavorite} masked={flashcards && !revealed.has(word.id)} onFlip={flashcards ? () => flipCard(word.id) : undefined} onSwipe={known => swipeWord(word.id, known)} />
+              ))}
+              {searchVisible < searchResults.length && (
+                <LoadMoreSentinel onMore={() => setSearchVisible(v => v + PAGE_STEP)} />
+              )}
+            </div>
+          )
         ) : tab === 'categories' ? (
           <div className="space-y-2">
             {groups.map(([label, groupWords]) => {
@@ -251,9 +331,16 @@ export default function WordsPage() {
                   </button>
                   {open ? (
                     <div className="animate-rise space-y-2 border-t border-border bg-background/40 p-2">
-                      {groupWords.map(word => (
+                      {groupWords.slice(0, catVisible[label] ?? PAGE_STEP).map(word => (
                         <WordRow key={word.id} word={word} course={course} onToggleFavorite={toggleFavorite} masked={flashcards && !revealed.has(word.id)} onFlip={flashcards ? () => flipCard(word.id) : undefined} onSwipe={known => swipeWord(word.id, known)} />
                       ))}
+                      {(catVisible[label] ?? PAGE_STEP) < groupWords.length && (
+                        <LoadMoreSentinel
+                          onMore={() =>
+                            setCatVisible(v => ({ ...v, [label]: (v[label] ?? PAGE_STEP) + PAGE_STEP }))
+                          }
+                        />
+                      )}
                     </div>
                   ) : null}
                 </div>
@@ -266,11 +353,9 @@ export default function WordsPage() {
             {topWords.slice(0, topVisible).map(word => (
               <WordRow key={word.id} word={word} course={course} onToggleFavorite={toggleFavorite} showRank masked={flashcards && !revealed.has(word.id)} onFlip={flashcards ? () => flipCard(word.id) : undefined} onSwipe={known => swipeWord(word.id, known)} />
             ))}
-            {topVisible < topWords.length ? (
-              <Button variant="secondary" className="w-full" onClick={() => setTopVisible(v => v + PAGE_STEP)}>
-                {t.showMore} ({topVisible} / {topWords.length})
-              </Button>
-            ) : null}
+            {topVisible < topWords.length && (
+              <LoadMoreSentinel onMore={() => setTopVisible(v => v + PAGE_STEP)} />
+            )}
           </div>
         ) : favoriteWords.length > 0 ? (
           <div className="space-y-2">
@@ -431,7 +516,9 @@ function WordRow({ word, course, onToggleFavorite, showRank, masked, onFlip, onS
           ) : (
             examples.map(ex => (
               <div key={ex.term}>
-                <p className="text-sm leading-snug text-foreground">{ex.term}</p>
+                <p className="text-sm leading-snug text-foreground">
+                  <TappableText text={ex.term} locale={localeOf(course.learned)} t={t} />
+                </p>
                 {ex.translation && (
                   <p className="text-xs italic leading-snug text-muted-foreground">{ex.translation}</p>
                 )}
