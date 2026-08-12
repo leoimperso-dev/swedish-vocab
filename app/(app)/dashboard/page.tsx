@@ -1,6 +1,6 @@
 import { auth } from '@/auth'
 import { db } from '@/lib/db'
-import { getLevelForXp, getNextLevel, xpToNextLevel } from '@/lib/xp'
+import { getLevelForXp, getNextLevel, levelTitle, xpToNextLevel } from '@/lib/xp'
 import { toLocalDateString } from '@/lib/streak'
 import { getStrings } from '@/lib/i18n'
 import { getCourse } from '@/lib/current-course'
@@ -88,7 +88,7 @@ export default async function DashboardPage() {
         <Card>
           <div className="flex items-baseline justify-between gap-3">
             <div className="min-w-0">
-              <CardTitle className="font-display text-lg">{level.title}</CardTitle>
+              <CardTitle className="font-display text-lg">{levelTitle(level, course.learned)}</CardTitle>
               <p className="text-xs text-muted-foreground">
                 {t.level} {level.level}
               </p>
@@ -98,11 +98,9 @@ export default async function DashboardPage() {
             </span>
           </div>
           <ProgressBar value={Math.min(progress * 100, 100)} tone="xp" className="mt-3" />
-          {nextLevel ? (
-            <p className="mt-2 text-xs text-muted-foreground">
-              {t.xpBeforeLevel(needed - current, nextLevel.title)}
-            </p>
-          ) : null}
+          <p className="mt-2 text-xs text-muted-foreground">
+            {t.xpBeforeLevel(needed - current, levelTitle(nextLevel, course.learned))}
+          </p>
         </Card>
 
         {/* Stats */}

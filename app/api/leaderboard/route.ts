@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@/auth'
 import { db } from '@/lib/db'
-import { getLevelForXp } from '@/lib/xp'
+import { getLevelForXp, levelTitle } from '@/lib/xp'
 import { toLocalDateString } from '@/lib/streak'
+import { getCourse } from '@/lib/current-course'
 
 function mondayOfCurrentWeek(timezone: string): string {
   const today = toLocalDateString(new Date(), timezone)
@@ -16,6 +17,9 @@ export async function GET(req: NextRequest) {
   if (!session?.user?.id) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   const period = req.nextUrl.searchParams.get('period') === 'week' ? 'week' : 'all'
+  // Rank names follow the reader's course: a board mixing five languages of
+  // titles reads as noise
+  const course = await getCourse(session.user.id)
 
   const users = await db.user.findMany({
     orderBy: { xp: 'desc' },
@@ -65,7 +69,7 @@ export async function GET(req: NextRequest) {
     image: e.user.image,
     xp: e.xp,
     level: e.user.level,
-    levelTitle: getLevelForXp(e.user.xp).title,
+    levelTitle: levelTitle(getLevelForXp(e.user.xp), course.learned),
     streak: e.user.streakCurrent,
     wordsStudied: e.wordsStudied,
     isCurrentUser: e.user.id === session.user!.id,

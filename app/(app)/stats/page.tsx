@@ -1,6 +1,6 @@
 import { auth } from '@/auth'
 import { db } from '@/lib/db'
-import { getLevelForXp, xpToNextLevel } from '@/lib/xp'
+import { getLevelForXp, levelTitle, xpToNextLevel } from '@/lib/xp'
 import { getStrings } from '@/lib/i18n'
 import { getCourseWithLevel } from '@/lib/current-course'
 import { localeOf, type PairId } from '@/lib/courses'
@@ -168,7 +168,7 @@ export default async function StatsPage() {
         {/* Level progress */}
         <Card>
           <div className="flex items-baseline justify-between gap-3">
-            <CardTitle className="font-display text-lg">{level.title}</CardTitle>
+            <CardTitle className="font-display text-lg">{levelTitle(level, course.learned)}</CardTitle>
             <span className="shrink-0 text-xs font-semibold tabular-nums text-muted-foreground">
               {user.xp} XP total
             </span>

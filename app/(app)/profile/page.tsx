@@ -1,6 +1,6 @@
 import { auth, signOut } from '@/auth'
 import { db } from '@/lib/db'
-import { getLevelForXp, xpToNextLevel, LEVELS } from '@/lib/xp'
+import { getLevelForXp, levelLadder, levelTitle, xpToNextLevel } from '@/lib/xp'
 import { ACHIEVEMENTS } from '@/lib/achievements'
 import { MAX_FREEZES, FREEZE_EARN_EVERY } from '@/lib/streak'
 import { asLang, getStrings } from '@/lib/i18n'
@@ -10,7 +10,7 @@ import Image from 'next/image'
 import { AppShell } from '@/components/AppShell'
 import { Card, CardTitle, Chip, ProgressBar, SectionLabel } from '@/components/ui/primitives'
 import { LevelSettings } from '@/components/LevelSettings'
-import { asLangOrDefault } from '@/lib/courses'
+import { asLangOrDefault, resolveCourse } from '@/lib/courses'
 import { Button } from '@/components/ui/button'
 import { Check, Flame, Lock, LogOut, Snowflake, Trophy, Zap } from 'lucide-react'
 
@@ -41,7 +41,9 @@ export default async function ProfilePage() {
   if (!user) return null
 
   const t = getStrings(asLang(user.nativeLanguage))
+  const course = resolveCourse(user.nativeLanguage, user.learningLanguage)
   const level = getLevelForXp(user.xp)
+  const ladder = levelLadder(course.learned, user.xp)
   const { current, needed, progress } = xpToNextLevel(user.xp)
   const unlockedSlugs = unlockedAchievements.map(ua => ua.achievement.slug)
 
@@ -67,7 +69,7 @@ export default async function ProfilePage() {
             <p className="truncate font-display text-lg font-semibold tracking-tight">{user.name}</p>
             <p className="truncate text-xs text-muted-foreground">{user.email}</p>
             <Chip tone="info" className="mt-2">
-              {level.title} · {t.level} {level.level}
+              {levelTitle(level, course.learned)} · {t.level} {level.level}
             </Chip>
           </div>
         </Card>
@@ -76,7 +78,7 @@ export default async function ProfilePage() {
         <Card>
           <CardTitle>{t.progression}</CardTitle>
           <div className="mt-3 flex items-baseline justify-between text-sm">
-            <span className="font-display font-semibold">{level.title}</span>
+            <span className="font-display font-semibold">{levelTitle(level, course.learned)}</span>
             <span className="text-muted-foreground tabular-nums">
               {current} / {needed || '∞'} XP
             </span>
@@ -85,9 +87,9 @@ export default async function ProfilePage() {
 
           {/* Level roadmap */}
           <ul className="mt-4 space-y-0">
-            {LEVELS.map((l, i) => {
-              const done = l.level < user.level
-              const isCurrent = l.level === user.level
+            {ladder.map((l, i) => {
+              const done = l.level < level.level
+              const isCurrent = l.level === level.level
               return (
                 <li key={l.level} className="flex gap-3">
                   <div className="flex flex-col items-center">
@@ -101,7 +103,7 @@ export default async function ProfilePage() {
                     >
                       {done ? <Check size={13} /> : l.level}
                     </span>
-                    {i < LEVELS.length - 1 ? (
+                    {i < ladder.length - 1 ? (
                       <span className={cn('w-px flex-1', done ? 'bg-success/40' : 'bg-border')} />
                     ) : null}
                   </div>
