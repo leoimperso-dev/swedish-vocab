@@ -172,7 +172,8 @@ const fr = {
   // imparfait, so the label names both rather than picking one
   preterit: 'Prétérit (passé composé / imparfait)',
   supine: 'Supin (participe passé)',
-  past: 'Prétérit (passé composé / imparfait)',
+  // en / nl / es share this key — see VERB_FORMS in lib/courses.ts
+  past: 'Prétérit (passé)',
   pastParticiple: 'Participe passé',
   // Results
   sessionDone: 'Session terminée 🎉',
