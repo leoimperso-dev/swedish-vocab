@@ -1,11 +1,14 @@
+// Thresholds are sized for the current rewards (~15-20 XP for a full session).
+// They were left at their old values when the per-answer rewards were divided
+// by ten, which made every rank reachable in a handful of sessions.
 export const LEVELS = [
-  { level: 1, minXp: 0,    title: 'Nybörjare' },
-  { level: 2, minXp: 20,   title: 'Elev' },
-  { level: 3, minXp: 60,   title: 'Student' },
-  { level: 4, minXp: 150,  title: 'Talare' },
-  { level: 5, minXp: 350,  title: 'Avancerad' },
-  { level: 6, minXp: 700,  title: 'Expert' },
-  { level: 7, minXp: 1500, title: 'Mästare' },
+  { level: 1, minXp: 0,     title: 'Nybörjare' },
+  { level: 2, minXp: 200,   title: 'Elev' },
+  { level: 3, minXp: 600,   title: 'Student' },
+  { level: 4, minXp: 1500,  title: 'Talare' },
+  { level: 5, minXp: 3500,  title: 'Avancerad' },
+  { level: 6, minXp: 7000,  title: 'Expert' },
+  { level: 7, minXp: 15000, title: 'Mästare' },
 ] as const
 
 export const XP_REWARDS = {
