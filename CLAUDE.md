@@ -109,8 +109,12 @@ Vocabulary files live in `C:\Users\Arnau\Desktop\pro\` and are declared in `SOUR
 - `Spanish_wiki.txt` — Wiktionary bulk vocabulary for Spanish
 
 `*_wiki.txt` files come from `Desktop\pro\generate-wiki-vocab.py <lang>` (kaikki.org
-extracts, CC BY-SA, frequency-filtered to the top 20k): regenerate + reseed rather
-than editing them by hand. After each vocabulary batch, re-run `apply-frequency`
+extracts, CC BY-SA): regenerate + reseed rather than editing them by hand. They are
+capped by the OpenSubtitles lists, which stop at rank 50 000 — raising `RANK_CUTOFF`
+above that does nothing. Their entries are judged one by one by
+`scripts/mark-studyable.ts`, which drops Wiktionary definitions, inflected forms the
+curated lists already cover, and the contraction fragments the corpus mis-ranks
+(`don` from "don't" at rank 31). After each vocabulary batch, re-run `apply-frequency`
 then `build-examples` (in that order — example ownership reads the fresh ranks;
 see scripts/key-ownership.ts for how homographs share surface forms).
 

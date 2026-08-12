@@ -103,9 +103,10 @@ model Word {
   forms    Json?
   source   String?  // "swedish_txt" | "core_3000"
   frequencyRank Int? // real-world rank from OpenSubtitles corpus (1 = most common)
-  // False for entries that are useless as an exercise (term == translation) or
-  // come from the bulk Wiktionary batches, whose ranks are unreliable. They stay
-  // in the dictionary, the list and search — only study sessions skip them.
+  // False for entries that make no exercise: term == translation, a Wiktionary
+  // gloss that is a definition rather than a translation, an inflected form the
+  // curated lists already teach, or a rank poisoned by contraction splitting.
+  // They stay in the dictionary, the list and search — only sessions skip them.
   // Recomputed by scripts/mark-studyable.ts after each seed.
   studyable Boolean @default(true)
   // CEFR band derived from frequencyRank — see lib/cefr.ts. Filters which new
