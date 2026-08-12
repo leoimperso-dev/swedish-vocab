@@ -168,9 +168,10 @@ const fr = {
   // Conjugation
   infinitive: 'Infinitif',
   present: 'Présent',
-  // The Swedish preterite covers what French splits between passé composé and
-  // imparfait, so the label names both rather than picking one
-  preterit: 'Prétérit (passé composé / imparfait)',
+  // A label repeated on every card names the form, it does not teach it: the
+  // preterite maps to passé composé or imparfait depending on aspect, and that
+  // rule belongs in the grammar lesson (present-et-preterit), not here
+  preterit: 'Prétérit (passé)',
   supine: 'Supin (participe passé)',
   // en / nl / es share this key — see VERB_FORMS in lib/courses.ts
   past: 'Prétérit (passé)',
