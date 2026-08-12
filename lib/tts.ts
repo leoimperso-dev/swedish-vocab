@@ -11,10 +11,33 @@ export function unlock() {
   unlocked = true
 }
 
+/**
+ * Turns dictionary notation into something a synthesizer can say out loud.
+ *
+ * Entries are written to be read, not spoken: "intelligent / malin" lists two
+ * senses, "une école (primaire)" carries a usage note. Handed to the engine
+ * as-is, the first is read "intelligent slash malin" and the second drags the
+ * parenthesis into the answer. Slashes become pauses, notes are dropped.
+ */
+export function speakable(text: string): string {
+  const spoken = text
+    .replace(/\([^)]*\)/g, ' ')
+    // Dictionary shorthand, spelled out letter by letter otherwise
+    .replace(/\bqqch\b/gi, 'quelque chose')
+    .replace(/\bqqn\b/gi, "quelqu'un")
+    .replace(/\s*\/\s*/g, ', ')
+    .replace(/\s*,\s*,+/g, ', ')
+    .replace(/\s+/g, ' ')
+    .replace(/\s+([.,;:!?])/g, '$1')
+    .replace(/^[\s,]+|[\s,]+$/g, '')
+  // A word made only of notes still has to be pronounced somehow
+  return spoken || text
+}
+
 export function speak(text: string, locale: string, rate = 0.9): void {
   if (typeof window === 'undefined') return
   window.speechSynthesis.cancel()
-  const utterance = new SpeechSynthesisUtterance(text)
+  const utterance = new SpeechSynthesisUtterance(speakable(text))
   utterance.lang = locale
   utterance.rate = rate
   utterance.pitch = 1

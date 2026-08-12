@@ -1,7 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { isSupported, unlock, watchVoiceAvailability } from '@/lib/tts'
+import { isSupported, speakable, unlock, watchVoiceAvailability } from '@/lib/tts'
 
 export interface SpeechItem {
   text: string
@@ -61,7 +61,7 @@ export function useSpeechQueue() {
       }
       setIndex(i)
       const item = items[i]
-      const utterance = new SpeechSynthesisUtterance(item.text)
+      const utterance = new SpeechSynthesisUtterance(speakable(item.text))
       utterance.lang = item.locale
       utterance.rate = 0.9
       const next = () => {
