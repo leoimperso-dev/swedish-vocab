@@ -2,6 +2,7 @@ import { auth } from '@/auth'
 import { db } from '@/lib/db'
 import { redirect } from 'next/navigation'
 import { resolveCourse } from '@/lib/courses'
+import { levelFor } from '@/lib/cefr'
 import { CourseProvider } from '@/components/CourseProvider'
 import { StatsProvider } from '@/components/StatsProvider'
 import BottomNav from '@/components/BottomNav'
@@ -15,6 +16,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     select: {
       nativeLanguage: true,
       learningLanguage: true,
+      levels: true,
       xp: true,
       streakCurrent: true,
       freezeCount: true,
@@ -28,7 +30,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   }
 
   return (
-    <CourseProvider course={course}>
+    <CourseProvider course={course} level={levelFor(user?.levels, course.learned)}>
       <StatsProvider stats={stats}>
         <div className="min-h-dvh">
           {children}

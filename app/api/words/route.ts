@@ -15,7 +15,7 @@ export async function GET() {
       where: { pair: course.pair },
       select: {
         id: true, term: true, translation: true, category: true, source: true,
-        forms: true, details: true, frequencyRank: true, examples: true,
+        forms: true, details: true, frequencyRank: true, examples: true, cefr: true,
       },
       orderBy: { term: 'asc' },
     }),

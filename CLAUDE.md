@@ -65,6 +65,25 @@ cloze, reading and grammar — a Swedish native learning French gets vocabulary 
 `Word.details` (JSONB `{translations[], context?, usage[{term,translation}]}`) follows the same rule
 via `showsEnrichedAnswer()`.
 
+## CEFR levels
+Every user declares a level per learned language (`User.levels`, a JSON map
+`{ "sv": "A2" }`). `Word.cefr` is derived from `frequencyRank` by `lib/cefr.ts`
+(A1 ≤ 600, A2 ≤ 1200, B1 ≤ 2500, B2 ≤ 5000, C1 ≤ 10000, C2 beyond / unranked).
+
+The level is a **floor on new words only**: study sessions draw new words from
+that band and above, and fall back to the whole pair if the band runs dry. Words
+already started keep coming back, and the vocabulary list shows every level with
+its own filter chips. `scripts/assign-cefr.ts` recomputes the column — run it
+after `apply-frequency`.
+
+## Conversation
+`Dialogue` table (96 turn-by-turn conversations, 3 levels) under `/conversation`.
+`DialoguePlayer` speaks the `them` lines, prompts the `you` lines in the interface
+language, and grades a spoken answer via `lib/use-speech-recognition.ts`
+(`evaluateSpokenAnswer`, looser than typing). Recognition is Chrome/Edge/Safari
+only, so a typed fallback is always one tap away. Import with
+`scripts/import-dialogues.ts <dir>` — the pair comes from each filename.
+
 ## Reading
 `Story` table (48 graded stories, 4 levels) under `/reading`; `StoryReader` makes every word
 tappable → `/api/dictionary?q=` backed by `lib/dictionary.ts` (one in-memory map per pair, over
@@ -111,6 +130,8 @@ pnpm db:apply <file.sql>      # apply SQL to Supabase via node-postgres
 pnpm db:seed                  # parse .txt files and seed DB
 pnpm parse                    # test vocabulary parser
 pnpm tsx scripts/check-story-coverage.ts   # QA: every story token must resolve
+pnpm tsx scripts/mark-studyable.ts         # recompute Word.studyable (after each seed)
+pnpm tsx scripts/assign-cefr.ts            # recompute Word.cefr (after apply-frequency)
 ```
 After touching stories or vocabulary, run the coverage check — only proper
 nouns and numbers may stay unresolved (the reader shows « Nom propre » for

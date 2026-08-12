@@ -84,6 +84,29 @@ const fr = {
   modeCloze: 'Phrase à trous',
   modeClozeDesc: (language: string) => `Complète de vraies phrases en ${language}`,
   clozePrompt: 'Complète la phrase',
+  // CEFR levels
+  levelTitle: 'Ton niveau',
+  levelSubtitle: (language: string) => `En ${language}`,
+  levelExplainer:
+    'Ton niveau détermine par où commencent les nouveaux mots. Les mots plus simples restent accessibles depuis la liste de vocabulaire.',
+  levelChange: 'Changer de niveau',
+  yourLevel: 'Niveau',
+  cefrLabel: {
+    A1: 'Grand débutant',
+    A2: 'Débutant',
+    B1: 'Intermédiaire',
+    B2: 'Intermédiaire avancé',
+    C1: 'Avancé',
+    C2: 'Maîtrise',
+  } as Record<string, string>,
+  cefrDesc: {
+    A1: 'Quelques mots, expressions de base',
+    A2: 'Phrases simples du quotidien',
+    B1: 'Conversation courante, sujets familiers',
+    B2: 'Discussions nuancées, actualité, travail',
+    C1: 'Langue riche, expression spontanée',
+    C2: 'Presque comme une langue maternelle',
+  } as Record<string, string>,
   // Reading
   readingTitle: 'Lecture',
   readingDesc: 'Petites histoires par niveau, chaque mot cliquable',
@@ -307,6 +330,29 @@ const sv: typeof fr = {
   modeClozeDesc: language => `Fyll i riktiga meningar på ${language}`,
   clozePrompt: 'Fyll i ordet',
   // Reading
+  // CEFR levels
+  levelTitle: 'Din nivå',
+  levelSubtitle: language => `I ${language}`,
+  levelExplainer:
+    'Nivån bestämmer var nya ord börjar. Enklare ord finns kvar i ordlistan.',
+  levelChange: 'Byt nivå',
+  yourLevel: 'Nivå',
+  cefrLabel: {
+    A1: 'Nybörjare',
+    A2: 'Grundläggande',
+    B1: 'Medel',
+    B2: 'Högre medel',
+    C1: 'Avancerad',
+    C2: 'Behärskning',
+  },
+  cefrDesc: {
+    A1: 'Enstaka ord och fasta uttryck',
+    A2: 'Enkla vardagsmeningar',
+    B1: 'Vanliga samtal om kända ämnen',
+    B2: 'Nyanserade samtal, nyheter, arbete',
+    C1: 'Rikt språk, spontant uttryck',
+    C2: 'Nästan som modersmål',
+  },
   readingTitle: 'Läsning',
   readingDesc: 'Korta berättelser per nivå, klickbara ord',
   chooseLevel: 'Välj nivå',
@@ -528,6 +574,29 @@ const en: typeof fr = {
   modeClozeDesc: language => `Complete real ${language} sentences`,
   clozePrompt: 'Complete the sentence',
   // Reading
+  // CEFR levels
+  levelTitle: 'Your level',
+  levelSubtitle: language => `In ${language}`,
+  levelExplainer:
+    'Your level decides where new words start. Easier words stay reachable from the vocabulary list.',
+  levelChange: 'Change level',
+  yourLevel: 'Level',
+  cefrLabel: {
+    A1: 'Absolute beginner',
+    A2: 'Beginner',
+    B1: 'Intermediate',
+    B2: 'Upper intermediate',
+    C1: 'Advanced',
+    C2: 'Mastery',
+  },
+  cefrDesc: {
+    A1: 'A few words and set phrases',
+    A2: 'Simple everyday sentences',
+    B1: 'Everyday conversation, familiar topics',
+    B2: 'Nuanced discussion, news, work',
+    C1: 'Rich language, spontaneous expression',
+    C2: 'Close to a native speaker',
+  },
   readingTitle: 'Reading',
   readingDesc: 'Short graded stories, every word tappable',
   chooseLevel: 'Choose your level',

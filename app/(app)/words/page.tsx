@@ -14,6 +14,7 @@ import { SpeakButton } from '@/components/SpeakButton'
 import { cn } from '@/lib/utils'
 import { AppShell } from '@/components/AppShell'
 import { LevelDots, Segmented, SectionLabel } from '@/components/ui/primitives'
+import { CEFR_LEVELS } from '@/lib/cefr'
 import { EmptyState, ListSkeleton } from '@/components/ui/feedback'
 import TappableText from '@/components/TappableText'
 
@@ -53,6 +54,7 @@ interface ApiWord {
   forms: unknown
   details: unknown
   frequencyRank: number | null
+  cefr: string | null
   hasExamples: boolean
   level: number
   known: boolean
@@ -99,6 +101,8 @@ export default function WordsPage() {
 
   // Swipe self-assessment: feeds SM-2 (both directions) and plain per-word XP
   const [knownFilter, setKnownFilter] = useState<'all' | 'toLearn' | 'known'>('all')
+  // CEFR band filter, null = every level
+  const [cefrFilter, setCefrFilter] = useState<string | null>(null)
   const router = useRouter()
 
   const swipeWord = (wordId: string, known: boolean) => {
@@ -150,12 +154,12 @@ export default function WordsPage() {
       .catch(() => setLoading(false))
   }, [course.pair])
 
-  const visibleWords = useMemo(
-    () => knownFilter === 'all'
+  const visibleWords = useMemo(() => {
+    const byKnown = knownFilter === 'all'
       ? words
-      : words.filter(w => (knownFilter === 'known' ? w.known : !w.known)),
-    [words, knownFilter],
-  )
+      : words.filter(w => (knownFilter === 'known' ? w.known : !w.known))
+    return cefrFilter ? byKnown.filter(w => w.cefr === cefrFilter) : byKnown
+  }, [words, knownFilter, cefrFilter])
 
   const groups = useMemo(() => {
     const labels = { personal: t.personalList, misc: t.misc }
@@ -330,6 +334,28 @@ export default function WordsPage() {
           value={knownFilter}
           onChange={v => setKnownFilter(v as typeof knownFilter)}
         />
+        {/* CEFR band — same bands the study sessions draw new words from */}
+        <div className="-mx-1 flex gap-1.5 overflow-x-auto px-1 pb-0.5">
+          {[null, ...CEFR_LEVELS].map(level => {
+            const active = cefrFilter === level
+            return (
+              <button
+                key={level ?? 'all'}
+                onClick={() => setCefrFilter(level)}
+                aria-pressed={active}
+                className={cn(
+                  'pressable shrink-0 rounded-lg border px-3 py-1.5 text-xs font-semibold',
+                  active
+                    ? 'border-primary/50 bg-info-soft text-primary'
+                    : 'border-border bg-surface text-muted-foreground',
+                )}
+              >
+                {level ?? t.filterAll}
+              </button>
+            )
+          })}
+        </div>
+
         <p className="text-center text-[11px] text-muted-foreground/70">{t.swipeListHint}</p>
         {missingVoice && (
           <p className="text-center text-[11px] text-warning">

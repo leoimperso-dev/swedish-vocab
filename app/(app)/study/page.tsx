@@ -21,7 +21,8 @@ import { Button } from '@/components/ui/button'
 import { EmptyState } from '@/components/ui/feedback'
 import { cn } from '@/lib/utils'
 import { getStrings } from '@/lib/i18n'
-import { useCourse, useLang } from '@/components/CourseProvider'
+import { useCourse, useLang, useLevel } from '@/components/CourseProvider'
+import { LevelPicker } from '@/components/LevelPicker'
 import {
   courseDirections, defaultDirection, flagOf, learnsTermLanguage, promptLang, answerLang,
   type Course, type Direction,
@@ -35,6 +36,10 @@ export default function StudyPage() {
   const course = useCourse()
   const t = getStrings(course.native)
   const [mode, setMode] = useState<StudyMode | null>(null)
+  // A language is never studied before its level is known — it decides which
+  // new words the session draws from
+  const declaredLevel = useLevel()
+  const [levelAsked, setLevelAsked] = useState(false)
   const [direction, setDirection] = useState<Direction>(defaultDirection(course))
   const [sessionId, setSessionId] = useState<string | null>(null)
   const [exercises, setExercises] = useState<ExerciseWord[]>([])
@@ -130,6 +135,9 @@ export default function StudyPage() {
       setCurrentIndex(i => i + 1)
     }
   }, [sessionId, exercises, currentIndex, results, combo, bestCombo, router, direction, missed])
+
+  // Asked before anything else: the session request must already know the level
+  if (!declaredLevel && !levelAsked) return <LevelPicker onDone={() => setLevelAsked(true)} />
 
   if (!mode) {
     return (

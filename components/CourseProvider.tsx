@@ -2,18 +2,33 @@
 
 import { createContext, useContext } from 'react'
 import { DEFAULT_COURSE, type Course, type Lang } from '@/lib/courses'
+import type { CefrLevel } from '@/lib/cefr'
 
-const CourseContext = createContext<Course>(DEFAULT_COURSE)
+interface CourseContextValue {
+  course: Course
+  // CEFR level declared for the learned language, null until the user picks one
+  level: CefrLevel | null
+}
 
-export function CourseProvider({ course, children }: { course: Course; children: React.ReactNode }) {
-  return <CourseContext.Provider value={course}>{children}</CourseContext.Provider>
+const CourseContext = createContext<CourseContextValue>({ course: DEFAULT_COURSE, level: null })
+
+export function CourseProvider({ course, level, children }: {
+  course: Course
+  level: CefrLevel | null
+  children: React.ReactNode
+}) {
+  return <CourseContext.Provider value={{ course, level }}>{children}</CourseContext.Provider>
 }
 
 export function useCourse(): Course {
-  return useContext(CourseContext)
+  return useContext(CourseContext).course
+}
+
+export function useLevel(): CefrLevel | null {
+  return useContext(CourseContext).level
 }
 
 // Interface language — the common case, kept as a shorthand
 export function useLang(): Lang {
-  return useContext(CourseContext).native
+  return useContext(CourseContext).course.native
 }

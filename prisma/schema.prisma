@@ -32,6 +32,9 @@ model User {
   // Language being studied. The (nativeLanguage, learningLanguage) couple is the
   // user's course and resolves to a content pair — see lib/courses.ts
   learningLanguage String @default("sv")
+  // Self-declared CEFR level per learned language: { "sv": "A2", "en": "B2" }.
+  // Unset means "not asked yet" — the app prompts before the first session.
+  levels        Json     @default("{}")
   xp            Int       @default(0)
   level         Int       @default(1)
   streakCurrent Int       @default(0)
@@ -105,6 +108,9 @@ model Word {
   // in the dictionary, the list and search — only study sessions skip them.
   // Recomputed by scripts/mark-studyable.ts after each seed.
   studyable Boolean @default(true)
+  // CEFR band derived from frequencyRank — see lib/cefr.ts. Filters which new
+  // words a learner is served, based on the level they declared for the language.
+  cefr     String?  // "A1" | "A2" | "B1" | "B2" | "C1" | "C2"
   // { translations: string[], context?: string, usage?: [{term, translation}] }
   details  Json?
   // Tatoeba example sentences (CC-BY): [{ term, translation?, blank }] — blank = surface form to hide in cloze
@@ -117,6 +123,7 @@ model Word {
   @@unique([pair, term, wordType, source], map: "Word_pair_term_wordType_source_key")
   @@index([pair, frequencyRank], map: "Word_pair_frequencyRank_idx")
   @@index([pair, studyable, frequencyRank], map: "Word_pair_studyable_rank_idx")
+  @@index([pair, cefr, frequencyRank], map: "Word_pair_cefr_rank_idx")
 }
 
 model Story {

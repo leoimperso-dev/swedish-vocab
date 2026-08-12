@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@/auth'
 import { db } from '@/lib/db'
-import { getCourse } from '@/lib/current-course'
+import { getCourseWithLevel } from '@/lib/current-course'
+import { levelsAtOrAbove } from '@/lib/cefr'
 import {
   courseDirections, defaultDirection, learnsTermLanguage, pairOf, promptLang, verbFormsFor,
   type Course, type Direction,
@@ -56,7 +57,7 @@ export async function GET(req: NextRequest) {
   if (!session?.user?.id) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   const userId = session.user.id
-  const course = await getCourse(userId)
+  const { course, level } = await getCourseWithLevel(userId)
   const pair = course.pair
   // Conjugation and cloze drill the pair's `term` language: only its learners get them
   const termExercises = learnsTermLanguage(course)
@@ -97,14 +98,23 @@ export async function GET(req: NextRequest) {
   const studiedIds = studiedWordIds.map(uw => uw.wordId)
 
   const newWordsTarget = Math.max(NEW_WORDS_PER_SESSION, SESSION_SIZE - dueUserWords.length)
-  const newWords = (await db.word.findMany({
-    where: { id: { notIn: studiedIds }, ...wordFilter },
-    take: needsEligibility ? newWordsTarget * 3 : newWordsTarget,
-    // Most common words (real corpus rank) first; unranked words last
-    orderBy: [{ frequencyRank: { sort: 'asc', nulls: 'last' } }, { createdAt: 'asc' }],
-  }))
-    .filter(w => isEligible(w))
-    .slice(0, newWordsTarget)
+  // The declared level is a floor on new words: someone who says B1 is not asked
+  // to translate "je" or "tu". Words already started keep coming back regardless.
+  const levelFilter = level ? { cefr: { in: levelsAtOrAbove(level) } } : {}
+  const drawNewWords = (filter: object) =>
+    db.word.findMany({
+      where: { id: { notIn: studiedIds }, ...wordFilter, ...filter },
+      take: needsEligibility ? newWordsTarget * 3 : newWordsTarget,
+      // Most common words (real corpus rank) first; unranked words last
+      orderBy: [{ frequencyRank: { sort: 'asc', nulls: 'last' } }, { createdAt: 'asc' }],
+    })
+
+  let newWords = (await drawNewWords(levelFilter)).filter(isEligible).slice(0, newWordsTarget)
+  // A level near the top of the pair can exhaust its band — fall back to the
+  // whole vocabulary rather than serve a half-empty session
+  if (newWords.length < newWordsTarget && level) {
+    newWords = (await drawNewWords({})).filter(isEligible).slice(0, newWordsTarget)
+  }
 
   // 3. Create session record
   const studySession = await db.studySession.create({
