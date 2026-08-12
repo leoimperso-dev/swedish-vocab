@@ -83,7 +83,7 @@ export default function ListeningExercise({ word, onAnswer }: Props) {
     if (!input.trim() || result) return
     const evaluation = evaluateAnswer(input, prompt.text)
     setResult(evaluation)
-    setTimeout(() => onAnswer(evaluation, 'LISTENING'), 1600)
+    if (evaluation === 'correct') setTimeout(() => onAnswer(evaluation, 'LISTENING'), 1600)
   }
 
   return (
@@ -135,11 +135,15 @@ export default function ListeningExercise({ word, onAnswer }: Props) {
           )}
         </AnimatePresence>
 
-        {!result && (
+        {!result ? (
           <Button size="lg" className="w-full" disabled={!input.trim()} onClick={handleSubmit}>
             {t.submit}
           </Button>
-        )}
+        ) : result !== 'correct' ? (
+          <Button size="lg" className="w-full" onClick={() => onAnswer(result, 'LISTENING')}>
+            {t.nextTurn}
+          </Button>
+        ) : null}
       </div>
     </div>
   )

@@ -8,6 +8,7 @@ import { answerLang, type Direction } from '@/lib/courses'
 import { getStrings } from '@/lib/i18n'
 import { useCourse } from '@/components/CourseProvider'
 import { Card } from '@/components/ui/primitives'
+import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 import type { Word } from '@prisma/client'
 import type { AnswerResult } from '@/types'
@@ -54,10 +55,8 @@ export default function MultipleChoice({ word, direction, distractors, onAnswer 
     unlock()
     speak(learnedText(word, course), learnedLocale(course))
 
-    setTimeout(() => {
-      const result: AnswerResult = option === correctOption ? 'correct' : 'incorrect'
-      onAnswer(result, 'QCM')
-    }, 800)
+    // Right answers flow on; a wrong one waits so the correct option can be read
+    if (option === correctOption) setTimeout(() => onAnswer('correct', 'QCM'), 800)
   }
 
   if (loading) return <div className="text-center text-muted-foreground">{t.loading}</div>
@@ -68,6 +67,12 @@ export default function MultipleChoice({ word, direction, distractors, onAnswer 
         <p className="text-hero-word">{directionPrompt(word, direction)}</p>
         <p className="mt-2 text-xs text-muted-foreground">{t.whichTranslation}</p>
       </Card>
+
+      {selected && selected !== correctOption && (
+        <Button size="lg" className="w-full" onClick={() => onAnswer('incorrect', 'QCM')}>
+          {t.nextTurn}
+        </Button>
+      )}
 
       <div className="grid grid-cols-2 gap-3">
         {options.map(option => {

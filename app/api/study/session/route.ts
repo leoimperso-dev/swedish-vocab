@@ -25,6 +25,16 @@ function hasExamples(examples: unknown): boolean {
   return Array.isArray(examples) && examples.length > 0
 }
 
+// Cloze hides one word of a real sentence and shows its French translation.
+// That only works for content words: blanking a pronoun or a preposition asks
+// the learner to guess something the translation cannot disambiguate — "sa
+// mort" gives no way to choose between "his" and "her".
+const CLOZE_TYPES = new Set(['VERB', 'NOUN', 'NOUN_EN', 'NOUN_ETT', 'ADJECTIVE', 'ADVERB'])
+
+function clozeEligible(word: Word): boolean {
+  return CLOZE_TYPES.has(word.wordType) && hasExamples(word.examples)
+}
+
 function selectExerciseType(
   userWord: UserWord | null,
   word: Word,
@@ -37,7 +47,7 @@ function selectExerciseType(
   // Dictation always drills the learned language, whichever side it sits on
   pool.push('LISTENING')
   if (termExercises && word.wordType === 'VERB' && hasFullVerbForms(word.forms, course)) pool.push('CONJUGATION')
-  if (termExercises && hasExamples(word.examples)) pool.push('CLOZE')
+  if (termExercises && clozeEligible(word)) pool.push('CLOZE')
   return pool[Math.floor(Math.random() * pool.length)]
 }
 
@@ -65,8 +75,9 @@ export async function GET(req: NextRequest) {
   const clozeOnly = forcedMode === 'CLOZE'
   const needsEligibility = conjugationOnly || clozeOnly
   const isEligible = (word: Word) =>
-    conjugationOnly ? hasFullVerbForms(word.forms, course) : clozeOnly ? hasExamples(word.examples) : true
-  const wordFilter = { pair, ...(conjugationOnly ? { wordType: 'VERB' as const } : {}) }
+    conjugationOnly ? hasFullVerbForms(word.forms, course) : clozeOnly ? clozeEligible(word) : true
+  // studyable excludes entries that make no exercise — see scripts/mark-studyable.ts
+  const wordFilter = { pair, studyable: true, ...(conjugationOnly ? { wordType: 'VERB' as const } : {}) }
 
   // 1. Due words (SM-2 scheduled for today, in the session's direction)
   const dueUserWords = (await db.userWord.findMany({
@@ -127,9 +138,9 @@ export async function GET(req: NextRequest) {
   if (exercises.some(e => e.exerciseType === 'QCM')) {
     // Random window into the pair's vocabulary — bounded by its actual size, or a
     // small pair would be skipped past entirely and yield no distractors
-    const pairTotal = await db.word.count({ where: { pair } })
+    const pairTotal = await db.word.count({ where: { pair, studyable: true } })
     const pool = await db.word.findMany({
-      where: { pair, id: { notIn: exercises.map(e => e.word.id) } },
+      where: { pair, studyable: true, id: { notIn: exercises.map(e => e.word.id) } },
       select: { term: true, translation: true, wordType: true },
       take: DISTRACTOR_POOL_SIZE,
       skip: Math.floor(Math.random() * Math.max(1, pairTotal - DISTRACTOR_POOL_SIZE)),

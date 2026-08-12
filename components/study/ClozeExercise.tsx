@@ -89,7 +89,7 @@ export default function ClozeExercise({ word, onAnswer }: Props) {
     const evaluation = evaluateAnswer(input, example.blank)
     setResult(evaluation)
 
-    setTimeout(() => onAnswer(evaluation, 'CLOZE'), 1500)
+    if (evaluation === 'correct') setTimeout(() => onAnswer(evaluation, 'CLOZE'), 1500)
   }
 
   return (
@@ -161,11 +161,15 @@ export default function ClozeExercise({ word, onAnswer }: Props) {
           )}
         </AnimatePresence>
 
-        {!result && (
+        {!result ? (
           <Button size="lg" className="w-full" disabled={!input.trim()} onClick={handleSubmit}>
             {t.submit}
           </Button>
-        )}
+        ) : result !== 'correct' ? (
+          <Button size="lg" className="w-full" onClick={() => onAnswer(result, 'CLOZE')}>
+            {t.nextTurn}
+          </Button>
+        ) : null}
       </div>
     </div>
   )

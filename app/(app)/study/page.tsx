@@ -42,6 +42,9 @@ export default function StudyPage() {
   const [results, setResults] = useState<AnswerResult[]>([])
   const [combo, setCombo] = useState(0)
   const [bestCombo, setBestCombo] = useState(0)
+  // Words missed this round — offered as a replay before the results screen
+  const [missed, setMissed] = useState<ExerciseWord[]>([])
+  const [reviewingMissed, setReviewingMissed] = useState(false)
   const [loading, setLoading] = useState(false)
   const [finishing, setFinishing] = useState(false)
   const [confirmQuit, setConfirmQuit] = useState(false)
@@ -97,7 +100,17 @@ export default function StudyPage() {
     setCombo(newCombo)
     if (newCombo > bestCombo) setBestCombo(newCombo)
 
+    const stillMissed = result === 'correct'
+      ? missed.filter(m => m.word.id !== word.id)
+      : missed.some(m => m.word.id === word.id) ? missed : [...missed, exercises[currentIndex]]
+    setMissed(stillMissed)
+
     if (currentIndex + 1 >= exercises.length) {
+      // Anything still wrong can be replayed until it sticks
+      if (stillMissed.length > 0) {
+        setReviewingMissed(true)
+        return
+      }
       setFinishing(true)
       const finalize = () =>
         fetch('/api/study/answer', {
@@ -116,7 +129,7 @@ export default function StudyPage() {
     } else {
       setCurrentIndex(i => i + 1)
     }
-  }, [sessionId, exercises, currentIndex, results, combo, bestCombo, router, direction])
+  }, [sessionId, exercises, currentIndex, results, combo, bestCombo, router, direction, missed])
 
   if (!mode) {
     return (
@@ -130,6 +143,34 @@ export default function StudyPage() {
   }
   if (loading) return <LoadingScreen />
   if (exercises.length === 0) return <NoWordsDueScreen />
+
+  if (reviewingMissed) {
+    return (
+      <MissedPrompt
+        missed={missed}
+        onReplay={() => {
+          setExercises(missed)
+          setCurrentIndex(0)
+          setReviewingMissed(false)
+        }}
+        onFinish={async () => {
+          setReviewingMissed(false)
+          setFinishing(true)
+          try {
+            const res = await fetch('/api/study/answer', {
+              method: 'PUT',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ sessionId, results, bestCombo }),
+            })
+            const summary = await res.json()
+            router.push(`/study/results?data=${encodeURIComponent(JSON.stringify({ ...summary, results }))}`)
+          } catch {
+            router.push('/dashboard')
+          }
+        }}
+      />
+    )
+  }
 
   const current = exercises[currentIndex]
 
@@ -321,6 +362,40 @@ class ExerciseBoundary extends Component<{ children: ReactNode; fallback: ReactN
   render() {
     return this.state.hasError ? this.props.fallback : this.props.children
   }
+}
+
+function MissedPrompt({ missed, onReplay, onFinish }: {
+  missed: ExerciseWord[]
+  onReplay: () => void
+  onFinish: () => void
+}) {
+  const t = getStrings(useLang())
+  return (
+    <AppShell title={t.missedTitle}>
+      <div className="space-y-4">
+        <Card className="space-y-1 py-6 text-center">
+          <p className="font-display text-4xl font-semibold tabular-nums">{missed.length}</p>
+          <p className="text-sm text-muted-foreground">{t.missedCount(missed.length)}</p>
+        </Card>
+
+        <div className="space-y-2">
+          {missed.slice(0, 8).map(m => (
+            <Card key={m.word.id} className="flex items-baseline justify-between gap-3 p-3.5">
+              <span className="min-w-0 font-display text-[15px] font-semibold">{m.word.term}</span>
+              <span className="min-w-0 text-right text-xs text-muted-foreground">{m.word.translation}</span>
+            </Card>
+          ))}
+        </div>
+
+        <Button size="lg" className="w-full" onClick={onReplay}>
+          {t.replayMissed}
+        </Button>
+        <Button variant="secondary" size="lg" className="w-full" onClick={onFinish}>
+          {t.finishSession}
+        </Button>
+      </div>
+    </AppShell>
+  )
 }
 
 function LoadingScreen() {

@@ -26,6 +26,9 @@ export default function ConjugationExercise({ word, onAnswer }: Props) {
   const t = getStrings(course.native)
   const [inputs, setInputs] = useState<Record<string, string>>({})
   const [evaluation, setEvaluation] = useState<ReturnType<typeof evaluateVerbForms> | null>(null)
+  // Set when the answer was not perfect: the learner reads the expected forms
+  // and moves on when ready
+  const [pending, setPending] = useState<AnswerResult | null>(null)
 
   const forms = word.forms as Record<string, string> | null
   if (!forms) return null
@@ -50,7 +53,8 @@ export default function ConjugationExercise({ word, onAnswer }: Props) {
       ? 'incorrect'
       : 'approximate'
 
-    setTimeout(() => onAnswer(overall, 'CONJUGATION'), 1500)
+    if (overall === 'correct') setTimeout(() => onAnswer(overall, 'CONJUGATION'), 1500)
+    else setPending(overall)
   }
 
   return (
@@ -82,11 +86,15 @@ export default function ConjugationExercise({ word, onAnswer }: Props) {
         })}
       </div>
 
-      {!evaluation && (
+      {!evaluation ? (
         <Button size="lg" className="w-full" onClick={handleSubmit}>
           {t.submit}
         </Button>
-      )}
+      ) : pending ? (
+        <Button size="lg" className="w-full" onClick={() => onAnswer(pending, 'CONJUGATION')}>
+          {t.nextTurn}
+        </Button>
+      ) : null}
     </div>
   )
 }

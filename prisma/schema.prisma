@@ -100,6 +100,11 @@ model Word {
   forms    Json?
   source   String?  // "swedish_txt" | "core_3000"
   frequencyRank Int? // real-world rank from OpenSubtitles corpus (1 = most common)
+  // False for entries that are useless as an exercise (term == translation) or
+  // come from the bulk Wiktionary batches, whose ranks are unreliable. They stay
+  // in the dictionary, the list and search — only study sessions skip them.
+  // Recomputed by scripts/mark-studyable.ts after each seed.
+  studyable Boolean @default(true)
   // { translations: string[], context?: string, usage?: [{term, translation}] }
   details  Json?
   // Tatoeba example sentences (CC-BY): [{ term, translation?, blank }] — blank = surface form to hide in cloze
@@ -111,6 +116,7 @@ model Word {
 
   @@unique([pair, term, wordType, source], map: "Word_pair_term_wordType_source_key")
   @@index([pair, frequencyRank], map: "Word_pair_frequencyRank_idx")
+  @@index([pair, studyable, frequencyRank], map: "Word_pair_studyable_rank_idx")
 }
 
 model Story {
@@ -125,6 +131,23 @@ model Story {
   createdAt       DateTime @default(now())
 
   @@index([pair])
+}
+
+// Turn-by-turn conversations for the speaking exercise: the app voices the
+// `them` turns, the learner says the `you` ones out loud (its French
+// translation is shown as the instruction).
+model Dialogue {
+  id              String   @id @default(cuid())
+  pair            String   @default("sv-fr") // content pair (lib/courses.ts)
+  slug            String   @unique
+  title           String // title in the pair's `term` language
+  titleTranslated String
+  level           String // "beginner" | "intermediate" | "expert"
+  // [{ speaker: "them" | "you", text, translation }]
+  turns           Json
+  createdAt       DateTime @default(now())
+
+  @@index([pair, level])
 }
 
 model GrammarLesson {

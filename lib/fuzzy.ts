@@ -26,6 +26,15 @@ function stripFormatting(s: string): string {
   return s.replace(/[()[\]{}]/g, '').replace(/\s+/g, ' ').trim()
 }
 
+// Headwords carry a leading marker the learner may or may not type: the
+// infinitive particle ("to do", "att göra", "te doen") and the noun article
+// ("en flicka", "het huis", "la casa"). Both spellings are right.
+const LEADING_MARKER = /^(to|att|te|en|ett|de|het|el|la|los|las|un|una|le|les)\s+/
+
+function stripMarker(s: string): string {
+  return s.replace(LEADING_MARKER, '')
+}
+
 export function evaluateAnswer(input: string, expected: string): AnswerResult {
   const a = normalize(input)
   const b = normalize(expected)
@@ -35,6 +44,9 @@ export function evaluateAnswer(input: string, expected: string): AnswerResult {
   const aStripped = stripFormatting(a)
   const bStripped = stripFormatting(b)
   if (aStripped === bStripped) return 'correct'
+
+  // "do" for "to do", "flicka" for "en flicka" — and the reverse
+  if (stripMarker(aStripped) === stripMarker(bStripped)) return 'correct'
 
   const dist = levenshtein(aStripped, bStripped)
   // Scale tolerance with word length
@@ -76,4 +88,31 @@ export function parseVerbForms(formsString: string): VerbForms | null {
   const parts = cleaned.split(',').map(s => s.trim())
   if (parts.length < 3) return null
   return { present: parts[0], preterit: parts[1], supine: parts[2] }
+}
+
+/**
+ * Compares a spoken answer to the expected sentence. Speech engines return no
+ * punctuation, inconsistent casing and sometimes digits, so the comparison
+ * strips everything that speaking cannot convey and tolerates more than typing
+ * does — a wrong transcription must not read as a wrong answer.
+ */
+export function evaluateSpokenAnswer(spoken: string, expected: string): AnswerResult {
+  const clean = (s: string) =>
+    s.toLowerCase()
+      .replace(/[.,!?¿¡;:"«»()[\]…'’„“”\-–—]/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim()
+
+  const a = clean(spoken)
+  const b = clean(expected)
+  if (!a) return 'incorrect'
+  if (a === b) return 'correct'
+
+  const dist = levenshtein(a, b)
+  // Roughly one wrong character per five, floor of two: speech-to-text slips on
+  // endings and compound boundaries far more often than a typist does
+  const tolerance = Math.max(2, Math.round(b.length / 5))
+  if (dist <= tolerance) return 'correct'
+  if (dist <= tolerance * 2) return 'approximate'
+  return 'incorrect'
 }

@@ -32,6 +32,7 @@ export async function GET(req: NextRequest) {
   const distractors = await db.word.findMany({
     where: {
       pair,
+      studyable: true,
       id: { not: wordId, in: seenWordIds.map(uw => uw.wordId) },
       ...(wordType ? { wordType } : {}),
     },
@@ -45,9 +46,9 @@ export async function GET(req: NextRequest) {
 
   // Fallback if not enough seen words
   if (shuffled.length < 3) {
-    const poolTotal = await db.word.count({ where: { pair, ...(wordType ? { wordType } : {}) } })
+    const poolTotal = await db.word.count({ where: { pair, studyable: true, ...(wordType ? { wordType } : {}) } })
     const fallback = await db.word.findMany({
-      where: { pair, id: { not: wordId }, ...(wordType ? { wordType } : {}) },
+      where: { pair, studyable: true, id: { not: wordId }, ...(wordType ? { wordType } : {}) },
       select: { term: true, translation: true },
       take: FALLBACK_WINDOW,
       skip: Math.floor(Math.random() * Math.max(1, poolTotal - FALLBACK_WINDOW)),

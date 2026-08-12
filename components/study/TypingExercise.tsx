@@ -55,7 +55,8 @@ export default function TypingExercise({ word, direction, onAnswer }: Props) {
     const evaluation = evaluateAnswer(input, expected)
     setResult(evaluation)
 
-    setTimeout(() => onAnswer(evaluation, 'TYPING'), 1200)
+    // A correct answer flows on; a wrong one waits for the learner to read it
+    if (evaluation === 'correct') setTimeout(() => onAnswer(evaluation, 'TYPING'), 1200)
   }
 
   return (
@@ -99,11 +100,15 @@ export default function TypingExercise({ word, direction, onAnswer }: Props) {
           )}
         </AnimatePresence>
 
-        {!result && (
+        {!result ? (
           <Button size="lg" className="w-full" disabled={!input.trim()} onClick={handleSubmit}>
             {t.submit}
           </Button>
-        )}
+        ) : result !== 'correct' ? (
+          <Button size="lg" className="w-full" onClick={() => onAnswer(result, 'TYPING')}>
+            {t.nextTurn}
+          </Button>
+        ) : null}
       </div>
     </div>
   )
