@@ -119,7 +119,17 @@ capped by the OpenSubtitles lists, which stop at rank 50 000 — raising `RANK_C
 above that does nothing. Their entries are judged one by one by
 `scripts/mark-studyable.ts`, which drops Wiktionary definitions, inflected forms the
 curated lists already cover, and the contraction fragments the corpus mis-ranks
-(`don` from "don't" at rank 31). After each vocabulary batch, re-run `apply-frequency`
+(`don` from "don't" at rank 31).
+
+Their glosses were reviewed language by language and rewritten to the primary sense
+(`bay` was "crier, aboyer", now "une baie"), because the app asks in both directions
+and a one-way gloss makes an unanswerable card. **`mark-studyable.ts` does not know
+about that review**: re-running it restores entries the review dropped, so follow it
+with `scripts/import-wiki-glosses.ts <dir> --apply` (sources in
+`Desktop\pro\wiki-glosses\`).
+
+Tatoeba is a general-purpose corpus and carries sentences unfit for a learning app;
+`scripts/filter-examples.ts --apply` strips them, with blocklists per language. After each vocabulary batch, re-run `apply-frequency`
 then `build-examples` (in that order — example ownership reads the fresh ranks;
 see scripts/key-ownership.ts for how homographs share surface forms).
 
