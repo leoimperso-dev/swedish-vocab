@@ -168,9 +168,11 @@ const fr = {
   // Conjugation
   infinitive: 'Infinitif',
   present: 'Présent',
-  preterit: 'Prétérit',
-  supine: 'Supin',
-  past: 'Prétérit',
+  // The Swedish preterite covers what French splits between passé composé and
+  // imparfait, so the label names both rather than picking one
+  preterit: 'Prétérit (passé composé / imparfait)',
+  supine: 'Supin (participe passé)',
+  past: 'Prétérit (passé composé / imparfait)',
   pastParticiple: 'Participe passé',
   // Results
   sessionDone: 'Session terminée 🎉',
