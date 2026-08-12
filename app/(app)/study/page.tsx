@@ -31,6 +31,17 @@ import type { ExerciseWord, AnswerResult, ExerciseType } from '@/types'
 
 type StudyMode = 'MIX' | ExerciseType
 
+// Fisher-Yates on a copy — a replay in the order the words were missed lets the
+// learner recite the sequence instead of recalling the words
+function shuffled<T>(items: T[]): T[] {
+  const copy = [...items]
+  for (let i = copy.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1))
+    ;[copy[i], copy[j]] = [copy[j], copy[i]]
+  }
+  return copy
+}
+
 export default function StudyPage() {
   const router = useRouter()
   const course = useCourse()
@@ -157,7 +168,7 @@ export default function StudyPage() {
       <MissedPrompt
         missed={missed}
         onReplay={() => {
-          setExercises(missed)
+          setExercises(shuffled(missed))
           setCurrentIndex(0)
           setReviewingMissed(false)
         }}

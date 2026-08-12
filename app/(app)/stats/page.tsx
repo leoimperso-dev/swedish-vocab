@@ -2,8 +2,9 @@ import { auth } from '@/auth'
 import { db } from '@/lib/db'
 import { getLevelForXp, xpToNextLevel } from '@/lib/xp'
 import { getStrings } from '@/lib/i18n'
-import { getCourse } from '@/lib/current-course'
+import { getCourseWithLevel } from '@/lib/current-course'
 import { localeOf, type PairId } from '@/lib/courses'
+import { levelsAtOrAbove, type CefrLevel } from '@/lib/cefr'
 import { cn } from '@/lib/utils'
 import { AppShell } from '@/components/AppShell'
 import { Card, CardTitle, Chip, ProgressBar, SectionLabel } from '@/components/ui/primitives'
@@ -11,20 +12,26 @@ import { BookOpen, CheckCircle2, Target, Flame } from 'lucide-react'
 
 const MASTERY_MILESTONES = [50, 100, 250, 500, 1000, 2000, 5000]
 
-// The vocabulary size changes rarely — memoize per pair, per lambda, for an hour
-const vocabTotalCache = new Map<PairId, { value: number; at: number }>()
-async function getVocabTotal(pair: PairId): Promise<number> {
-  const cached = vocabTotalCache.get(pair)
+// Denominator of the progress bar: the words this learner can actually be
+// served — studyable, and at or above the level they declared. Counting the
+// whole pair would cap their progress below 100% by construction.
+// The figure changes rarely — memoized per pair and level, per lambda, for an hour.
+const vocabTotalCache = new Map<string, { value: number; at: number }>()
+async function getVocabTotal(pair: PairId, level: CefrLevel | null): Promise<number> {
+  const key = `${pair}:${level ?? 'all'}`
+  const cached = vocabTotalCache.get(key)
   if (cached && Date.now() - cached.at < 3600000) return cached.value
-  const value = await db.word.count({ where: { pair } })
-  vocabTotalCache.set(pair, { value, at: Date.now() })
+  const value = await db.word.count({
+    where: { pair, studyable: true, ...(level ? { cefr: { in: levelsAtOrAbove(level) } } : {}) },
+  })
+  vocabTotalCache.set(key, { value, at: Date.now() })
   return value
 }
 
 export default async function StatsPage() {
   const session = await auth()
   const userId = session!.user!.id
-  const course = await getCourse(userId)
+  const { course, level: cefrLevel } = await getCourseWithLevel(userId)
   // Vocabulary figures are per course; XP, streak and achievements stay global
   const inCourse = { userId, word: { pair: course.pair } }
   const now = new Date()
@@ -56,7 +63,7 @@ export default async function StatsPage() {
         include: { achievement: true },
         orderBy: { unlockedAt: 'desc' },
       }),
-      getVocabTotal(course.pair),
+      getVocabTotal(course.pair, cefrLevel),
     ])
 
   if (!user) return null
@@ -131,7 +138,10 @@ export default async function StatsPage() {
         {/* Global progress: known words vs entire vocabulary */}
         <Card>
           <CardTitle>{t.globalProgress}</CardTitle>
-          <p className="mt-1 text-xs text-muted-foreground">{t.knownOf(masteredCount, vocabTotal)}</p>
+          <p className="mt-1 text-xs text-muted-foreground">
+            {t.knownOf(masteredCount, vocabTotal)}
+            {cefrLevel ? <span className="text-muted-foreground/70"> · {t.atYourLevel(cefrLevel)}</span> : null}
+          </p>
           <ProgressBar
             className="mt-3"
             value={Math.min((masteredCount / Math.max(vocabTotal, 1)) * 100, 100)}

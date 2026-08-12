@@ -249,6 +249,7 @@ const fr = {
   // Global progress
   globalProgress: 'Progression globale',
   knownOf: (known: number, total: number) => `${known} / ${total} mots connus`,
+  atYourLevel: (level: string) => `à partir de ${level}`,
   // Errors
   errorTitle: 'Oups, une erreur est survenue',
   retry: 'Réessayer',
@@ -497,6 +498,7 @@ const sv: typeof fr = {
   // Global progress
   globalProgress: 'Total utveckling',
   knownOf: (known, total) => `${known} / ${total} ord du kan`,
+  atYourLevel: level => `från ${level} och uppåt`,
   // Errors
   errorTitle: 'Hoppsan, något gick fel',
   retry: 'Försök igen',
@@ -745,6 +747,7 @@ const en: typeof fr = {
   // Global progress
   globalProgress: 'Overall progress',
   knownOf: (known, total) => `${known} / ${total} words known`,
+  atYourLevel: level => `from ${level} up`,
   // Errors
   errorTitle: 'Oops, something went wrong',
   retry: 'Try again',
