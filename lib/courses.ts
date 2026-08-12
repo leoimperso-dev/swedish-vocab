@@ -53,6 +53,11 @@ export const COURSES: Course[] = [
 
 export const DEFAULT_COURSE: Course = COURSES[0]
 
+// User.nativeLanguage is a plain string in the DB — narrow before use
+export function asLangOrDefault(value: string | null | undefined): Lang {
+  return COURSES.some(c => c.native === value) ? (value as Lang) : DEFAULT_COURSE.native
+}
+
 // Translation direction of an exercise — absolute, so each keeps its own SM-2
 // progression regardless of which side the user reads the interface in.
 export type Direction = 'SV_FR' | 'FR_SV' | 'EN_FR' | 'FR_EN'

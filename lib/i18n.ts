@@ -90,6 +90,7 @@ const fr = {
   levelExplainer:
     'Ton niveau détermine par où commencent les nouveaux mots. Les mots plus simples restent accessibles depuis la liste de vocabulaire.',
   levelChange: 'Changer de niveau',
+  levelNotSet: 'non défini',
   yourLevel: 'Niveau',
   cefrLabel: {
     A1: 'Grand débutant',
@@ -336,6 +337,7 @@ const sv: typeof fr = {
   levelExplainer:
     'Nivån bestämmer var nya ord börjar. Enklare ord finns kvar i ordlistan.',
   levelChange: 'Byt nivå',
+  levelNotSet: 'ej vald',
   yourLevel: 'Nivå',
   cefrLabel: {
     A1: 'Nybörjare',
@@ -580,6 +582,7 @@ const en: typeof fr = {
   levelExplainer:
     'Your level decides where new words start. Easier words stay reachable from the vocabulary list.',
   levelChange: 'Change level',
+  levelNotSet: 'not set',
   yourLevel: 'Level',
   cefrLabel: {
     A1: 'Absolute beginner',

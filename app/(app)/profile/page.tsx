@@ -9,8 +9,8 @@ import { revalidatePath } from 'next/cache'
 import Image from 'next/image'
 import { AppShell } from '@/components/AppShell'
 import { Card, CardTitle, Chip, ProgressBar, SectionLabel } from '@/components/ui/primitives'
-import { LevelPicker } from '@/components/LevelPicker'
-import { resolveCourse } from '@/lib/courses'
+import { LevelSettings } from '@/components/LevelSettings'
+import { asLangOrDefault } from '@/lib/courses'
 import { Button } from '@/components/ui/button'
 import { Check, Flame, Lock, LogOut, Snowflake, Trophy, Zap } from 'lucide-react'
 
@@ -134,13 +134,14 @@ export default async function ProfilePage() {
           </Card>
         </div>
 
-        {/* CEFR level of the language being learned */}
+        {/* CEFR level, one per language the user can study */}
         <Card>
-          <CardTitle>
-            {t.levelTitle} · {t.languageName[resolveCourse(user.nativeLanguage, user.learningLanguage).learned]}
-          </CardTitle>
-          <p className="mt-1 mb-3 text-xs text-muted-foreground">{t.levelExplainer}</p>
-          <LevelPicker embedded />
+          <CardTitle>{t.levelTitle}</CardTitle>
+          <p className="mt-1 mb-4 text-xs text-muted-foreground">{t.levelExplainer}</p>
+          <LevelSettings
+            native={asLangOrDefault(user.nativeLanguage)}
+            levels={(user.levels && typeof user.levels === 'object' ? user.levels : {}) as Record<string, string>}
+          />
         </Card>
 
         {/* Daily goal setting */}
