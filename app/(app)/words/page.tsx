@@ -9,6 +9,8 @@ import { MAX_KNOWLEDGE_LEVEL } from '@/lib/sm2'
 import { getStrings } from '@/lib/i18n'
 import { learnsTermLanguage, localeOf, type Course } from '@/lib/courses'
 import { useCourse } from '@/components/CourseProvider'
+import { useSpeechQueue } from '@/lib/use-speech-queue'
+import { SpeakButton } from '@/components/SpeakButton'
 import { cn } from '@/lib/utils'
 import { AppShell } from '@/components/AppShell'
 import { LevelDots, Segmented, SectionLabel } from '@/components/ui/primitives'
@@ -221,6 +223,30 @@ export default function WordsPage() {
     })
   }
 
+  // What the read-aloud button plays: whatever the current view shows
+  const spokenWords = useMemo(() => {
+    if (query.trim()) return searchResults.slice(0, searchVisible)
+    if (tab === 'favorites') return favoriteWords
+    if (tab === 'top') return topWords.slice(0, topVisible)
+    return groups
+      .filter(([label]) => openCategories.has(label))
+      .flatMap(([label, words]) => words.slice(0, catVisible[label] ?? PAGE_STEP))
+  }, [query, searchResults, searchVisible, tab, favoriteWords, topWords, topVisible, groups, openCategories, catVisible])
+
+  const { speak, stop, index: spokenIndex, playing } = useSpeechQueue()
+  const spokenWordId = spokenIndex === null ? null : spokenWords[Math.floor(spokenIndex / 2)]?.id
+
+  const toggleSpeak = () => {
+    if (playing) return stop()
+    const learnedLocale = localeOf(course.learned)
+    const nativeLocale = localeOf(course.native)
+    // Each word reads as "term, then translation" — two utterances, two languages
+    speak(spokenWords.flatMap(w => [
+      { text: w.term.replace(/\(.*?\)/g, '').trim(), locale: learnedLocale, pauseAfter: 250 },
+      { text: w.translation, locale: nativeLocale, pauseAfter: 450 },
+    ]))
+  }
+
   const tabOptions = [
     { value: 'categories', label: t.tabCategories },
     { value: 'top', label: t.tabTop(TOP_LIST_SIZE) },
@@ -275,6 +301,14 @@ export default function WordsPage() {
           >
             {flashcards ? <EyeOff size={17} /> : <Eye size={17} />}
           </button>
+          <SpeakButton
+            compact
+            playing={playing}
+            onToggle={toggleSpeak}
+            label={t.speakList}
+            stopLabel={t.stopReading}
+            className={spokenWords.length === 0 ? 'pointer-events-none opacity-40' : undefined}
+          />
         </div>
 
         <Segmented
@@ -297,7 +331,7 @@ export default function WordsPage() {
             <div className="space-y-2">
               <SectionLabel>{t.searchResults(searchResults.length)}</SectionLabel>
               {searchResults.slice(0, searchVisible).map(word => (
-                <WordRow key={word.id} word={word} course={course} onToggleFavorite={toggleFavorite} masked={flashcards && !revealed.has(word.id)} onFlip={flashcards ? () => flipCard(word.id) : undefined} onSwipe={known => swipeWord(word.id, known)} />
+                <WordRow key={word.id} word={word} course={course} onToggleFavorite={toggleFavorite} masked={flashcards && !revealed.has(word.id)} onFlip={flashcards ? () => flipCard(word.id) : undefined} onSwipe={known => swipeWord(word.id, known)} speaking={spokenWordId === word.id} />
               ))}
               {searchVisible < searchResults.length && (
                 <LoadMoreSentinel onMore={() => setSearchVisible(v => v + PAGE_STEP)} />
@@ -332,7 +366,7 @@ export default function WordsPage() {
                   {open ? (
                     <div className="animate-rise space-y-2 border-t border-border bg-background/40 p-2">
                       {groupWords.slice(0, catVisible[label] ?? PAGE_STEP).map(word => (
-                        <WordRow key={word.id} word={word} course={course} onToggleFavorite={toggleFavorite} masked={flashcards && !revealed.has(word.id)} onFlip={flashcards ? () => flipCard(word.id) : undefined} onSwipe={known => swipeWord(word.id, known)} />
+                        <WordRow key={word.id} word={word} course={course} onToggleFavorite={toggleFavorite} masked={flashcards && !revealed.has(word.id)} onFlip={flashcards ? () => flipCard(word.id) : undefined} onSwipe={known => swipeWord(word.id, known)} speaking={spokenWordId === word.id} />
                       ))}
                       {(catVisible[label] ?? PAGE_STEP) < groupWords.length && (
                         <LoadMoreSentinel
@@ -351,7 +385,7 @@ export default function WordsPage() {
           <div className="space-y-2">
             <SectionLabel>{t.topWordsHint}</SectionLabel>
             {topWords.slice(0, topVisible).map(word => (
-              <WordRow key={word.id} word={word} course={course} onToggleFavorite={toggleFavorite} showRank masked={flashcards && !revealed.has(word.id)} onFlip={flashcards ? () => flipCard(word.id) : undefined} onSwipe={known => swipeWord(word.id, known)} />
+              <WordRow key={word.id} word={word} course={course} onToggleFavorite={toggleFavorite} showRank masked={flashcards && !revealed.has(word.id)} onFlip={flashcards ? () => flipCard(word.id) : undefined} onSwipe={known => swipeWord(word.id, known)} speaking={spokenWordId === word.id} />
             ))}
             {topVisible < topWords.length && (
               <LoadMoreSentinel onMore={() => setTopVisible(v => v + PAGE_STEP)} />
@@ -360,7 +394,7 @@ export default function WordsPage() {
         ) : favoriteWords.length > 0 ? (
           <div className="space-y-2">
             {favoriteWords.map(word => (
-              <WordRow key={word.id} word={word} course={course} onToggleFavorite={toggleFavorite} masked={flashcards && !revealed.has(word.id)} onFlip={flashcards ? () => flipCard(word.id) : undefined} onSwipe={known => swipeWord(word.id, known)} />
+              <WordRow key={word.id} word={word} course={course} onToggleFavorite={toggleFavorite} masked={flashcards && !revealed.has(word.id)} onFlip={flashcards ? () => flipCard(word.id) : undefined} onSwipe={known => swipeWord(word.id, known)} speaking={spokenWordId === word.id} />
             ))}
           </div>
         ) : (
@@ -373,7 +407,7 @@ export default function WordsPage() {
 
 const SWIPE_THRESHOLD = 90
 
-function WordRow({ word, course, onToggleFavorite, showRank, masked, onFlip, onSwipe }: {
+function WordRow({ word, course, onToggleFavorite, showRank, masked, onFlip, onSwipe, speaking }: {
   word: ApiWord
   course: Course
   onToggleFavorite: (id: string) => void
@@ -383,7 +417,13 @@ function WordRow({ word, course, onToggleFavorite, showRank, masked, onFlip, onS
   onFlip?: () => void
   // Swipe self-assessment: right = I know it, left = I don't
   onSwipe?: (known: boolean) => void
+  // This row is the one being read aloud
+  speaking?: boolean
 }) {
+  const rowRef = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    if (speaking) rowRef.current?.scrollIntoView({ block: 'center', behavior: 'smooth' })
+  }, [speaking])
   const x = useMotionValue(0)
   const knownOpacity = useTransform(x, [30, SWIPE_THRESHOLD], [0, 1])
   const unknownOpacity = useTransform(x, [-SWIPE_THRESHOLD, -30], [1, 0])
@@ -418,7 +458,7 @@ function WordRow({ word, course, onToggleFavorite, showRank, masked, onFlip, onS
   const secondaryWord = learnsTerm ? word.term : translationLabel
 
   return (
-    <div className="relative">
+    <div ref={rowRef} className="relative">
       {/* Swipe hints revealed behind the row while dragging */}
       <motion.div
         style={{ opacity: knownOpacity }}
@@ -446,7 +486,11 @@ function WordRow({ word, course, onToggleFavorite, showRank, masked, onFlip, onS
           if (info.offset.x > SWIPE_THRESHOLD) onSwipe(true)
           else if (info.offset.x < -SWIPE_THRESHOLD) onSwipe(false)
         }}
-        className={cn('card-surface overflow-hidden', onFlip && 'pressable cursor-pointer')}
+        className={cn(
+          'card-surface overflow-hidden',
+          onFlip && 'pressable cursor-pointer',
+          speaking && 'border-primary/50 bg-info-soft',
+        )}
       >
       <div className={cn('flex items-start gap-2.5', masked ? 'p-2.5 px-3.5' : 'p-3.5')}>
         <button
