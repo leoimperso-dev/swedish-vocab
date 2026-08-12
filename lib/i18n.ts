@@ -84,6 +84,7 @@ const fr = {
   modeCloze: 'Phrase à trous',
   modeClozeDesc: (language: string) => `Complète de vraies phrases en ${language}`,
   clozePrompt: 'Complète la phrase',
+  showHint: 'Voir l’indice',
   // CEFR levels
   levelTitle: 'Ton niveau',
   levelSubtitle: (language: string) => `En ${language}`,
@@ -330,6 +331,7 @@ const sv: typeof fr = {
   modeCloze: 'Lucktext',
   modeClozeDesc: language => `Fyll i riktiga meningar på ${language}`,
   clozePrompt: 'Fyll i ordet',
+  showHint: 'Visa ledtråd',
   // Reading
   // CEFR levels
   levelTitle: 'Din nivå',
@@ -575,6 +577,7 @@ const en: typeof fr = {
   modeCloze: 'Fill in the blank',
   modeClozeDesc: language => `Complete real ${language} sentences`,
   clozePrompt: 'Complete the sentence',
+  showHint: 'Show hint',
   // Reading
   // CEFR levels
   levelTitle: 'Your level',

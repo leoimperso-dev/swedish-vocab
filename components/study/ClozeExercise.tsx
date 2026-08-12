@@ -45,6 +45,9 @@ const FEEDBACK_CLASS: Record<AnswerResult, string> = {
 export default function ClozeExercise({ word, onAnswer }: Props) {
   const [input, setInput] = useState('')
   const [result, setResult] = useState<AnswerResult | null>(null)
+  // The hint gives the answer away, so it stays behind a tap: searching first
+  // is what the exercise trains
+  const [hintShown, setHintShown] = useState(false)
   const course = useCourse()
   const t = getStrings(course.native)
 
@@ -112,22 +115,32 @@ export default function ClozeExercise({ word, onAnswer }: Props) {
         )}
       </Card>
 
-      <div className="flex items-start gap-2 rounded-xl border border-border bg-surface p-3">
-        <Lightbulb size={14} className="mt-0.5 shrink-0 text-warning" />
-        <p className="text-xs text-muted-foreground">
-          {/* The headword is the answer — only reveal it after answering */}
-          {result ? (
-            <>
-              <span className="font-semibold text-foreground">
-                {word.term.replace(/\(.*?\)/g, '').trim()}
-              </span>{' '}
-              — {hint}
-            </>
-          ) : (
-            hint
-          )}
-        </p>
-      </div>
+      {hintShown || result ? (
+        <div className="flex items-start gap-2 rounded-xl border border-border bg-surface p-3">
+          <Lightbulb size={14} className="mt-0.5 shrink-0 text-warning" />
+          <p className="text-xs text-muted-foreground">
+            {/* The headword is the answer — only reveal it after answering */}
+            {result ? (
+              <>
+                <span className="font-semibold text-foreground">
+                  {word.term.replace(/\(.*?\)/g, '').trim()}
+                </span>{' '}
+                — {hint}
+              </>
+            ) : (
+              hint
+            )}
+          </p>
+        </div>
+      ) : (
+        <button
+          onClick={() => setHintShown(true)}
+          className="pressable flex w-full items-center justify-center gap-2 rounded-xl border border-dashed border-border bg-surface p-3 text-xs text-muted-foreground"
+        >
+          <Lightbulb size={14} className="shrink-0 text-warning" />
+          {t.showHint}
+        </button>
+      )}
 
       <div className="space-y-3">
         <TextField
