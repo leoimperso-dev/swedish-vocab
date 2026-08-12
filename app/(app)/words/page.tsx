@@ -380,14 +380,14 @@ function WordRow({ word, course, onToggleFavorite, showRank, masked, onFlip, onS
                 #{word.frequencyRank}
               </span>
             )}
-            <p className="min-w-0 truncate font-display text-[17px] font-semibold tracking-tight">
+            <p className="min-w-0 break-words font-display text-[17px] font-semibold tracking-tight">
               {primaryWord}
             </p>
           </div>
           {masked ? null : (
             <div className={onFlip ? 'animate-rise' : undefined}>
               {/* Inflected forms belong to the `term` side — shown wherever it sits */}
-              {!learnsTerm && forms && <p className="truncate text-xs text-muted-foreground/80">({forms})</p>}
+              {!learnsTerm && forms && <p className="break-words text-xs text-muted-foreground/80">({forms})</p>}
               <p className="mt-1 text-sm text-muted-foreground">
                 {secondaryWord}
                 {learnsTerm && forms && <span className="ml-1 text-xs opacity-70">({forms})</span>}

@@ -220,8 +220,8 @@ export default async function StatsPage() {
               {hardestWords.map(uw => (
                 <Card key={uw.id} className="flex items-center gap-3 p-3.5">
                   <div className="min-w-0 flex-1">
-                    <p className="truncate font-display text-[15px] font-semibold">{uw.word.term}</p>
-                    <p className="truncate text-xs text-muted-foreground">{uw.word.translation}</p>
+                    <p className="break-words font-display text-[15px] font-semibold">{uw.word.term}</p>
+                    <p className="break-words text-xs text-muted-foreground">{uw.word.translation}</p>
                   </div>
                   <span className="shrink-0 text-xs font-semibold tabular-nums text-danger">
                     ✗ {uw.incorrectCount}

@@ -80,7 +80,7 @@ export default function ReadingBrowser({ stories }: { stories: StoryMeta[] }) {
           >
             <span className="min-w-0 flex-1">
               <span className="block truncate font-display text-base font-semibold">{story.title}</span>
-              <span className="block truncate text-xs italic text-muted-foreground">{story.titleTranslated}</span>
+              <span className="block text-xs italic text-muted-foreground">{story.titleTranslated}</span>
               <span className="mt-1 block text-[11px] tabular-nums text-muted-foreground/80">
                 {t.storyWordCount(story.wordCount)}
               </span>
