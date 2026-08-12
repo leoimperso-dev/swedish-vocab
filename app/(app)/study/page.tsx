@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import {
   Shuffle, Layers, ListChecks, PenLine, TextCursorInput, Repeat2,
-  BookOpen, Brain, ChevronRight, Sparkles, Loader2, PartyPopper,
+  BookOpen, Brain, ChevronRight, Sparkles, Loader2, PartyPopper, Ear,
   type LucideIcon,
 } from 'lucide-react'
 import FlashCard from '@/components/study/FlashCard'
@@ -13,6 +13,7 @@ import MultipleChoice from '@/components/study/MultipleChoice'
 import TypingExercise from '@/components/study/TypingExercise'
 import ConjugationExercise from '@/components/study/ConjugationExercise'
 import ClozeExercise from '@/components/study/ClozeExercise'
+import ListeningExercise from '@/components/study/ListeningExercise'
 import SessionProgress from '@/components/study/SessionProgress'
 import { AppShell } from '@/components/AppShell'
 import { Card, Chip, SectionLabel, Segmented } from '@/components/ui/primitives'
@@ -188,6 +189,9 @@ export default function StudyPage() {
           {current.exerciseType === 'CLOZE' && (
             <ClozeExercise word={current.word} onAnswer={handleAnswer} />
           )}
+          {current.exerciseType === 'LISTENING' && (
+            <ListeningExercise word={current.word} onAnswer={handleAnswer} />
+          )}
         </ExerciseBoundary>
       </main>
     </div>
@@ -201,6 +205,7 @@ const MODE_ICONS: Record<StudyMode, LucideIcon> = {
   TYPING: PenLine,
   CLOZE: TextCursorInput,
   CONJUGATION: Repeat2,
+  LISTENING: Ear,
 }
 
 function ModePicker({ course, onPick, direction, onDirectionChange }: {
@@ -220,6 +225,7 @@ function ModePicker({ course, onPick, direction, onDirectionChange }: {
     { mode: 'FLASHCARD', label: t.modeFlashcard, desc: t.modeFlashcardDesc },
     { mode: 'QCM', label: t.modeQcm, desc: t.modeQcmDesc },
     { mode: 'TYPING', label: t.modeTyping, desc: t.modeTypingDesc },
+    { mode: 'LISTENING', label: t.modeListening, desc: t.modeListeningDesc },
     ...(termContent
       ? [
           { mode: 'CLOZE' as StudyMode, label: t.modeCloze, desc: t.modeClozeDesc(learnedName) },

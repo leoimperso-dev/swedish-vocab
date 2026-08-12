@@ -1,7 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { isSupported, unlock } from '@/lib/tts'
+import { isSupported, unlock, watchVoiceAvailability } from '@/lib/tts'
 
 export interface SpeechItem {
   text: string
@@ -82,4 +82,11 @@ export function useSpeechQueue() {
   useEffect(() => stop, [stop])
 
   return { speak, stop, index, playing: index !== null }
+}
+
+/** True once the device is known to lack a voice for this language. */
+export function useMissingVoice(locale: string): boolean {
+  const [missing, setMissing] = useState(false)
+  useEffect(() => watchVoiceAvailability(locale, ok => setMissing(!ok)), [locale])
+  return missing
 }

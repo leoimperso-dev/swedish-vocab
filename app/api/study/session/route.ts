@@ -11,7 +11,7 @@ import type { Word, UserWord } from '@prisma/client'
 
 const SESSION_SIZE = 15
 const NEW_WORDS_PER_SESSION = 5
-const FORCED_MODES: ExerciseType[] = ['FLASHCARD', 'QCM', 'TYPING', 'CONJUGATION', 'CLOZE']
+const FORCED_MODES: ExerciseType[] = ['FLASHCARD', 'QCM', 'TYPING', 'CONJUGATION', 'CLOZE', 'LISTENING']
 
 function hasFullVerbForms(forms: unknown, course: Course): boolean {
   if (!forms || typeof forms !== 'object') return false
@@ -34,6 +34,8 @@ function selectExerciseType(
   if (!userWord || userWord.repetitions === 0) return 'FLASHCARD'
   if (userWord.repetitions <= 2) return 'QCM'
   const pool: ExerciseType[] = ['TYPING']
+  // Dictation always drills the learned language, whichever side it sits on
+  pool.push('LISTENING')
   if (termExercises && word.wordType === 'VERB' && hasFullVerbForms(word.forms, course)) pool.push('CONJUGATION')
   if (termExercises && hasExamples(word.examples)) pool.push('CLOZE')
   return pool[Math.floor(Math.random() * pool.length)]

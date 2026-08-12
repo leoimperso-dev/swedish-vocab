@@ -1,7 +1,7 @@
 import type { Word, UserWord } from '@prisma/client'
 import type { Direction } from '@/lib/courses'
 
-export type ExerciseType = 'FLASHCARD' | 'QCM' | 'TYPING' | 'CONJUGATION' | 'CLOZE'
+export type ExerciseType = 'FLASHCARD' | 'QCM' | 'TYPING' | 'CONJUGATION' | 'CLOZE' | 'LISTENING'
 
 export type AnswerResult = 'correct' | 'approximate' | 'incorrect'
 

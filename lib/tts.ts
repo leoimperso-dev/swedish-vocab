@@ -30,3 +30,27 @@ export function getVoiceFor(locale: string): SpeechSynthesisVoice | null {
   const prefix = locale.split('-')[0]
   return window.speechSynthesis.getVoices().find(v => v.lang.startsWith(prefix)) ?? null
 }
+
+/**
+ * Whether the device can actually speak this language. The voice list loads
+ * asynchronously, so the callback may fire twice: unknown first, then settled.
+ * Returns an unsubscribe function.
+ */
+export function watchVoiceAvailability(
+  locale: string,
+  onChange: (available: boolean) => void,
+): () => void {
+  if (!isSupported()) {
+    onChange(false)
+    return () => {}
+  }
+  const check = () => {
+    const voices = window.speechSynthesis.getVoices()
+    // An empty list means "not loaded yet", not "no voice" — stay optimistic
+    if (voices.length === 0) return
+    onChange(!!getVoiceFor(locale))
+  }
+  check()
+  window.speechSynthesis.addEventListener('voiceschanged', check)
+  return () => window.speechSynthesis.removeEventListener('voiceschanged', check)
+}

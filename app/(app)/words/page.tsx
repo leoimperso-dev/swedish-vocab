@@ -1,15 +1,15 @@
 'use client'
 
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { motion, useMotionValue, useTransform } from 'framer-motion'
-import { Check, ChevronDown, Eye, EyeOff, MessageSquare, Search, Star, X } from 'lucide-react'
+import { Check, ChevronDown, Eye, EyeOff, MessageSquare, Search, Square, Star, Volume2, X } from 'lucide-react'
 import { formatForms, parseDetails } from '@/lib/word-display'
 import { MAX_KNOWLEDGE_LEVEL } from '@/lib/sm2'
 import { getStrings } from '@/lib/i18n'
 import { learnsTermLanguage, localeOf, type Course } from '@/lib/courses'
 import { useCourse } from '@/components/CourseProvider'
-import { useSpeechQueue } from '@/lib/use-speech-queue'
+import { useMissingVoice, useSpeechQueue } from '@/lib/use-speech-queue'
 import { SpeakButton } from '@/components/SpeakButton'
 import { cn } from '@/lib/utils'
 import { AppShell } from '@/components/AppShell'
@@ -30,7 +30,7 @@ function fold(s: string): string {
 function LoadMoreSentinel({ onMore }: { onMore: () => void }) {
   const ref = useRef<HTMLDivElement>(null)
   const onMoreRef = useRef(onMore)
-  onMoreRef.current = onMore
+  useEffect(() => { onMoreRef.current = onMore })
   useEffect(() => {
     const el = ref.current
     if (!el) return
@@ -234,17 +234,27 @@ export default function WordsPage() {
   }, [query, searchResults, searchVisible, tab, favoriteWords, topWords, topVisible, groups, openCategories, catVisible])
 
   const { speak, stop, index: spokenIndex, playing } = useSpeechQueue()
-  const spokenWordId = spokenIndex === null ? null : spokenWords[Math.floor(spokenIndex / 2)]?.id
+  const missingVoice = useMissingVoice(localeOf(course.learned))
+  // Ids of the words currently queued, in order — two utterances each, so the
+  // spoken index maps back with a halving. Covers both the whole-list button
+  // and a single card's speaker.
+  const [playlist, setPlaylist] = useState<string[]>([])
+  const spokenWordId = spokenIndex === null ? null : playlist[Math.floor(spokenIndex / 2)]
 
-  const toggleSpeak = () => {
-    if (playing) return stop()
+  const speakWords = useCallback((list: ApiWord[]) => {
     const learnedLocale = localeOf(course.learned)
     const nativeLocale = localeOf(course.native)
+    setPlaylist(list.map(w => w.id))
     // Each word reads as "term, then translation" — two utterances, two languages
-    speak(spokenWords.flatMap(w => [
+    speak(list.flatMap(w => [
       { text: w.term.replace(/\(.*?\)/g, '').trim(), locale: learnedLocale, pauseAfter: 250 },
       { text: w.translation, locale: nativeLocale, pauseAfter: 450 },
     ]))
+  }, [course.learned, course.native, speak])
+
+  const toggleSpeak = () => {
+    if (playing) stop()
+    else speakWords(spokenWords)
   }
 
   const tabOptions = [
@@ -321,6 +331,11 @@ export default function WordsPage() {
           onChange={v => setKnownFilter(v as typeof knownFilter)}
         />
         <p className="text-center text-[11px] text-muted-foreground/70">{t.swipeListHint}</p>
+        {missingVoice && (
+          <p className="text-center text-[11px] text-warning">
+            {t.noVoiceForLanguage(t.languageName[course.learned])}
+          </p>
+        )}
 
         {loading ? (
           <ListSkeleton rows={5} />
@@ -331,7 +346,7 @@ export default function WordsPage() {
             <div className="space-y-2">
               <SectionLabel>{t.searchResults(searchResults.length)}</SectionLabel>
               {searchResults.slice(0, searchVisible).map(word => (
-                <WordRow key={word.id} word={word} course={course} onToggleFavorite={toggleFavorite} masked={flashcards && !revealed.has(word.id)} onFlip={flashcards ? () => flipCard(word.id) : undefined} onSwipe={known => swipeWord(word.id, known)} speaking={spokenWordId === word.id} />
+                <WordRow key={word.id} word={word} course={course} onToggleFavorite={toggleFavorite} masked={flashcards && !revealed.has(word.id)} onFlip={flashcards ? () => flipCard(word.id) : undefined} onSwipe={known => swipeWord(word.id, known)} speaking={spokenWordId === word.id} onSpeak={() => (spokenWordId === word.id ? stop() : speakWords([word]))} />
               ))}
               {searchVisible < searchResults.length && (
                 <LoadMoreSentinel onMore={() => setSearchVisible(v => v + PAGE_STEP)} />
@@ -366,7 +381,7 @@ export default function WordsPage() {
                   {open ? (
                     <div className="animate-rise space-y-2 border-t border-border bg-background/40 p-2">
                       {groupWords.slice(0, catVisible[label] ?? PAGE_STEP).map(word => (
-                        <WordRow key={word.id} word={word} course={course} onToggleFavorite={toggleFavorite} masked={flashcards && !revealed.has(word.id)} onFlip={flashcards ? () => flipCard(word.id) : undefined} onSwipe={known => swipeWord(word.id, known)} speaking={spokenWordId === word.id} />
+                        <WordRow key={word.id} word={word} course={course} onToggleFavorite={toggleFavorite} masked={flashcards && !revealed.has(word.id)} onFlip={flashcards ? () => flipCard(word.id) : undefined} onSwipe={known => swipeWord(word.id, known)} speaking={spokenWordId === word.id} onSpeak={() => (spokenWordId === word.id ? stop() : speakWords([word]))} />
                       ))}
                       {(catVisible[label] ?? PAGE_STEP) < groupWords.length && (
                         <LoadMoreSentinel
@@ -385,7 +400,7 @@ export default function WordsPage() {
           <div className="space-y-2">
             <SectionLabel>{t.topWordsHint}</SectionLabel>
             {topWords.slice(0, topVisible).map(word => (
-              <WordRow key={word.id} word={word} course={course} onToggleFavorite={toggleFavorite} showRank masked={flashcards && !revealed.has(word.id)} onFlip={flashcards ? () => flipCard(word.id) : undefined} onSwipe={known => swipeWord(word.id, known)} speaking={spokenWordId === word.id} />
+              <WordRow key={word.id} word={word} course={course} onToggleFavorite={toggleFavorite} showRank masked={flashcards && !revealed.has(word.id)} onFlip={flashcards ? () => flipCard(word.id) : undefined} onSwipe={known => swipeWord(word.id, known)} speaking={spokenWordId === word.id} onSpeak={() => (spokenWordId === word.id ? stop() : speakWords([word]))} />
             ))}
             {topVisible < topWords.length && (
               <LoadMoreSentinel onMore={() => setTopVisible(v => v + PAGE_STEP)} />
@@ -394,7 +409,7 @@ export default function WordsPage() {
         ) : favoriteWords.length > 0 ? (
           <div className="space-y-2">
             {favoriteWords.map(word => (
-              <WordRow key={word.id} word={word} course={course} onToggleFavorite={toggleFavorite} masked={flashcards && !revealed.has(word.id)} onFlip={flashcards ? () => flipCard(word.id) : undefined} onSwipe={known => swipeWord(word.id, known)} speaking={spokenWordId === word.id} />
+              <WordRow key={word.id} word={word} course={course} onToggleFavorite={toggleFavorite} masked={flashcards && !revealed.has(word.id)} onFlip={flashcards ? () => flipCard(word.id) : undefined} onSwipe={known => swipeWord(word.id, known)} speaking={spokenWordId === word.id} onSpeak={() => (spokenWordId === word.id ? stop() : speakWords([word]))} />
             ))}
           </div>
         ) : (
@@ -407,7 +422,7 @@ export default function WordsPage() {
 
 const SWIPE_THRESHOLD = 90
 
-function WordRow({ word, course, onToggleFavorite, showRank, masked, onFlip, onSwipe, speaking }: {
+function WordRow({ word, course, onToggleFavorite, showRank, masked, onFlip, onSwipe, speaking, onSpeak }: {
   word: ApiWord
   course: Course
   onToggleFavorite: (id: string) => void
@@ -419,6 +434,8 @@ function WordRow({ word, course, onToggleFavorite, showRank, masked, onFlip, onS
   onSwipe?: (known: boolean) => void
   // This row is the one being read aloud
   speaking?: boolean
+  // Read this word and its translation out loud
+  onSpeak?: () => void
 }) {
   const rowRef = useRef<HTMLDivElement>(null)
   useEffect(() => {
@@ -533,6 +550,22 @@ function WordRow({ word, course, onToggleFavorite, showRank, masked, onFlip, onS
           )}
           <LevelDots level={word.level} total={MAX_KNOWLEDGE_LEVEL} className={masked ? 'mt-1.5' : 'mt-2'} />
         </div>
+
+        {onSpeak && (
+          <button
+            onClick={e => { e.stopPropagation(); onSpeak() }}
+            aria-label={`${t.listen} — ${word.term}`}
+            aria-pressed={speaking}
+            className={cn(
+              'pressable mt-0.5 grid size-9 shrink-0 place-items-center rounded-xl border',
+              speaking
+                ? 'border-primary/40 bg-info-soft text-primary'
+                : 'border-border bg-surface text-muted-foreground',
+            )}
+          >
+            {speaking ? <Square size={14} /> : <Volume2 size={16} />}
+          </button>
+        )}
 
         {word.hasExamples && !masked && (
           <button

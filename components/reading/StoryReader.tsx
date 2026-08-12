@@ -5,7 +5,7 @@ import Link from 'next/link'
 import { getStrings } from '@/lib/i18n'
 import { useCourse } from '@/components/CourseProvider'
 import { localeOf } from '@/lib/courses'
-import { useSpeechQueue } from '@/lib/use-speech-queue'
+import { useMissingVoice, useSpeechQueue } from '@/lib/use-speech-queue'
 import { AppShell } from '@/components/AppShell'
 import { SpeakButton } from '@/components/SpeakButton'
 import { Card } from '@/components/ui/primitives'
@@ -27,6 +27,7 @@ export default function StoryReader({ story }: { story: Story }) {
   const t = getStrings(course.native)
   const locale = localeOf(course.learned)
   const { speak, stop, index, playing } = useSpeechQueue()
+  const missingVoice = useMissingVoice(locale)
 
   // Flat sentence list drives playback; the [paragraph, sentence] shape drives rendering
   const { paragraphs, sentences } = useMemo(() => {
@@ -83,6 +84,11 @@ export default function StoryReader({ story }: { story: Story }) {
         </div>
       </Card>
 
+      {missingVoice && (
+        <p className="mt-3 text-center text-[11px] text-warning">
+          {t.noVoiceForLanguage(t.languageName[course.learned])}
+        </p>
+      )}
       <p className="mt-3 text-center text-xs text-muted-foreground">{t.tapAnyWord}</p>
     </AppShell>
   )
