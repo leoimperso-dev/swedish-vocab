@@ -219,9 +219,6 @@
   }
   to {
     opacity: 1;
-    /* No transform here: with fill-mode "both" a retained transform would make
-       every .animate-rise element a containing block for fixed descendants
-       (the reader's word panel is position: fixed on phones) */
   }
 }
 
@@ -234,5 +231,9 @@
 }
 
 @utility animate-rise {
-  animation: svk-rise 200ms var(--ease-snap) both;
+  /* fill "backwards", never "forwards": a forwards fill retains a transform
+     matrix after the animation, and any transformed ancestor becomes the
+     containing block of every position: fixed descendant — it silently
+     breaks the reader's fixed word panel on phones */
+  animation: svk-rise 200ms var(--ease-snap) backwards;
 }
