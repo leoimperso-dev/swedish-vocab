@@ -3,6 +3,7 @@ import { auth } from '@/auth'
 import { db } from '@/lib/db'
 import { getCourseWithLevel } from '@/lib/current-course'
 import { levelsAtOrAbove } from '@/lib/cefr'
+import { answerableExamples } from '@/lib/cloze'
 import {
   courseDirections, defaultDirection, learnsTermLanguage, pairOf, promptLang, verbFormsFor,
   type Course, type Direction,
@@ -33,7 +34,11 @@ function hasExamples(examples: unknown): boolean {
 const CLOZE_TYPES = new Set(['VERB', 'NOUN', 'NOUN_EN', 'NOUN_ETT', 'ADJECTIVE', 'ADVERB'])
 
 function clozeEligible(word: Word): boolean {
-  return CLOZE_TYPES.has(word.wordType) && hasExamples(word.examples)
+  if (!CLOZE_TYPES.has(word.wordType) || !hasExamples(word.examples)) return false
+  // ...and the sentence has to point at the hidden word, or the card is a
+  // coin toss: "id" glossed "ça" over "Amène ta carte d'étudiant"
+  const examples = word.examples as unknown as Array<{ translation?: string }>
+  return answerableExamples(examples, word.translation).length > 0
 }
 
 function selectExerciseType(

@@ -5,6 +5,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { Check, Minus, X, Lightbulb } from 'lucide-react'
 import { speak, unlock } from '@/lib/tts'
 import { evaluateAnswer } from '@/lib/fuzzy'
+import { answerableExamples } from '@/lib/cloze'
 import { learnedLocale, parseDetails } from '@/lib/word-display'
 import { getStrings } from '@/lib/i18n'
 import { useCourse } from '@/components/CourseProvider'
@@ -51,9 +52,10 @@ export default function ClozeExercise({ word, onAnswer }: Props) {
     const examples = (Array.isArray(word.examples) ? word.examples : []) as unknown as ClozeExample[]
     const valid = examples.filter(e => e?.term && e?.blank)
     if (valid.length === 0) return null
-    const translated = valid.filter(e => e.translation)
-    const pool = translated.length > 0 ? translated : valid
-    return pool[Math.floor(Math.random() * pool.length)]
+    // Only sentences whose translation points at the hidden word — see lib/cloze.ts
+    const answerable = answerableExamples(valid, word.translation)
+    if (answerable.length === 0) return null
+    return answerable[Math.floor(Math.random() * answerable.length)]
   }, [word])
 
   // Word-boundary match of the surface form, case-insensitive — split into before/word/after
