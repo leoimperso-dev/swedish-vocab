@@ -9,7 +9,7 @@ import { localeOf } from '@/lib/courses'
 import { speak, unlock } from '@/lib/tts'
 import { useMissingVoice } from '@/lib/use-speech-queue'
 import { isRecognitionSupported, useSpeechRecognition } from '@/lib/use-speech-recognition'
-import { evaluateSpokenAnswer } from '@/lib/fuzzy'
+import { evaluateSpokenAlternatives } from '@/lib/fuzzy'
 import { AppShell } from '@/components/AppShell'
 import { Card, ProgressBar, TextField } from '@/components/ui/primitives'
 import { Button } from '@/components/ui/button'
@@ -21,6 +21,8 @@ export interface Turn {
   speaker: 'them' | 'you'
   text: string
   translation: string
+  // Other correct ways to say the same line — see scripts/import-dialogue-variants.ts
+  accepts?: string[]
 }
 
 const FEEDBACK_CLASS: Record<AnswerResult, string> = {
@@ -76,7 +78,7 @@ export default function DialoguePlayer({ dialogue }: { dialogue: Dialogue }) {
 
   const grade = () => {
     if (!answer.trim() || result) return
-    const evaluation = evaluateSpokenAnswer(answer, turn.text)
+    const evaluation = evaluateSpokenAlternatives(answer, [turn.text, ...(turn.accepts ?? [])])
     setResult(evaluation)
     if (evaluation !== 'incorrect') speak(turn.text, locale)
   }

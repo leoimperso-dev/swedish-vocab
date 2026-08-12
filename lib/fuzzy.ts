@@ -116,3 +116,20 @@ export function evaluateSpokenAnswer(spoken: string, expected: string): AnswerRe
   if (dist <= tolerance * 2) return 'approximate'
   return 'incorrect'
 }
+
+const RESULT_RANK: Record<AnswerResult, number> = { incorrect: 0, approximate: 1, correct: 2 }
+
+/**
+ * Grades a spoken answer against every accepted phrasing of a dialogue turn and
+ * keeps the most favourable verdict. One idea has many correct wordings, and
+ * refusing all but the authored one teaches the wording, not the language.
+ */
+export function evaluateSpokenAlternatives(spoken: string, accepted: string[]): AnswerResult {
+  let best: AnswerResult = 'incorrect'
+  for (const candidate of accepted) {
+    const result = evaluateSpokenAnswer(spoken, candidate)
+    if (RESULT_RANK[result] > RESULT_RANK[best]) best = result
+    if (best === 'correct') break
+  }
+  return best
+}

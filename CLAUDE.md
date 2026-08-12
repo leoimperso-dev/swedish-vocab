@@ -84,6 +84,11 @@ language, and grades a spoken answer via `lib/use-speech-recognition.ts`
 only, so a typed fallback is always one tap away. Import with
 `scripts/import-dialogues.ts <dir>` — the pair comes from each filename.
 
+Each `you` turn carries `accepts[]`, other correct wordings of the same line, so a
+learner is not marked wrong for saying it differently (`evaluateSpokenAlternatives`
+keeps the best verdict across them). Generated per language and attached with
+`scripts/import-dialogue-variants.ts <dir>`; sources in `Desktop\pro\dialoguesariants\`.
+
 ## Reading
 `Story` table (48 graded stories, 4 levels) under `/reading`; `StoryReader` makes every word
 tappable → `/api/dictionary?q=` backed by `lib/dictionary.ts` (one in-memory map per pair, over
