@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import {
   Shuffle, Layers, ListChecks, PenLine, TextCursorInput, Repeat2,
-  BookOpen, Brain, ChevronRight, Sparkles, Loader2, PartyPopper, Ear,
+  BookOpen, Brain, ChevronRight, Sparkles, Loader2, PartyPopper, Ear, MessagesSquare,
   type LucideIcon,
 } from 'lucide-react'
 import FlashCard from '@/components/study/FlashCard'
@@ -332,6 +332,16 @@ function ModePicker({ course, onPick, direction, onDirectionChange }: {
               <span className="min-w-0 flex-1">
                 <span className="block truncate font-display text-base font-semibold">{t.readingTitle}</span>
                 <span className="block truncate text-xs text-muted-foreground">{t.readingDesc}</span>
+              </span>
+              <ChevronRight size={18} className="shrink-0 text-muted-foreground" />
+            </Link>
+            <Link href="/conversation" className="pressable card-surface flex items-center gap-3 p-4">
+              <span className="grid size-11 shrink-0 place-items-center rounded-xl bg-success-soft text-success">
+                <MessagesSquare size={20} />
+              </span>
+              <span className="min-w-0 flex-1">
+                <span className="block truncate font-display text-base font-semibold">{t.conversationTitle}</span>
+                <span className="block truncate text-xs text-muted-foreground">{t.conversationDesc}</span>
               </span>
               <ChevronRight size={18} className="shrink-0 text-muted-foreground" />
             </Link>
