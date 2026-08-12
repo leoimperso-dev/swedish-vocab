@@ -58,7 +58,16 @@ export function useSpeechRecognition(locale: string) {
   // A stopped-by-us session must not report its late "no-speech" error
   const cancelledRef = useRef(false)
 
+  // Ends the run but lets the engine deliver what it already heard
   const stop = useCallback(() => {
+    recognitionRef.current?.stop()
+    recognitionRef.current = null
+    setListening(false)
+    setInterim('')
+  }, [])
+
+  // Drops the run and its pending results — used when leaving the turn
+  const cancel = useCallback(() => {
     cancelledRef.current = true
     recognitionRef.current?.abort()
     recognitionRef.current = null
@@ -80,7 +89,9 @@ export function useSpeechRecognition(locale: string) {
 
     const recognition = new Ctor()
     recognition.lang = locale
-    recognition.continuous = false
+    // Keep listening through pauses: a learner searching for a word would
+    // otherwise have the engine decide the sentence was over
+    recognition.continuous = true
     recognition.interimResults = true
     recognition.maxAlternatives = 1
     recognition.onresult = e => {
@@ -114,7 +125,7 @@ export function useSpeechRecognition(locale: string) {
     recognition.start()
   }, [locale])
 
-  useEffect(() => stop, [stop])
+  useEffect(() => cancel, [cancel])
 
-  return { start, stop, listening, transcript, interim, error, reset: () => setTranscript('') }
+  return { start, stop, cancel, listening, transcript, interim, error, reset: () => setTranscript('') }
 }

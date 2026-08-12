@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
-import { Check, Keyboard, Mic, Minus, PartyPopper, Volume2, X } from 'lucide-react'
+import { Check, Mic, Minus, PartyPopper, Square, Volume2, X } from 'lucide-react'
 import { getStrings } from '@/lib/i18n'
 import { useCourse } from '@/components/CourseProvider'
 import { localeOf } from '@/lib/courses'
@@ -45,10 +45,11 @@ export default function DialoguePlayer({ dialogue }: { dialogue: Dialogue }) {
   const [index, setIndex] = useState(0)
   const [result, setResult] = useState<AnswerResult | null>(null)
   const [revealed, setRevealed] = useState(false)
-  const [typed, setTyped] = useState('')
-  // Falls back to typing when recognition is missing, denied, or refused by the user
-  const [typing, setTyping] = useState(!isRecognitionSupported())
-  const { start, stop, listening, transcript, interim, error, reset } = useSpeechRecognition(locale)
+  // One editable answer, whether it came from the microphone or the keyboard —
+  // recognition mishears often enough that it has to stay correctable
+  const [answer, setAnswer] = useState('')
+  const { start, stop, cancel, listening, transcript, interim, error, reset } = useSpeechRecognition(locale)
+  const canSpeak = isRecognitionSupported()
 
   const turn = turns[index]
   const done = index >= turns.length
@@ -65,31 +66,31 @@ export default function DialoguePlayer({ dialogue }: { dialogue: Dialogue }) {
   }, [index, theirLine, turn, locale])
 
   const goNext = useCallback(() => {
-    stop()
+    cancel()
     reset()
     setResult(null)
     setRevealed(false)
-    setTyped('')
+    setAnswer('')
     setIndex(i => i + 1)
-  }, [stop, reset])
+  }, [cancel, reset])
 
-  const grade = useCallback((answer: string) => {
-    if (!answer.trim()) return
+  const grade = () => {
+    if (!answer.trim() || result) return
     const evaluation = evaluateSpokenAnswer(answer, turn.text)
     setResult(evaluation)
     if (evaluation !== 'incorrect') speak(turn.text, locale)
-  }, [turn, locale])
+  }
 
-  // A finished recognition run grades itself — the learner stops talking, not clicking
+  // What the engine heard lands in the field, where it can still be fixed
   useEffect(() => {
-    if (!listening && transcript && !result) grade(transcript)
-  }, [listening, transcript, result, grade])
+    if (transcript) setAnswer(transcript)
+  }, [transcript])
 
   const restart = () => {
     setIndex(0)
     setResult(null)
     setRevealed(false)
-    setTyped('')
+    setAnswer('')
     reset()
   }
 
@@ -162,42 +163,44 @@ export default function DialoguePlayer({ dialogue }: { dialogue: Dialogue }) {
             </div>
 
             {!result && (
-              typing ? (
-                <div className="space-y-2">
-                  <TextField
-                    value={typed}
-                    onChange={e => setTyped(e.target.value)}
-                    onKeyDown={e => e.key === 'Enter' && grade(typed)}
-                    placeholder={turn.text.slice(0, 1) + '…'}
-                    autoFocus
-                  />
-                  <Button className="w-full" disabled={!typed.trim()} onClick={() => grade(typed)}>
-                    {t.submit}
-                  </Button>
-                </div>
-              ) : (
-                <div className="space-y-2 text-center">
-                  <button
-                    onClick={() => (listening ? stop() : start())}
-                    aria-label={t.tapToSpeak}
-                    className={cn(
-                      'pressable mx-auto grid size-20 place-items-center rounded-full border-2',
-                      listening
-                        ? 'animate-pulse border-danger/50 bg-danger-soft text-danger'
-                        : 'border-primary/40 bg-info-soft text-primary',
-                    )}
-                  >
-                    <Mic size={30} />
-                  </button>
-                  <p className="text-xs text-muted-foreground">
-                    {listening ? t.listening : t.tapToSpeak}
-                  </p>
-                  {interim && <p className="text-sm italic text-muted-foreground">{interim}</p>}
-                </div>
-              )
+              <div className="space-y-3">
+                {canSpeak && (
+                  <div className="space-y-1.5 text-center">
+                    <button
+                      onClick={() => (listening ? stop() : start())}
+                      aria-label={listening ? t.stopReading : t.tapToSpeak}
+                      className={cn(
+                        'pressable mx-auto grid size-20 place-items-center rounded-full border-2',
+                        listening
+                          ? 'animate-pulse border-danger/50 bg-danger-soft text-danger'
+                          : 'border-primary/40 bg-info-soft text-primary',
+                      )}
+                    >
+                      {listening ? <Square size={26} /> : <Mic size={30} />}
+                    </button>
+                    <p className="text-xs text-muted-foreground">
+                      {listening ? t.listeningTapToStop : t.tapToSpeak}
+                    </p>
+                    {interim && <p className="text-sm italic text-muted-foreground">{interim}</p>}
+                  </div>
+                )}
+
+                {/* The transcript lands here and stays editable — the engine
+                    mishears learners often, and the cue is on screen anyway */}
+                <TextField
+                  value={answer}
+                  onChange={e => setAnswer(e.target.value)}
+                  onKeyDown={e => e.key === 'Enter' && grade()}
+                  placeholder={canSpeak ? t.orTypeAnswer : t.typeWhatYouHear}
+                  autoFocus={!canSpeak}
+                />
+                <Button className="w-full" disabled={!answer.trim()} onClick={grade}>
+                  {t.submit}
+                </Button>
+              </div>
             )}
 
-            {error && !typing && (
+            {error && (
               <p className="text-center text-xs text-warning">
                 {error === 'not-allowed' ? t.micDenied
                   : error === 'unsupported' ? t.micUnsupported
@@ -213,9 +216,7 @@ export default function DialoguePlayer({ dialogue }: { dialogue: Dialogue }) {
                     : result === 'approximate' ? t.resultAlmost
                     : t.resultIncorrect}
                 </p>
-                {transcript && !typing && (
-                  <p className="text-xs text-foreground/70">{t.iHeard} « {transcript} »</p>
-                )}
+                <p className="text-xs text-foreground/70">{t.iHeard} « {answer} »</p>
                 <p className="text-xs text-foreground/80">
                   {t.expectedAnswer} <span className="font-medium">{turn.text}</span>
                 </p>
@@ -229,31 +230,17 @@ export default function DialoguePlayer({ dialogue }: { dialogue: Dialogue }) {
             <div className="space-y-2">
               {result ? (
                 <Button size="lg" className="w-full" onClick={goNext}>{t.nextTurn}</Button>
+              ) : !revealed ? (
+                <button
+                  onClick={() => setRevealed(true)}
+                  className="pressable w-full text-xs text-muted-foreground underline underline-offset-2"
+                >
+                  {t.showAnswer}
+                </button>
               ) : (
-                <>
-                  {isRecognitionSupported() && (
-                    <button
-                      onClick={() => { stop(); setTyping(v => !v) }}
-                      className="pressable flex w-full items-center justify-center gap-1.5 text-xs text-muted-foreground"
-                    >
-                      {typing ? <Mic size={13} /> : <Keyboard size={13} />}
-                      {typing ? t.speakInstead : t.typeInstead}
-                    </button>
-                  )}
-                  {!revealed && (
-                    <button
-                      onClick={() => setRevealed(true)}
-                      className="pressable w-full text-xs text-muted-foreground underline underline-offset-2"
-                    >
-                      {t.showAnswer}
-                    </button>
-                  )}
-                  {revealed && (
-                    <Button variant="secondary" size="lg" className="w-full" onClick={goNext}>
-                      {t.nextTurn}
-                    </Button>
-                  )}
-                </>
+                <Button variant="secondary" size="lg" className="w-full" onClick={goNext}>
+                  {t.nextTurn}
+                </Button>
               )}
             </div>
           </Card>
