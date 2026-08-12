@@ -4,7 +4,7 @@ import { useMemo, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Check, Minus, X, Lightbulb } from 'lucide-react'
 import { speak, unlock } from '@/lib/tts'
-import { evaluateAnswer } from '@/lib/fuzzy'
+import { evaluateAlternatives } from '@/lib/fuzzy'
 import { answerableExamples } from '@/lib/cloze'
 import { learnedLocale, parseDetails } from '@/lib/word-display'
 import { getStrings } from '@/lib/i18n'
@@ -23,6 +23,8 @@ interface ClozeExample {
 
 interface Props {
   word: Word
+  // Other words that fill the blank just as well — see the session route
+  alsoAccepted?: string[]
   onAnswer: (result: AnswerResult, type: string) => void
 }
 
@@ -42,7 +44,7 @@ const FEEDBACK_CLASS: Record<AnswerResult, string> = {
   incorrect: 'border-danger/40 bg-danger-soft text-danger',
 }
 
-export default function ClozeExercise({ word, onAnswer }: Props) {
+export default function ClozeExercise({ word, alsoAccepted, onAnswer }: Props) {
   const [input, setInput] = useState('')
   const [result, setResult] = useState<AnswerResult | null>(null)
   // The hint gives the answer away, so it stays behind a tap: searching first
@@ -91,7 +93,7 @@ export default function ClozeExercise({ word, onAnswer }: Props) {
     unlock()
     speak(example.term, learnedLocale(course))
 
-    const evaluation = evaluateAnswer(input, example.blank)
+    const evaluation = evaluateAlternatives(input, [example.blank, ...(alsoAccepted ?? [])])
     setResult(evaluation)
 
     if (evaluation === 'correct') setTimeout(() => onAnswer(evaluation, 'CLOZE'), 1500)

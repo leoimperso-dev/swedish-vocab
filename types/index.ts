@@ -14,6 +14,9 @@ export interface ExerciseWord {
   userWord: UserWord | null
   exerciseType: ExerciseType
   distractors?: string[]
+  // Other words of the pair that share a sense with this one — accepted when the
+  // learner has to produce the term, since several words can be equally right
+  alsoAccepted?: string[]
 }
 
 export interface AnswerPayload {

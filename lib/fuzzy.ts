@@ -120,6 +120,21 @@ export function evaluateSpokenAnswer(spoken: string, expected: string): AnswerRe
 const RESULT_RANK: Record<AnswerResult, number> = { incorrect: 0, approximate: 1, correct: 2 }
 
 /**
+ * Grades against every acceptable answer and keeps the best verdict. Producing
+ * a word from its translation has more than one right answer: shown "crier,
+ * aboyer", "bark" is at least as good as the stored "bay".
+ */
+export function evaluateAlternatives(input: string, accepted: string[]): AnswerResult {
+  let best: AnswerResult = 'incorrect'
+  for (const candidate of accepted) {
+    const result = evaluateAnswer(input, candidate)
+    if (RESULT_RANK[result] > RESULT_RANK[best]) best = result
+    if (best === 'correct') break
+  }
+  return best
+}
+
+/**
  * Grades a spoken answer against every accepted phrasing of a dialogue turn and
  * keeps the most favourable verdict. One idea has many correct wordings, and
  * refusing all but the authored one teaches the wording, not the language.

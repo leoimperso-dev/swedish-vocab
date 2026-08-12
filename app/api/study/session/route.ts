@@ -4,6 +4,7 @@ import { db } from '@/lib/db'
 import { getCourseWithLevel } from '@/lib/current-course'
 import { levelsAtOrAbove } from '@/lib/cefr'
 import { answerableExamples } from '@/lib/cloze'
+import { glossSenses, glossesOverlap } from '@/lib/gloss'
 import {
   courseDirections, defaultDirection, learnsTermLanguage, pairOf, promptLang, verbFormsFor,
   type Course, type Direction,
@@ -174,8 +175,41 @@ export async function GET(req: NextRequest) {
     }
   }
 
+  // Answers that produce the term can be right without being the stored word:
+  // shown "crier, aboyer", a learner writes "bark" where the entry says "bay".
+  // Every word of the pair sharing a sense is collected as an accepted answer.
+  const producesTerm = answerField === 'term'
+  const alsoAcceptedByWordId = new Map<string, string[]>()
+  const needsAlternatives = exercises.filter(
+    e => producesTerm || e.exerciseType === 'CLOZE',
+  )
+  if (needsAlternatives.length > 0) {
+    const senses = [...new Set(needsAlternatives.flatMap(e => glossSenses(e.word.translation)))]
+    const candidates = senses.length > 0
+      ? await db.word.findMany({
+          where: {
+            pair,
+            studyable: true,
+            id: { notIn: needsAlternatives.map(e => e.word.id) },
+            OR: senses.map(sense => ({ translation: { contains: sense, mode: 'insensitive' as const } })),
+          },
+          select: { term: true, translation: true, wordType: true },
+        })
+      : []
+    for (const ex of needsAlternatives) {
+      const matches = candidates
+        .filter(c => c.wordType === ex.word.wordType && glossesOverlap(c.translation, ex.word.translation))
+        .map(c => c.term)
+      if (matches.length > 0) alsoAcceptedByWordId.set(ex.word.id, [...new Set(matches)].slice(0, 12))
+    }
+  }
+
   return NextResponse.json({
     sessionId: studySession.id,
-    exercises: exercises.map(e => ({ ...e, distractors: distractorsByWordId.get(e.word.id) })),
+    exercises: exercises.map(e => ({
+      ...e,
+      distractors: distractorsByWordId.get(e.word.id),
+      alsoAccepted: alsoAcceptedByWordId.get(e.word.id),
+    })),
   })
 }

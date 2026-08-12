@@ -4,7 +4,7 @@ import { useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Check, Minus, X } from 'lucide-react'
 import { speak, unlock } from '@/lib/tts'
-import { evaluateAnswer } from '@/lib/fuzzy'
+import { evaluateAlternatives } from '@/lib/fuzzy'
 import { directionPrompt, directionAnswer, learnedText, learnedLocale } from '@/lib/word-display'
 import { answerLang, type Direction } from '@/lib/courses'
 import { getStrings } from '@/lib/i18n'
@@ -18,6 +18,8 @@ import type { AnswerResult } from '@/types'
 interface Props {
   word: Word
   direction: Direction
+  // Other words that answer this prompt just as well — see the session route
+  alsoAccepted?: string[]
   onAnswer: (result: AnswerResult, type: string) => void
 }
 
@@ -33,7 +35,7 @@ const FEEDBACK_CLASS: Record<AnswerResult, string> = {
   incorrect: 'border-danger/40 bg-danger-soft text-danger',
 }
 
-export default function TypingExercise({ word, direction, onAnswer }: Props) {
+export default function TypingExercise({ word, direction, alsoAccepted, onAnswer }: Props) {
   const [input, setInput] = useState('')
   const [result, setResult] = useState<AnswerResult | null>(null)
   const course = useCourse()
@@ -52,7 +54,7 @@ export default function TypingExercise({ word, direction, onAnswer }: Props) {
     unlock()
     speak(learnedText(word, course), learnedLocale(course))
 
-    const evaluation = evaluateAnswer(input, expected)
+    const evaluation = evaluateAlternatives(input, [expected, ...(alsoAccepted ?? [])])
     setResult(evaluation)
 
     // A correct answer flows on; a wrong one waits for the learner to read it

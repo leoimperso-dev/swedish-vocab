@@ -241,13 +241,22 @@ export default function StudyPage() {
             />
           )}
           {current.exerciseType === 'TYPING' && (
-            <TypingExercise word={current.word} direction={direction} onAnswer={handleAnswer} />
+            <TypingExercise
+              word={current.word}
+              direction={direction}
+              alsoAccepted={current.alsoAccepted}
+              onAnswer={handleAnswer}
+            />
           )}
           {current.exerciseType === 'CONJUGATION' && (
             <ConjugationExercise word={current.word} onAnswer={handleAnswer} />
           )}
           {current.exerciseType === 'CLOZE' && (
-            <ClozeExercise word={current.word} onAnswer={handleAnswer} />
+            <ClozeExercise
+              word={current.word}
+              alsoAccepted={current.alsoAccepted}
+              onAnswer={handleAnswer}
+            />
           )}
           {current.exerciseType === 'LISTENING' && (
             <ListeningExercise word={current.word} onAnswer={handleAnswer} />
