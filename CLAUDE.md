@@ -92,6 +92,16 @@ cloze, reading and grammar — a Swedish native learning French gets vocabulary 
 `Word.details` (JSONB `{translations[], context?, usage[{term,translation}]}`) follows the same rule
 via `showsEnrichedAnswer()`.
 
+**Whatever is spoken must be in the language being learned, and read by a voice of it.** That is
+not automatic: `Word.term`, `Word.examples`, stories, dialogues and grammar are all authored in
+the pair's `term` language, so on an inverted course (`sv → fr`, `en → fr`) they are the
+learner's *native* language. Reading them with `localeOf(course.learned)` said Swedish words in a
+French voice and never one French word. Hence `learnedSpeech()` for words, the example gate in
+`ListeningExercise`, the side swap in the vocabulary list's read-aloud, and a **server-side**
+guard on `/reading`, `/grammar` and the dialogue pages — hiding their links left the URL open.
+The free chat is generated in the learned language, so it stays open to every course.
+Guarded by `scripts/check-speech-language.ts`.
+
 ## CEFR levels
 Every user declares a level per learned language (`User.levels`, a JSON map
 `{ "sv": "A2" }`). `Word.cefr` is derived from `frequencyRank` by `lib/cefr.ts`
@@ -308,6 +318,7 @@ pnpm tsx scripts/check-story-coverage.ts   # QA: every story token must resolve
 pnpm tsx scripts/mark-studyable.ts         # recompute Word.studyable (after each seed)
 pnpm tsx scripts/assign-cefr.ts            # recompute Word.cefr (after apply-frequency)
 pnpm tsx scripts/check-duel-rules.ts       # QA: duel scoring and match resolution
+pnpm tsx scripts/check-speech-language.ts  # QA: every course only ever speaks the learned language
 pnpm tsx scripts/simulate-duel.ts          # QA: full duel against the DB (self-cleaning)
 pnpm tsx scripts/check-mixed-session.ts <email>  # QA: a MIXED session keeps each card's direction
 pnpm tsx scripts/check-mastered.ts         # QA: "I know these perfectly" (throwaway account)
