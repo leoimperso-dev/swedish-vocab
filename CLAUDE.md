@@ -243,6 +243,11 @@ a majority (`winsNeeded`) or on the last round.
   over a long clock puts every honest answer near the maximum and stops ranking anyone. Both
   are relative to the exercise's own budget, so the same share of any clock pays the same —
   hence the answer reports its `exerciseType` alongside `msLeft`.
+- **The clock stops when the answer is given**, not when the learner moves on. Graded exercises
+  fire `onSubmitted(result)` the instant they evaluate — before the correction is shown and
+  before the word is spoken in full — and the duel page freezes its timer there, banks the
+  points and flashes `+X`. Without it, waiting for the readout drained the speed bonus, and a
+  slow one could expire an exercise that had just been answered correctly.
 - The score is **recomputed server-side** from the results the browser reports — the client
   only says what was answered and how much clock was left.
 - A round's score stays hidden until both sides have played it, so nobody plays knowing the

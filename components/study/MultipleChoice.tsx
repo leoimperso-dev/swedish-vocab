@@ -19,9 +19,15 @@ interface Props {
   direction: Direction
   distractors?: string[]
   onAnswer: (result: AnswerResult, type: string) => void
+  /**
+   * Fired the instant the answer is graded, before any correction is shown or
+   * spoken. A duel freezes its clock here: the points are earned by answering,
+   * not by pressing "next".
+   */
+  onSubmitted?: (result: AnswerResult) => void
 }
 
-export default function MultipleChoice({ word, direction, distractors, onAnswer }: Props) {
+export default function MultipleChoice({ word, direction, distractors, onAnswer, onSubmitted }: Props) {
   const [options, setOptions] = useState<string[]>([])
   const [selected, setSelected] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
@@ -53,6 +59,7 @@ export default function MultipleChoice({ word, direction, distractors, onAnswer 
   const handleSelect = (option: string) => {
     if (selected) return
     setSelected(option)
+    onSubmitted?.(option === correctOption ? 'correct' : 'incorrect')
     unlock()
     // Right answers flow on, but only once the word has been said in full —
     // cutting the voice off mid-superlative teaches half the word

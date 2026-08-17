@@ -22,6 +22,12 @@ interface Props {
   // Other words that answer this prompt just as well — see the session route
   alsoAccepted?: string[]
   onAnswer: (result: AnswerResult, type: string) => void
+  /**
+   * Fired the instant the answer is graded, before any correction is shown or
+   * spoken. A duel freezes its clock here: the points are earned by answering,
+   * not by pressing "next".
+   */
+  onSubmitted?: (result: AnswerResult) => void
 }
 
 const FEEDBACK_ICON: Record<AnswerResult, typeof Check> = {
@@ -36,7 +42,7 @@ const FEEDBACK_CLASS: Record<AnswerResult, string> = {
   incorrect: 'border-danger/40 bg-danger-soft text-danger',
 }
 
-export default function TypingExercise({ word, direction, alsoAccepted, onAnswer }: Props) {
+export default function TypingExercise({ word, direction, alsoAccepted, onAnswer, onSubmitted }: Props) {
   const [input, setInput] = useState('')
   const [result, setResult] = useState<AnswerResult | null>(null)
   const course = useCourse()
@@ -55,6 +61,7 @@ export default function TypingExercise({ word, direction, alsoAccepted, onAnswer
     unlock()
     const evaluation = evaluateAlternatives(input, [expected, ...(alsoAccepted ?? [])])
     setResult(evaluation)
+    onSubmitted?.(evaluation)
 
     // A correct answer flows on once the word has been said in full; a wrong one
     // waits for the learner to read it

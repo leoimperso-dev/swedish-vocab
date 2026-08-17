@@ -97,17 +97,46 @@ export default function PlayRoundPage({ params }: { params: Promise<{ id: string
   // the learner is still reading the correction of the answer they just gave —
   // without this, that exercise would be scored twice.
   const answeredIndex = useRef(-1)
+  // Set the moment the answer is graded, well before the exercise hands over:
+  // a correct answer waits for the word to be spoken in full, and a wrong one
+  // waits for the learner to press "next". The clock stops here, so neither
+  // costs points — and the score is shown right away.
+  const settled = useRef<{ points: number; msLeft: number } | null>(null)
+  const [earned, setEarned] = useState<number | null>(null)
+
+  const handleSubmitted = useCallback(
+    (result: AnswerResult, msLeft: number) => {
+      if (!data || settled.current || answeredIndex.current === index) return
+      const exercise = data.exercises[index]
+      if (!exercise) return
+      const streak = result === 'correct' ? consecutiveCorrect(answers) + 1 : 0
+      const points = scoreAnswer(data.mode, result, {
+        streak, msLeft, exerciseType: exercise.exerciseType,
+      })
+      settled.current = { points, msLeft }
+      setScore(s => s + points)
+      setEarned(points)
+    },
+    [data, index, answers],
+  )
 
   const handleAnswer = useCallback(
-    (result: AnswerResult, msLeft: number) => {
+    (result: AnswerResult, liveMsLeft: number) => {
       if (!data) return
       const exercise = data.exercises[index]
       if (!exercise || answeredIndex.current === index) return
       answeredIndex.current = index
 
-      const streak = result === 'correct' ? consecutiveCorrect(answers) + 1 : 0
+      // The clock as it stood when the answer was given. Only a timeout — where
+      // nothing was ever submitted — falls back to the live reading.
+      const msLeft = settled.current?.msLeft ?? liveMsLeft
       const exerciseType = exercise.exerciseType
-      setScore(s => s + scoreAnswer(data.mode, result, { streak, msLeft, exerciseType }))
+      if (!settled.current) {
+        const streak = result === 'correct' ? consecutiveCorrect(answers) + 1 : 0
+        setScore(s => s + scoreAnswer(data.mode, result, { streak, msLeft, exerciseType }))
+      }
+      settled.current = null
+      setEarned(null)
 
       const all = [
         ...answers,
@@ -165,8 +194,22 @@ export default function PlayRoundPage({ params }: { params: Promise<{ id: string
           <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
             <Swords size={14} /> {t.duelRoundOf(index + 1, data.exercises.length)}
           </span>
-          <span className="font-display text-sm font-semibold tabular-nums text-accent">
-            {t.duelPoints(score)}
+          <span className="relative flex items-center gap-2">
+            <span className="font-display text-sm font-semibold tabular-nums text-accent">
+              {t.duelPoints(score)}
+            </span>
+            {/* What the answer just scored — the clock stopped when it was given */}
+            {earned !== null && (
+              <span
+                key={index}
+                className={cn(
+                  'animate-pop rounded-lg px-2 py-0.5 font-display text-sm font-semibold tabular-nums',
+                  earned > 0 ? 'bg-success-soft text-success' : 'bg-danger-soft text-danger',
+                )}
+              >
+                +{earned}
+              </span>
+            )}
           </span>
         </div>
         <ProgressBar value={(index / data.exercises.length) * 100} />
@@ -177,14 +220,25 @@ export default function PlayRoundPage({ params }: { params: Promise<{ id: string
           <BlitzTimer
             key={index}
             seconds={blitzSeconds(current.exerciseType)}
+            frozen={earned !== null}
             onExpire={() => handleAnswer('incorrect', 0)}
             label={t.duelTimeUp}
             render={msLeft => (
-              <Exercise exercise={current} fallbackDirection={data.direction} onAnswer={r => handleAnswer(r, msLeft)} />
+              <Exercise
+                exercise={current}
+                fallbackDirection={data.direction}
+                onSubmitted={r => handleSubmitted(r, msLeft)}
+                onAnswer={r => handleAnswer(r, msLeft)}
+              />
             )}
           />
         ) : (
-          <Exercise exercise={current} fallbackDirection={data.direction} onAnswer={r => handleAnswer(r, 0)} />
+          <Exercise
+            exercise={current}
+            fallbackDirection={data.direction}
+            onSubmitted={r => handleSubmitted(r, 0)}
+            onAnswer={r => handleAnswer(r, 0)}
+          />
         )}
       </main>
     </div>
@@ -205,10 +259,13 @@ function Exercise({
   exercise,
   fallbackDirection,
   onAnswer,
+  onSubmitted,
 }: {
   exercise: ExerciseWord
   fallbackDirection: Direction
   onAnswer: (result: AnswerResult) => void
+  /** Fired when the answer is graded, before its correction is shown */
+  onSubmitted: (result: AnswerResult) => void
 }) {
   const { word, exerciseType, distractors, alsoAccepted } = exercise
   // Blitz asks some questions the other way round — see lib/study/build.ts
@@ -218,17 +275,17 @@ function Exercise({
   // No flashcard here: a duel score cannot rest on self-assessment
   switch (exerciseType) {
     case 'QCM':
-      return <MultipleChoice word={word} direction={direction} distractors={distractors} onAnswer={answer} />
+      return <MultipleChoice word={word} direction={direction} distractors={distractors} onAnswer={answer} onSubmitted={onSubmitted} />
     case 'TYPING':
-      return <TypingExercise word={word} direction={direction} alsoAccepted={alsoAccepted} onAnswer={answer} />
+      return <TypingExercise word={word} direction={direction} alsoAccepted={alsoAccepted} onAnswer={answer} onSubmitted={onSubmitted} />
     case 'CONJUGATION':
-      return <ConjugationExercise word={word} onAnswer={answer} />
+      return <ConjugationExercise word={word} onAnswer={answer} onSubmitted={onSubmitted} />
     case 'CLOZE':
-      return <ClozeExercise word={word} alsoAccepted={alsoAccepted} onAnswer={answer} />
+      return <ClozeExercise word={word} alsoAccepted={alsoAccepted} onAnswer={answer} onSubmitted={onSubmitted} />
     case 'LISTENING':
-      return <ListeningExercise word={word} onAnswer={answer} />
+      return <ListeningExercise word={word} onAnswer={answer} onSubmitted={onSubmitted} />
     default:
-      return <MultipleChoice word={word} direction={direction} distractors={distractors} onAnswer={answer} />
+      return <MultipleChoice word={word} direction={direction} distractors={distractors} onAnswer={answer} onSubmitted={onSubmitted} />
   }
 }
 
@@ -238,12 +295,20 @@ function Exercise({
  */
 function BlitzTimer({
   seconds,
+  frozen,
   onExpire,
   label,
   render,
 }: {
   /** This exercise's budget — a dictation gets more than a QCM, see BLITZ_SECONDS. */
   seconds: number
+  /**
+   * Stop the clock: the answer has been given and is being corrected. Without
+   * this, reading a correction — or simply waiting for the word to be spoken in
+   * full — kept draining the speed bonus, and a slow readout could even expire
+   * the exercise the learner had just answered correctly.
+   */
+  frozen: boolean
   onExpire: () => void
   label: string
   /** Milliseconds left, refreshed every 100ms — precise enough for a speed bonus. */
@@ -260,9 +325,15 @@ function BlitzTimer({
     expire.current = onExpire
   })
 
+  const stopped = useRef(frozen)
+  useEffect(() => {
+    stopped.current = frozen
+  })
+
   useEffect(() => {
     deadline.current = Date.now() + total
     const tick = setInterval(() => {
+      if (stopped.current) return
       const remaining = deadline.current - Date.now()
       setLeft(Math.max(0, remaining))
       if (remaining <= 0 && !expired.current) {

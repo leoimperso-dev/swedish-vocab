@@ -15,13 +15,19 @@ import type { AnswerResult } from '@/types'
 interface Props {
   word: Word
   onAnswer: (result: AnswerResult, type: string) => void
+  /**
+   * Fired the instant the answer is graded, before any correction is shown or
+   * spoken. A duel freezes its clock here: the points are earned by answering,
+   * not by pressing "next".
+   */
+  onSubmitted?: (result: AnswerResult) => void
 }
 
 // Drilled forms differ per language: Swedish present/preterit/supine,
 // English past/past participle — the registry decides, i18n supplies the labels.
 type FormKey = 'present' | 'preterit' | 'supine' | 'past' | 'pastParticiple'
 
-export default function ConjugationExercise({ word, onAnswer }: Props) {
+export default function ConjugationExercise({ word, onAnswer, onSubmitted }: Props) {
   const course = useCourse()
   const t = getStrings(course.native)
   const [inputs, setInputs] = useState<Record<string, string>>({})
@@ -53,6 +59,7 @@ export default function ConjugationExercise({ word, onAnswer }: Props) {
       ? 'incorrect'
       : 'approximate'
 
+    onSubmitted?.(overall)
     if (overall === 'correct') setTimeout(() => onAnswer(overall, 'CONJUGATION'), 1500)
     else setPending(overall)
   }

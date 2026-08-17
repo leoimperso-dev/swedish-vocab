@@ -24,6 +24,12 @@ interface ClozeExample {
 interface Props {
   word: Word
   onAnswer: (result: AnswerResult, type: string) => void
+  /**
+   * Fired the instant the answer is graded, before any correction is shown or
+   * spoken. A duel freezes its clock here: the points are earned by answering,
+   * not by pressing "next".
+   */
+  onSubmitted?: (result: AnswerResult) => void
 }
 
 const FEEDBACK_ICON: Record<AnswerResult, typeof Check> = {
@@ -40,7 +46,7 @@ const FEEDBACK_CLASS: Record<AnswerResult, string> = {
 
 // Dictation: the word (or one of its example sentences) is spoken, never shown,
 // and has to be typed back. The only exercise that trains the ear.
-export default function ListeningExercise({ word, onAnswer }: Props) {
+export default function ListeningExercise({ word, onAnswer, onSubmitted }: Props) {
   const course = useCourse()
   const t = getStrings(course.native)
   const [input, setInput] = useState('')
@@ -91,6 +97,7 @@ export default function ListeningExercise({ word, onAnswer }: Props) {
     if (!input.trim() || result) return
     const evaluation = evaluateAnswer(input, prompt.text)
     setResult(evaluation)
+    onSubmitted?.(evaluation)
     if (evaluation === 'correct') setTimeout(() => onAnswer(evaluation, 'LISTENING'), 1600)
   }
 
