@@ -1,17 +1,30 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@/auth'
 import { db } from '@/lib/db'
-import { getCourseWithLevel } from '@/lib/current-course'
+import { getCourse, getCourseWithLevel } from '@/lib/current-course'
 import { buildExercises } from '@/lib/study/build'
 import { recordAnswer } from '@/lib/study/answer'
 import { finalizeSession } from '@/lib/study/finalize'
-import { isDirection } from '@/lib/courses'
+import { courseDirections, defaultDirection, type Course, type Direction } from '@/lib/courses'
 import { DUEL_XP, ROUND_NEW_WORDS, ROUND_SIZE, scoreAnswer, type DuelMode } from '@/lib/duel/rules'
 import { isParticipant, submitRound } from '@/lib/duel/service'
 import type { AnswerResult } from '@/types'
 
 interface Ctx {
   params: Promise<{ id: string }>
+}
+
+/**
+ * The direction this player answers in.
+ *
+ * Two learners of the same pair share the direction the challenger picked, so
+ * the duel is symmetrical. Across pairs there is no shared direction at all —
+ * a French speaker learning Swedish and a Dutch learner have no language in
+ * common to translate between — so each falls back to their own course. Every
+ * player always drills the language they are actually learning.
+ */
+function directionForPlayer(course: Course, agreed: string): Direction {
+  return courseDirections(course).find(d => d === agreed) ?? defaultDirection(course)
 }
 
 /**
@@ -36,8 +49,7 @@ export async function POST(_req: NextRequest, { params }: Ctx) {
   if (already) return NextResponse.json({ error: 'Round already played' }, { status: 409 })
 
   const { course, level } = await getCourseWithLevel(userId)
-  const direction = isDirection(duel.direction) ? duel.direction : undefined
-  if (!direction) return NextResponse.json({ error: 'Corrupt duel' }, { status: 500 })
+  const direction = directionForPlayer(course, duel.direction)
 
   const exercises = await buildExercises({
     userId,
@@ -85,8 +97,9 @@ export async function PUT(req: NextRequest, { params }: Ctx) {
 
   const round = duel.currentRound
   const mode = duel.mode as DuelMode
-  const direction = isDirection(duel.direction) ? duel.direction : null
-  if (!direction) return NextResponse.json({ error: 'Corrupt duel' }, { status: 500 })
+  // Must match what the round was built with, or SM-2 would be credited to the
+  // wrong direction
+  const direction = directionForPlayer(await getCourse(userId), duel.direction)
 
   // The score is recomputed here, never taken from the client: the browser only
   // reports what was answered and how much clock was left.

@@ -1,15 +1,16 @@
 import { NextResponse } from 'next/server'
 import { auth } from '@/auth'
 import { db } from '@/lib/db'
-import { getCourse } from '@/lib/current-course'
 import { resolveCourse } from '@/lib/courses'
 
-/** Everyone studying the same content pair — the people this user can challenge. */
+/** Everyone this user can challenge, with the language each of them studies. */
 export async function GET() {
   const session = await auth()
   if (!session?.user?.id) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  const course = await getCourse(session.user.id)
+  // Anyone can be challenged, whatever they are learning: each player answers
+  // in their own course, so a Swedish learner and a Dutch learner still get a
+  // comparable ten exercises each.
   const users = await db.user.findMany({
     where: { id: { not: session.user.id } },
     select: { id: true, name: true, image: true, xp: true, nativeLanguage: true, learningLanguage: true },
@@ -17,9 +18,14 @@ export async function GET() {
     take: 100,
   })
 
-  const opponents = users
-    .filter(u => resolveCourse(u.nativeLanguage, u.learningLanguage).pair === course.pair)
-    .map(({ id, name, image, xp }) => ({ id, name, image, xp }))
+  const opponents = users.map(u => ({
+    id: u.id,
+    name: u.name,
+    image: u.image,
+    xp: u.xp,
+    // Shown in the picker, so it is clear what the other side will be drilling
+    learning: resolveCourse(u.nativeLanguage, u.learningLanguage).learned,
+  }))
 
   // Duels already running against them — the list shows those as "in progress"
   // rather than offering a second challenge.

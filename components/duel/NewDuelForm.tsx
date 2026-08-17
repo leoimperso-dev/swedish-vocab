@@ -8,7 +8,8 @@ import { Button } from '@/components/ui/button'
 import { ListSkeleton } from '@/components/ui/feedback'
 import { getStrings } from '@/lib/i18n'
 import { useCourse, useLang } from '@/components/CourseProvider'
-import { courseDirections, flagOf, promptLang, answerLang, type Direction } from '@/lib/courses'
+import { courseDirections, flagOf, promptLang, answerLang, type Direction, type Lang } from '@/lib/courses'
+import { Flag } from '@/components/ui/flags'
 import { BLITZ_SECONDS, DEFAULT_ROUNDS, ROUND_LENGTH_OPTIONS, type DuelMode } from '@/lib/duel/rules'
 import { cn } from '@/lib/utils'
 
@@ -17,6 +18,8 @@ interface Opponent {
   name: string | null
   image: string | null
   xp: number
+  /** What they are learning — need not match what this user studies. */
+  learning: Lang
 }
 
 export function NewDuelForm({
@@ -95,7 +98,8 @@ export function NewDuelForm({
                   >
                     <Avatar name={o.name} image={o.image} size={32} />
                     <span className="min-w-0 flex-1 truncate text-sm font-semibold">{o.name}</span>
-                    <span className="shrink-0 text-xs text-muted-foreground">
+                    <span className="flex shrink-0 items-center gap-1.5 text-xs text-muted-foreground">
+                      <Flag lang={o.learning} />
                       {running ? t.duelActive : `${o.xp} XP`}
                     </span>
                   </button>

@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@/auth'
 import { db } from '@/lib/db'
 import { getCourse } from '@/lib/current-course'
-import { courseDirections, defaultDirection, resolveCourse, type Direction } from '@/lib/courses'
+import { courseDirections, defaultDirection, type Direction } from '@/lib/courses'
 import { isDuelMode, roundsCount } from '@/lib/duel/rules'
 import { listDuels } from '@/lib/duel/service'
 
@@ -23,17 +23,8 @@ export async function POST(req: NextRequest) {
   }
 
   const course = await getCourse(userId)
-  const opponent = await db.user.findUnique({
-    where: { id: opponentId },
-    select: { nativeLanguage: true, learningLanguage: true },
-  })
+  const opponent = await db.user.findUnique({ where: { id: opponentId }, select: { id: true } })
   if (!opponent) return NextResponse.json({ error: 'Unknown opponent' }, { status: 404 })
-
-  // Both play on the same content, each on their own words: the same pair is
-  // the only requirement — their CEFR levels can differ freely.
-  if (resolveCourse(opponent.nativeLanguage, opponent.learningLanguage).pair !== course.pair) {
-    return NextResponse.json({ error: 'Different course' }, { status: 400 })
-  }
 
   // One running duel per opponent, so the list stays readable
   const running = await db.duel.findFirst({
@@ -52,6 +43,9 @@ export async function POST(req: NextRequest) {
 
   const duel = await db.duel.create({
     data: {
+      // The challenger's own pair and direction. Each player is served their
+      // own course at round time, so these only bind the opponent when they
+      // happen to study the same pair — see app/api/duels/[id]/round.
       pair: course.pair,
       direction,
       mode: isDuelMode(mode) ? mode : 'CLASSIC',

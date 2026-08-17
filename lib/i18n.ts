@@ -334,6 +334,7 @@ const fr = {
   duelTimeUp: 'Temps écoulé',
   duelRecord: (wins: number, losses: number, draws: number) => `${wins}V · ${losses}D · ${draws}N`,
   duelPreparingRound: 'Préparation de ta manche...',
+  duelRoundUnavailable: "Cette manche n'est plus jouable : le duel a avancé ou s'est terminé entre-temps.",
   // Push notifications
   pushTitle: 'Notifications de duel',
   pushDesc: "Être prévenu quand c'est à toi de jouer",
@@ -675,6 +676,7 @@ const sv: typeof fr = {
   duelTimeUp: 'Tiden är ute',
   duelRecord: (wins: number, losses: number, draws: number) => `${wins}V · ${losses}F · ${draws}O`,
   duelPreparingRound: 'Förbereder din omgång...',
+  duelRoundUnavailable: 'Omgången går inte att spela längre: duellen har gått vidare eller avslutats under tiden.',
   // Push notifications
   pushTitle: 'Duellaviseringar',
   pushDesc: 'Få veta när det är din tur',
@@ -1016,6 +1018,7 @@ const en: typeof fr = {
   duelTimeUp: "Time's up",
   duelRecord: (wins: number, losses: number, draws: number) => `${wins}W · ${losses}L · ${draws}D`,
   duelPreparingRound: 'Preparing your round...',
+  duelRoundUnavailable: 'This round can no longer be played: the duel moved on or ended in the meantime.',
   // Push notifications
   pushTitle: 'Duel notifications',
   pushDesc: 'Get told when it is your turn',

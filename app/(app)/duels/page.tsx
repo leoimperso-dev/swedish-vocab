@@ -7,6 +7,7 @@ import { Swords, ChevronRight, Plus } from 'lucide-react'
 import { AppShell } from '@/components/AppShell'
 import { CompeteTabs } from '@/components/CompeteTabs'
 import { Avatar } from '@/components/ui/avatar'
+import { Flag } from '@/components/ui/flags'
 import { Card, Chip, SectionLabel } from '@/components/ui/primitives'
 import { Button } from '@/components/ui/button'
 import { EmptyState, ListSkeleton } from '@/components/ui/feedback'
@@ -115,7 +116,10 @@ function DuelRow({ duel }: { duel: DuelSummaryRow }) {
     <Link href={`/duels/${duel.id}`} className="pressable card-surface flex items-center gap-3 p-3">
       <Avatar name={duel.opponent.name} image={duel.opponent.image} size={38} />
       <div className="min-w-0 flex-1">
-        <p className="truncate text-sm font-semibold">{name}</p>
+        <p className="flex items-center gap-1.5 truncate text-sm font-semibold">
+          {name}
+          <Flag lang={duel.opponentLearning} />
+        </p>
         <p className="truncate text-xs text-muted-foreground">
           {duel.mode === 'BLITZ' ? t.duelModeBlitz : t.duelModeClassic} ·{' '}
           {t.duelRoundOf(Math.min(duel.currentRound, duel.rounds), duel.rounds)}

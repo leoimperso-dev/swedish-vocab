@@ -70,6 +70,13 @@ export default function PlayRoundPage({ params }: { params: Promise<{ id: string
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ sessionId, answers: all }),
         })
+        // A refused submission (the duel ended, or the turn moved on while this
+        // round was being played) carries an `error`, not a score — rendering it
+        // as a summary would show an empty scoreboard instead of saying why.
+        if (!res.ok) {
+          setError(true)
+          return
+        }
         setOutcome(await res.json())
         // The nav badge and the header XP live in the (app) layout
         router.refresh()
@@ -107,9 +114,14 @@ export default function PlayRoundPage({ params }: { params: Promise<{ id: string
   if (error) {
     return (
       <AppShell title={t.duelsTitle}>
-        <Link href={`/duels/${id}`} className={buttonClasses({ variant: 'secondary', className: 'w-full' })}>
-          {t.duelBack}
-        </Link>
+        <div className="space-y-4">
+          <Card>
+            <p className="text-sm text-muted-foreground">{t.duelRoundUnavailable}</p>
+          </Card>
+          <Link href={`/duels/${id}`} className={buttonClasses({ variant: 'secondary', className: 'w-full' })}>
+            {t.duelBack}
+          </Link>
+        </div>
       </AppShell>
     )
   }

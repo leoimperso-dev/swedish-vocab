@@ -6,7 +6,10 @@
 import 'dotenv/config'
 import { db } from '../lib/db'
 import { submitRound, listDuels, pendingDuelCount } from '../lib/duel/service'
-import { winsNeeded } from '../lib/duel/rules'
+import { winsNeeded, ROUND_SIZE, ROUND_NEW_WORDS } from '../lib/duel/rules'
+import { buildExercises } from '../lib/study/build'
+import { getCourseWithLevel } from '../lib/current-course'
+import { courseDirections, defaultDirection } from '../lib/courses'
 
 let failures = 0
 
@@ -23,9 +26,22 @@ function check(label: string, actual: unknown, expected: unknown) {
 const STAMP = `duel-sim-${process.pid}`
 
 async function main() {
+  // Deliberately mismatched courses: Alice learns Swedish, Bob learns Dutch.
+  // They share no content pair, which is exactly the case the duel has to
+  // support — each answers in their own course.
   const [alice, bob] = await Promise.all([
-    db.user.create({ data: { email: `${STAMP}-a@example.invalid`, name: 'Sim Alice' } }),
-    db.user.create({ data: { email: `${STAMP}-b@example.invalid`, name: 'Sim Bob' } }),
+    db.user.create({
+      data: {
+        email: `${STAMP}-a@example.invalid`, name: 'Sim Alice',
+        nativeLanguage: 'fr', learningLanguage: 'sv', levels: { sv: 'A2' },
+      },
+    }),
+    db.user.create({
+      data: {
+        email: `${STAMP}-b@example.invalid`, name: 'Sim Bob',
+        nativeLanguage: 'fr', learningLanguage: 'nl', levels: { nl: 'B1' },
+      },
+    }),
   ])
 
   const duel = await db.duel.create({
@@ -102,6 +118,27 @@ async function main() {
   const listed = await listDuels(bob.id)
   check('the loser sees it as lost', listed[0].youWon, false)
   check('and reads the score from their own side', [listed[0].yourWins, listed[0].theirWins], [0, 2])
+  check('the list shows what the opponent studies', listed[0].opponentLearning, 'sv')
+
+  // Cross-course exercise drawing: each player is served their own language,
+  // whatever direction the challenger agreed to.
+  for (const [who, learner, expectedPair] of [['Alice', alice, 'sv-fr'], ['Bob', bob, 'nl-fr']] as const) {
+    const { course, level } = await getCourseWithLevel(learner.id)
+    const direction =
+      courseDirections(course).find(d => d === duel.direction) ?? defaultDirection(course)
+    const exercises = await buildExercises({
+      userId: learner.id, course, level, direction,
+      size: ROUND_SIZE, newWords: ROUND_NEW_WORDS, allowFlashcard: false,
+    })
+    check(`${who} gets a full round`, exercises.length, ROUND_SIZE)
+    check(`${who} is served their own pair`, [...new Set(exercises.map(e => e.word.pair))], [expectedPair])
+    check(`${who} gets no flashcard`, exercises.some(e => e.exerciseType === 'FLASHCARD'), false)
+    check(
+      `${who} answers in a direction of their own course`,
+      courseDirections(course).includes(direction),
+      true,
+    )
+  }
 
   return [alice.id, bob.id]
 }

@@ -7,6 +7,7 @@ import { db } from '@/lib/db'
 import { DUEL_XP, winsNeeded, type DuelMode } from '@/lib/duel/rules'
 import { notify } from '@/lib/push'
 import { getStrings } from '@/lib/i18n'
+import { resolveCourse, type Lang } from '@/lib/courses'
 import type { Duel } from '@prisma/client'
 
 export function opponentOf(duel: Duel, userId: string): string {
@@ -192,6 +193,8 @@ export interface DuelSummaryRow {
   winnerId: string | null
   youWon: boolean | null
   opponent: { id: string; name: string | null; image: string | null }
+  /** What the opponent is drilling — not necessarily what this user studies. */
+  opponentLearning: Lang
   updatedAt: string
 }
 
@@ -200,8 +203,8 @@ export async function listDuels(userId: string): Promise<DuelSummaryRow[]> {
   const duels = await db.duel.findMany({
     where: { OR: [{ challengerId: userId }, { opponentId: userId }], status: { not: 'DECLINED' } },
     include: {
-      challenger: { select: { id: true, name: true, image: true } },
-      opponent: { select: { id: true, name: true, image: true } },
+      challenger: { select: { id: true, name: true, image: true, nativeLanguage: true, learningLanguage: true } },
+      opponent: { select: { id: true, name: true, image: true, nativeLanguage: true, learningLanguage: true } },
     },
     orderBy: { updatedAt: 'desc' },
     take: 50,
@@ -209,6 +212,7 @@ export async function listDuels(userId: string): Promise<DuelSummaryRow[]> {
 
   return duels.map(d => {
     const youAreChallenger = d.challengerId === userId
+    const them = youAreChallenger ? d.opponent : d.challenger
     return {
       id: d.id,
       mode: d.mode as DuelMode,
@@ -220,7 +224,8 @@ export async function listDuels(userId: string): Promise<DuelSummaryRow[]> {
       theirWins: youAreChallenger ? d.opponentWins : d.challengerWins,
       winnerId: d.winnerId,
       youWon: d.status !== 'FINISHED' ? null : d.winnerId === null ? null : d.winnerId === userId,
-      opponent: youAreChallenger ? d.opponent : d.challenger,
+      opponent: { id: them.id, name: them.name, image: them.image },
+      opponentLearning: resolveCourse(them.nativeLanguage, them.learningLanguage).learned,
       updatedAt: d.updatedAt.toISOString(),
     }
   })
