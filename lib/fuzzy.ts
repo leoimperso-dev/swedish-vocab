@@ -27,31 +27,74 @@ function stripFormatting(s: string): string {
 }
 
 // Headwords carry a leading marker the learner may or may not type: the
-// infinitive particle ("to do", "att göra", "te doen") and the noun article
-// ("en flicka", "het huis", "la casa"). Both spellings are right.
-const LEADING_MARKER = /^(to|att|te|en|ett|de|het|el|la|los|las|un|una|le|les)\s+/
+// infinitive particle ("to do", "att göra", "te doen") and the article
+// ("en flicka", "the cat", "un monstre"). Entries are inconsistent about it
+// across languages — "un monstre" is stored with its article, "monster"
+// without — so both spellings have to be right in both directions.
+const MARKERS = [
+  'to', 'att', 'te',
+  'a', 'an', 'the',
+  'en', 'ett',
+  'de', 'het',
+  'el', 'la', 'los', 'las', 'un', 'una', 'unos', 'unas',
+  'le', 'les', 'une', 'des', 'du',
+]
+const LEADING_MARKER = new RegExp(`^(?:${MARKERS.join('|')})\\s+|^l['’]`)
 
+// Twice, so partitives made of two markers come off whole ("de la confiture")
 function stripMarker(s: string): string {
-  return s.replace(LEADING_MARKER, '')
+  return s.replace(LEADING_MARKER, '').replace(LEADING_MARKER, '').trim()
+}
+
+// Usage notes are read, not answered: "une école (primaire)" is answered "une école"
+function dropNotes(s: string): string {
+  return s.replace(/\([^)]*\)/g, ' ').replace(/\s+/g, ' ').trim()
+}
+
+/**
+ * Every spelling that should count as this answer: with and without its
+ * article, with and without its usage note, and each sense on its own — an
+ * entry glossed "crier, aboyer" is answered by either verb.
+ */
+function variants(s: string): string[] {
+  const out = new Set<string>()
+  const add = (v: string) => {
+    const trimmed = v.trim()
+    if (!trimmed) return
+    out.add(trimmed)
+    const bare = stripMarker(trimmed)
+    if (bare) out.add(bare)
+  }
+  const base = normalize(s)
+  add(base)
+  add(stripFormatting(base))
+  const clean = dropNotes(base)
+  add(clean)
+  if (clean.length > 0) for (const sense of clean.split(/[,;/]/)) add(sense)
+  return [...out]
 }
 
 export function evaluateAnswer(input: string, expected: string): AnswerResult {
-  const a = normalize(input)
-  const b = normalize(expected)
-  if (a === b) return 'correct'
+  const given = variants(input)
+  const accepted = variants(expected)
+  if (given.some(v => accepted.includes(v))) return 'correct'
 
-  // Also try without formatting chars
-  const aStripped = stripFormatting(a)
-  const bStripped = stripFormatting(b)
-  if (aStripped === bStripped) return 'correct'
-
-  // "do" for "to do", "flicka" for "en flicka" — and the reverse
-  if (stripMarker(aStripped) === stripMarker(bStripped)) return 'correct'
-
-  const dist = levenshtein(aStripped, bStripped)
+  // Typo tolerance, measured against the closest acceptable spelling so that a
+  // missing article never eats the allowance
+  let best = Infinity
+  let bestLength = 0
+  for (const a of given) {
+    for (const b of accepted) {
+      const dist = levenshtein(a, b)
+      if (dist < best) {
+        best = dist
+        bestLength = b.length
+      }
+    }
+  }
   // Scale tolerance with word length
-  const maxDist = bStripped.length <= 4 ? 1 : 2
-  if (dist <= maxDist) return 'approximate'
+  const maxDist = bestLength <= 4 ? 1 : 2
+  if (best <= maxDist) return 'approximate'
 
   return 'incorrect'
 }

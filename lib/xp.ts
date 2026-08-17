@@ -22,6 +22,13 @@ const TITLES: Record<Lang, readonly string[]> = {
   fr: ['Débutant', 'Apprenti', 'Étudiant', 'Locuteur', 'Avancé', 'Expert', 'Maître'],
 }
 
+// A full session is worth ~20 XP, so anything under 15 is reached before the
+// learner has done a day's work. The presets are suggestions — the goal itself
+// is free between the two bounds.
+export const MIN_DAILY_GOAL = 15
+export const MAX_DAILY_GOAL = 500
+export const DAILY_GOAL_PRESETS = [15, 25, 40, 60] as const
+
 export interface LevelInfo {
   level: number
   minXp: number

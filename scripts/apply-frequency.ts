@@ -13,7 +13,10 @@ function buildKeys(term: string, forms: unknown, lang: Lang): string[] {
   const base = headwordKey(term, lang)
   if (base) keys.add(base)
   const tokens = base.split(/\s+/)
-  if (tokens.length > 1 && tokens[0]) keys.add(tokens[0])
+  // A two-word headword can legitimately be ranked on its first token ("gå ut"),
+  // but a phrase cannot: "Är bron genom Överföring av kompetens" claimed the
+  // rank of "är" (3) and was taught to B2 learners as an A1 word.
+  if (tokens.length === 2 && tokens[0]) keys.add(tokens[0])
   if (forms && typeof forms === 'object') {
     for (const value of Object.values(forms as Record<string, unknown>)) {
       if (typeof value !== 'string') continue

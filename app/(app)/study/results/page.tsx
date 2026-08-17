@@ -57,8 +57,10 @@ function ResultsContent() {
     { label: t.incorrect, value: incorrect, tone: 'text-danger', Icon: X },
   ]
 
+  // pb-28 like AppShell: the bottom nav is fixed over this page too, and pb-12
+  // left the last button half under it on a phone
   return (
-    <main className="mx-auto min-h-dvh max-w-[430px] px-4 pb-12 pt-10">
+    <main className="mx-auto min-h-dvh max-w-[430px] px-4 pb-28 pt-10">
       <div className="animate-rise space-y-4">
         {/* Score circle */}
         <div className="text-center">

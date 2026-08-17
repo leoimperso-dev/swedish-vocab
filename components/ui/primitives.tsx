@@ -147,7 +147,14 @@ export function Segmented({
   return (
     <div
       role="tablist"
-      className={cn('flex gap-1 rounded-2xl border border-border bg-surface p-1', className)}
+      // Labels are never abbreviated: a tab reading "C…" or showing a bare icon
+      // tells the learner nothing. Tighter type on a phone usually makes all of
+      // them fit; if a translation is long enough that they still do not, the
+      // row scrolls sideways rather than hiding the words.
+      className={cn(
+        'flex gap-1 overflow-x-auto rounded-2xl border border-border bg-surface p-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden',
+        className,
+      )}
     >
       {options.map(o => {
         const active = o.value === value
@@ -158,7 +165,7 @@ export function Segmented({
             aria-selected={active}
             onClick={() => onChange(o.value)}
             className={cn(
-              'pressable min-w-0 flex-1 truncate rounded-xl px-3 py-2 text-[13px] font-semibold',
+              'pressable flex-1 shrink-0 whitespace-nowrap rounded-xl px-2 py-2 text-[12px] font-semibold sm:px-3 sm:text-[13px]',
               active
                 ? 'bg-surface-raised text-foreground shadow-[var(--shadow-card)]'
                 : 'text-muted-foreground',

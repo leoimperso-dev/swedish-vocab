@@ -10,7 +10,10 @@ export async function GET() {
 
   const userId = session.user.id
   const course = await getCourse(userId)
-  const [words, progress, favorites] = await Promise.all([
+  // Favourites are not part of this payload: the list is cached in
+  // sessionStorage and starring happens from three screens, so the set is held
+  // by FavoritesProvider instead (see components/FavoritesProvider.tsx)
+  const [words, progress] = await Promise.all([
     db.word.findMany({
       where: { pair: course.pair },
       select: {
@@ -23,7 +26,6 @@ export async function GET() {
       where: { userId },
       select: { wordId: true, interval: true, repetitions: true },
     }),
-    db.favorite.findMany({ where: { userId }, select: { wordId: true } }),
   ])
 
   // Best level across directions; "known" = at least one successful repetition
@@ -35,15 +37,12 @@ export async function GET() {
     if (level > (levelByWord.get(p.wordId) ?? 0)) levelByWord.set(p.wordId, level)
     if (p.repetitions > 0) knownIds.add(p.wordId)
   }
-  const favoriteIds = new Set(favorites.map(f => f.wordId))
-
   return NextResponse.json({
     words: words.map(({ examples, ...w }) => ({
       ...w,
       hasExamples: Array.isArray(examples) && examples.length > 0,
       level: levelByWord.get(w.id) ?? 0,
       known: knownIds.has(w.id),
-      favorite: favoriteIds.has(w.id),
     })),
   })
 }

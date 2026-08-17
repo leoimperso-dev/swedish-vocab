@@ -5,7 +5,10 @@
 // glosses as whole strings misses that two words can share one sense — which is
 // exactly what makes a learner's answer right when it is not the stored one.
 
-const fold = (s: string) => s.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '')
+// NFD splits accents off their letter, but leaves the ligatures whole: without
+// this, "cœur" tokenizes to "c" + "ur" and never matches "coeur"
+const fold = (s: string) =>
+  s.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/œ/g, 'oe').replace(/æ/g, 'ae')
 
 // Apostrophes are separators: French elision makes "l'acide" two words
 export const tokenize = (s: string) => fold(s).split(/[^a-z0-9]+/).filter(Boolean)

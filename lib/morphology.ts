@@ -34,9 +34,26 @@ const SV_STRIP_SUFFIXES = [
 const SV_VERB_SUFFIXES = new Set(['ade', 'dde', 'de', 'te'])
 const VOWELS = 'aeiouyåäö'
 
+// Same idea as NL_DERIVATIONS: "möjlighet" is "möjlig" turned into a noun,
+// "läsning" is "läsa" turned into one.
+const SV_DERIVATIONS: Array<[suffix: string, base: (stem: string) => string[]]> = [
+  ['heten', stem => [stem + 'het', stem]],
+  ['heter', stem => [stem + 'het', stem]],
+  ['het', stem => [stem]],
+  ['ningar', stem => [stem + 'a', stem]],
+  ['ning', stem => [stem + 'a', stem]],
+  ['skap', stem => [stem]],
+  ['löst', stem => [stem + 'lös']],
+]
+
 function swedishCandidates(token: string): string[] {
   const out: string[] = []
   if (SV_IRREGULARS[token]) out.push(SV_IRREGULARS[token])
+  for (const [suffix, base] of SV_DERIVATIONS) {
+    if (!token.endsWith(suffix)) continue
+    const stem = token.slice(0, -suffix.length)
+    if (stem.length >= 3) out.push(...base(stem))
+  }
   // Imperatives are the bare verb stem: "drick!" → "dricka", "lägg" → "lägga"
   out.push(token + 'a')
   for (const suffix of SV_STRIP_SUFFIXES) {
@@ -173,6 +190,21 @@ const NL_STRIP_SUFFIXES = [
   'den', 'ten', 'end', 'en', 'de', 'te', 's', 't', 'd', 'e',
 ]
 
+// Suffixes that derive a new word rather than inflect one: "kortademigheid" is
+// "kortademig" turned into a noun, "wandeling" is "wandelen" turned into one.
+// The vocabulary rarely carries the derived form, so the base is the answer.
+const NL_DERIVATIONS: Array<[suffix: string, base: (stem: string) => string[]]> = [
+  ['heden', stem => [stem + 'heid', stem]],
+  ['heid', stem => [stem]],
+  ['ingen', stem => infinitivesOf(stem)],
+  ['ing', stem => infinitivesOf(stem)],
+  ['schap', stem => [stem]],
+  ['loze', stem => [stem + 'loos']],
+  ['baar', stem => [stem, ...infinitivesOf(stem)]],
+  ['lijk', stem => [stem]],
+  ['achtig', stem => [stem]],
+]
+
 // Rebuild a Dutch stem's spelling variants. Open/closed syllable spelling moves
 // both ways ("loop" ↔ "lop-", "hog-" ↔ "hoog"), and final consonants devoice
 // ("huiz-" ↔ "huis", "geev-" ↔ "geef") — combinations included ("raas" → "raz-").
@@ -213,6 +245,13 @@ function infinitivesOf(stem: string): string[] {
 function dutchCandidates(token: string): string[] {
   const out: string[] = []
   if (NL_IRREGULARS[token]) out.push(NL_IRREGULARS[token])
+  // Before anything else: a derived word points at its base, not at whatever a
+  // blind split makes of its suffix
+  for (const [suffix, base] of NL_DERIVATIONS) {
+    if (!token.endsWith(suffix)) continue
+    const stem = token.slice(0, -suffix.length)
+    if (stem.length >= 3) out.push(...base(stem))
+  }
   // Bare stem is the 1st person / imperative: "ik kom", "praat!", "denk na"
   out.push(...infinitivesOf(token))
   // Regular past participle: ge + stem + t/d ("gewerkt" → "werken")
@@ -365,6 +404,25 @@ function spanishCandidates(token: string, depth = 0): string[] {
     }
   }
   return out
+}
+
+// A compound's head is a real word; a derivational suffix is not, even when it
+// happens to spell one. Splitting "kortademigheid" into "kortademig" + "heid"
+// resolved "heid" to "heiden" and answered "un païen" — the tail of a derived
+// word must never be treated as the thing the word denotes.
+const DERIVATIONAL_TAILS: Partial<Record<Lang, Set<string>>> = {
+  nl: new Set([
+    'heid', 'heden', 'ing', 'ingen', 'lijk', 'lijke', 'baar', 'bare', 'loos', 'loze',
+    'schap', 'dom', 'nis', 'achtig', 'sel', 'ster', 'te', 'je', 'tje', 'er', 'aar',
+  ]),
+  sv: new Set([
+    'het', 'heten', 'heter', 'ning', 'ningen', 'ningar', 'lig', 'ligt', 'liga',
+    'lös', 'löst', 'skap', 'dom', 'else', 'ande', 'ende', 'are', 'eri', 'aktig',
+  ]),
+}
+
+export function isDerivationalTail(token: string, lang: Lang): boolean {
+  return DERIVATIONAL_TAILS[lang]?.has(token) ?? false
 }
 
 // Ordered lemma guesses for a token, best first. Callers stop at the first hit.

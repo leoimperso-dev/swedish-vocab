@@ -15,6 +15,9 @@ export default async function ConversationPage() {
 
   return (
     <DialogueBrowser
+      // No key, no entry: an offer that leads straight to an error screen is
+      // worse than no offer. The card appears the moment one is configured.
+      chatEnabled={!!process.env.GROQ_API_KEY}
       dialogues={dialogues.map(({ turns, ...rest }) => ({
         ...rest,
         turnCount: Array.isArray(turns) ? turns.length : 0,

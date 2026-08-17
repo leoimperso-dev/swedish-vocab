@@ -3,10 +3,11 @@
 // then the language's suffix stripping rules (lib/morphology.ts).
 import { db } from '@/lib/db'
 import { parseDetails } from '@/lib/word-display'
-import { headwordKey, isSuffixShorthand, lemmaCandidates } from '@/lib/morphology'
+import { headwordKey, isDerivationalTail, isSuffixShorthand, lemmaCandidates } from '@/lib/morphology'
 import { pairOf, type Lang, type PairId } from '@/lib/courses'
 
 export interface DictEntry {
+  id: string // the Word row, so the popover can star it
   term: string // display headword ("en kvinna")
   translation: string // best translation(s)
   forms: string | null
@@ -14,11 +15,38 @@ export interface DictEntry {
 
 const caches = new Map<PairId, Map<string, DictEntry>>()
 
+// How many senses a popover shows before it stops being a translation and
+// starts being a dictionary article
+const MAX_SENSES = 3
+
+/**
+ * The senses worth showing, in order. `details.translations` is merged from
+ * several sources, so it repeats itself ("solitude, isolement, solitude") and
+ * sometimes carries a definition rather than a translation ("qualité de ce qui
+ * est beau"). Both read as errors to a learner glancing at a popover.
+ */
+function bestSenses(translations: string[], fallback: string): string {
+  const seen = new Set<string>()
+  const kept: string[] = []
+  for (const raw of translations) {
+    const sense = raw.trim()
+    const key = sense.toLowerCase()
+    if (!sense || seen.has(key)) continue
+    seen.add(key)
+    // A definition explains, a translation names — "qui", "ce qui" and length
+    // are what separates the two here
+    if (sense.length > 34 || /\b(qui|dont|lorsqu|celui|celle)\b/.test(key)) continue
+    kept.push(sense)
+    if (kept.length === MAX_SENSES) break
+  }
+  return kept.length > 0 ? kept.join(', ') : fallback
+}
+
 async function buildCache(pair: PairId): Promise<Map<string, DictEntry>> {
   const lang = pairOf(pair).term
   const words = await db.word.findMany({
     where: { pair },
-    select: { term: true, translation: true, forms: true, details: true, frequencyRank: true },
+    select: { id: true, term: true, translation: true, forms: true, details: true, frequencyRank: true },
     // Common words win when several entries share a surface form
     orderBy: [{ frequencyRank: { sort: 'asc', nulls: 'last' } }, { createdAt: 'asc' }],
   })
@@ -34,8 +62,14 @@ async function buildCache(pair: PairId): Promise<Map<string, DictEntry>> {
     const details = parseDetails(word.details)
     const formsRecord = word.forms && typeof word.forms === 'object' ? word.forms as Record<string, string> : null
     const entry: DictEntry = {
+      id: word.id,
       term: word.term.replace(/\(.*?\)/g, '').trim(),
-      translation: details?.translations ? details.translations.join(', ') : word.translation,
+      // The stored gloss is noisy the same way an enriched one is — the bulk
+      // import merged senses and sometimes kept a definition
+      translation: bestSenses(
+        details?.translations ?? word.translation.split(','),
+        word.translation,
+      ),
       forms: formsRecord
         ? formOrder.filter(k => formsRecord[k]).map(k => formsRecord[k]).join(', ') || null
         : null,
@@ -88,6 +122,9 @@ function resolveCompound(cache: Map<string, DictEntry>, token: string, lang: Lan
       !resolve(cache, prefix, lang)
     ) continue
     const rest = token.slice(i)
+    // "kortademig" + "heid" is a derivation, not a compound: its head is a
+    // suffix, and answering with whatever that suffix resolves to is nonsense
+    if (isDerivationalTail(rest, lang)) continue
     const head = resolve(cache, rest, lang) ?? resolveCompound(cache, rest, lang, depth + 1)
     if (head) return head
   }

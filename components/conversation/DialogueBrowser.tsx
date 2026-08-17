@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import Link from 'next/link'
-import { ChevronRight, MessagesSquare } from 'lucide-react'
+import { ChevronRight, MessagesSquare, Sparkles } from 'lucide-react'
 import { getStrings } from '@/lib/i18n'
 import { useLang } from '@/components/CourseProvider'
 import { AppShell } from '@/components/AppShell'
@@ -19,7 +19,10 @@ interface DialogueMeta {
   turnCount: number
 }
 
-export default function DialogueBrowser({ dialogues }: { dialogues: DialogueMeta[] }) {
+export default function DialogueBrowser({ dialogues, chatEnabled }: {
+  dialogues: DialogueMeta[]
+  chatEnabled: boolean
+}) {
   const [level, setLevel] = useState<Level | null>(null)
   const t = getStrings(useLang())
 
@@ -33,6 +36,26 @@ export default function DialogueBrowser({ dialogues }: { dialogues: DialogueMeta
     return (
       <AppShell title={t.conversationTitle} subtitle={t.conversationDesc}>
         <div className="space-y-3">
+          {/* Unlike the scripted dialogues, the free conversation has no fixed
+              script to run out of — so it leads */}
+          {chatEnabled && (
+            <>
+              <Link
+                href="/conversation/chat"
+                className="pressable card-surface flex items-center gap-3.5 border-primary/40 bg-linear-to-br from-info-soft to-transparent p-4 shadow-[var(--shadow-glow)]"
+              >
+                <span className="grid size-12 shrink-0 place-items-center rounded-2xl bg-info-soft text-primary">
+                  <Sparkles size={22} />
+                </span>
+                <span className="min-w-0 flex-1">
+                  <span className="block font-display text-base font-semibold text-primary">{t.chatTitle}</span>
+                  <span className="block text-xs text-muted-foreground">{t.chatDesc}</span>
+                </span>
+                <ChevronRight size={18} className="shrink-0 text-muted-foreground" />
+              </Link>
+              <SectionLabel>{t.dialoguesLabel}</SectionLabel>
+            </>
+          )}
           {levels.map(({ level: lvl, icon, label, desc, tone }) => (
             <button
               key={lvl}

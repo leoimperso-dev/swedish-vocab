@@ -1,6 +1,8 @@
 'use client'
 
 import { X, Flame } from 'lucide-react'
+import { FavoriteStar } from '@/components/FavoriteStar'
+import { ReportButton } from '@/components/ReportButton'
 import { cn } from '@/lib/utils'
 import type { AnswerResult } from '@/types'
 
@@ -11,6 +13,12 @@ interface Props {
   results: AnswerResult[]
   onQuit: () => void
   quitLabel: string
+  // The word being asked — starred and reported from here, so every exercise
+  // type gets both without repeating them in six components
+  wordId: string
+  wordLabel: string
+  wordTranslation: string
+  exerciseType: string
 }
 
 const RESULT_CLASS: Record<AnswerResult, string> = {
@@ -19,7 +27,10 @@ const RESULT_CLASS: Record<AnswerResult, string> = {
   incorrect: 'bg-danger',
 }
 
-export default function SessionProgress({ current, total, combo, results, onQuit, quitLabel }: Props) {
+export default function SessionProgress({
+  current, total, combo, results, onQuit, quitLabel,
+  wordId, wordLabel, wordTranslation, exerciseType,
+}: Props) {
   return (
     <header className="safe-top sticky top-0 z-40 border-b border-border/70 bg-background/85 px-4 pb-3 backdrop-blur-xl">
       <div className="flex items-center gap-3">
@@ -37,6 +48,14 @@ export default function SessionProgress({ current, total, combo, results, onQuit
             )
           })}
         </div>
+        <FavoriteStar wordId={wordId} label={wordLabel} size={16} className="p-1.5" />
+        <ReportButton
+          wordId={wordId}
+          context={exerciseType}
+          shownTerm={wordLabel}
+          shownTranslation={wordTranslation}
+          className="p-1.5"
+        />
         <button
           onClick={onQuit}
           aria-label={quitLabel}

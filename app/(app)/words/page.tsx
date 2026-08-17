@@ -9,7 +9,10 @@ import { MAX_KNOWLEDGE_LEVEL } from '@/lib/sm2'
 import { getStrings } from '@/lib/i18n'
 import { learnsTermLanguage, localeOf, type Course } from '@/lib/courses'
 import { useCourse } from '@/components/CourseProvider'
+import { FavoriteStar } from '@/components/FavoriteStar'
+import { useFavorites } from '@/components/FavoritesProvider'
 import { useMissingVoice, useSpeechQueue } from '@/lib/use-speech-queue'
+import { useLongPress } from '@/lib/use-long-press'
 import { SpeakButton } from '@/components/SpeakButton'
 import { cn } from '@/lib/utils'
 import { AppShell } from '@/components/AppShell'
@@ -58,7 +61,6 @@ interface ApiWord {
   hasExamples: boolean
   level: number
   known: boolean
-  favorite: boolean
 }
 
 interface WordExample {
@@ -70,6 +72,7 @@ type Tab = 'categories' | 'top' | 'favorites'
 
 export default function WordsPage() {
   const course = useCourse()
+  const { ids: favoriteIds } = useFavorites()
   const t = getStrings(course.native)
   const [words, setWords] = useState<ApiWord[]>([])
   const [loading, setLoading] = useState(true)
@@ -186,7 +189,10 @@ export default function WordsPage() {
     [visibleWords]
   )
 
-  const favoriteWords = useMemo(() => visibleWords.filter(w => w.favorite), [visibleWords])
+  const favoriteWords = useMemo(
+    () => visibleWords.filter(w => favoriteIds.has(w.id)),
+    [visibleWords, favoriteIds],
+  )
 
   const searchResults = useMemo(() => {
     const q = fold(query.trim())
@@ -203,20 +209,6 @@ export default function WordsPage() {
       (a.frequencyRank ?? 1e9) - (b.frequencyRank ?? 1e9)
     return [...starts.sort(byRank), ...contains.sort(byRank)]
   }, [visibleWords, query])
-
-  const toggleFavorite = (wordId: string) => {
-    const word = words.find(w => w.id === wordId)
-    if (!word) return
-    const next = !word.favorite
-    setWords(ws => ws.map(w => (w.id === wordId ? { ...w, favorite: next } : w)))
-    fetch('/api/words/favorite', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ wordId, favorite: next }),
-    }).catch(() => {
-      setWords(ws => ws.map(w => (w.id === wordId ? { ...w, favorite: !next } : w)))
-    })
-  }
 
   const toggleCategory = (label: string) => {
     setOpenCategories(prev => {
@@ -261,6 +253,13 @@ export default function WordsPage() {
     else speakWords(spokenWords)
   }
 
+  // Read on from one word to the end of what the list currently shows — the
+  // same queue as the header button, entered in the middle
+  const speakFrom = useCallback((wordId: string) => {
+    const start = spokenWords.findIndex(w => w.id === wordId)
+    speakWords(start >= 0 ? spokenWords.slice(start) : spokenWords)
+  }, [spokenWords, speakWords])
+
   const tabOptions = [
     { value: 'categories', label: t.tabCategories },
     { value: 'top', label: t.tabTop(TOP_LIST_SIZE) },
@@ -294,13 +293,18 @@ export default function WordsPage() {
           )}
         </div>
 
+        {/* Tabs own their row: three text labels plus two 40px buttons leave
+            ~47px of text per tab on a 360px phone, which truncated "Categories"
+            to "C...". The icon buttons sit with the search field instead, which
+            can shrink; a label cannot. */}
+        <Segmented
+          className="w-full"
+          options={tabOptions}
+          value={tab}
+          onChange={v => setTab(v as Tab)}
+        />
+
         <div className="flex items-center gap-2">
-          <Segmented
-            className="min-w-0 flex-1"
-            options={tabOptions}
-            value={tab}
-            onChange={v => setTab(v as Tab)}
-          />
           <button
             onClick={toggleFlashcards}
             title={t.flashcardMode}
@@ -324,6 +328,10 @@ export default function WordsPage() {
             className={spokenWords.length === 0 ? 'pointer-events-none opacity-40' : undefined}
           />
         </div>
+        {/* A hold is invisible until someone says so */}
+        {spokenWords.length > 0 && (
+          <p className="mt-1.5 text-[11px] text-muted-foreground/80">{t.speakFromHint}</p>
+        )}
 
         <Segmented
           options={[
@@ -372,7 +380,7 @@ export default function WordsPage() {
             <div className="space-y-2">
               <SectionLabel>{t.searchResults(searchResults.length)}</SectionLabel>
               {searchResults.slice(0, searchVisible).map(word => (
-                <WordRow key={word.id} word={word} course={course} onToggleFavorite={toggleFavorite} masked={flashcards && !revealed.has(word.id)} onFlip={flashcards ? () => flipCard(word.id) : undefined} onSwipe={known => swipeWord(word.id, known)} speaking={spokenWordId === word.id} onSpeak={() => (spokenWordId === word.id ? stop() : speakWords([word]))} />
+                <WordRow key={word.id} word={word} course={course} masked={flashcards && !revealed.has(word.id)} onFlip={flashcards ? () => flipCard(word.id) : undefined} onSwipe={known => swipeWord(word.id, known)} speaking={spokenWordId === word.id} onSpeak={() => (spokenWordId === word.id ? stop() : speakWords([word]))} onSpeakFrom={() => speakFrom(word.id)} />
               ))}
               {searchVisible < searchResults.length && (
                 <LoadMoreSentinel onMore={() => setSearchVisible(v => v + PAGE_STEP)} />
@@ -407,7 +415,7 @@ export default function WordsPage() {
                   {open ? (
                     <div className="animate-rise space-y-2 border-t border-border bg-background/40 p-2">
                       {groupWords.slice(0, catVisible[label] ?? PAGE_STEP).map(word => (
-                        <WordRow key={word.id} word={word} course={course} onToggleFavorite={toggleFavorite} masked={flashcards && !revealed.has(word.id)} onFlip={flashcards ? () => flipCard(word.id) : undefined} onSwipe={known => swipeWord(word.id, known)} speaking={spokenWordId === word.id} onSpeak={() => (spokenWordId === word.id ? stop() : speakWords([word]))} />
+                        <WordRow key={word.id} word={word} course={course} masked={flashcards && !revealed.has(word.id)} onFlip={flashcards ? () => flipCard(word.id) : undefined} onSwipe={known => swipeWord(word.id, known)} speaking={spokenWordId === word.id} onSpeak={() => (spokenWordId === word.id ? stop() : speakWords([word]))} onSpeakFrom={() => speakFrom(word.id)} />
                       ))}
                       {(catVisible[label] ?? PAGE_STEP) < groupWords.length && (
                         <LoadMoreSentinel
@@ -426,7 +434,7 @@ export default function WordsPage() {
           <div className="space-y-2">
             <SectionLabel>{t.topWordsHint}</SectionLabel>
             {topWords.slice(0, topVisible).map(word => (
-              <WordRow key={word.id} word={word} course={course} onToggleFavorite={toggleFavorite} showRank masked={flashcards && !revealed.has(word.id)} onFlip={flashcards ? () => flipCard(word.id) : undefined} onSwipe={known => swipeWord(word.id, known)} speaking={spokenWordId === word.id} onSpeak={() => (spokenWordId === word.id ? stop() : speakWords([word]))} />
+              <WordRow key={word.id} word={word} course={course} showRank masked={flashcards && !revealed.has(word.id)} onFlip={flashcards ? () => flipCard(word.id) : undefined} onSwipe={known => swipeWord(word.id, known)} speaking={spokenWordId === word.id} onSpeak={() => (spokenWordId === word.id ? stop() : speakWords([word]))} onSpeakFrom={() => speakFrom(word.id)} />
             ))}
             {topVisible < topWords.length && (
               <LoadMoreSentinel onMore={() => setTopVisible(v => v + PAGE_STEP)} />
@@ -435,7 +443,7 @@ export default function WordsPage() {
         ) : favoriteWords.length > 0 ? (
           <div className="space-y-2">
             {favoriteWords.map(word => (
-              <WordRow key={word.id} word={word} course={course} onToggleFavorite={toggleFavorite} masked={flashcards && !revealed.has(word.id)} onFlip={flashcards ? () => flipCard(word.id) : undefined} onSwipe={known => swipeWord(word.id, known)} speaking={spokenWordId === word.id} onSpeak={() => (spokenWordId === word.id ? stop() : speakWords([word]))} />
+              <WordRow key={word.id} word={word} course={course} masked={flashcards && !revealed.has(word.id)} onFlip={flashcards ? () => flipCard(word.id) : undefined} onSwipe={known => swipeWord(word.id, known)} speaking={spokenWordId === word.id} onSpeak={() => (spokenWordId === word.id ? stop() : speakWords([word]))} onSpeakFrom={() => speakFrom(word.id)} />
             ))}
           </div>
         ) : (
@@ -448,10 +456,9 @@ export default function WordsPage() {
 
 const SWIPE_THRESHOLD = 90
 
-function WordRow({ word, course, onToggleFavorite, showRank, masked, onFlip, onSwipe, speaking, onSpeak }: {
+function WordRow({ word, course, showRank, masked, onFlip, onSwipe, speaking, onSpeak, onSpeakFrom }: {
   word: ApiWord
   course: Course
-  onToggleFavorite: (id: string) => void
   showRank?: boolean
   // Flashcard mode: masked hides the translation side; onFlip toggles the reveal
   masked?: boolean
@@ -462,6 +469,8 @@ function WordRow({ word, course, onToggleFavorite, showRank, masked, onFlip, onS
   speaking?: boolean
   // Read this word and its translation out loud
   onSpeak?: () => void
+  // Long press: read this word and every one below it
+  onSpeakFrom?: () => void
 }) {
   const rowRef = useRef<HTMLDivElement>(null)
   useEffect(() => {
@@ -476,6 +485,11 @@ function WordRow({ word, course, onToggleFavorite, showRank, masked, onFlip, onS
   const learnsTerm = learnsTermLanguage(course)
   const forms = formatForms(word.forms)
   const details = parseDetails(word.details)
+  // Tap reads this word alone, hold reads on from it to the end of the list
+  const speakPress = useLongPress(
+    () => onSpeakFrom?.(),
+    () => onSpeak?.(),
+  )
   const [examples, setExamples] = useState<WordExample[] | null>(null)
   const [showExamples, setShowExamples] = useState(false)
 
@@ -536,14 +550,7 @@ function WordRow({ word, course, onToggleFavorite, showRank, masked, onFlip, onS
         )}
       >
       <div className={cn('flex items-start gap-2.5', masked ? 'p-2.5 px-3.5' : 'p-3.5')}>
-        <button
-          onClick={e => { e.stopPropagation(); onToggleFavorite(word.id) }}
-          aria-label={word.favorite ? t.removeFavorite(word.term) : t.addFavorite(word.term)}
-          aria-pressed={word.favorite}
-          className="pressable mt-0.5 shrink-0 rounded-lg p-1"
-        >
-          <Star size={17} className={word.favorite ? 'fill-accent text-accent' : 'text-muted-foreground'} />
-        </button>
+        <FavoriteStar wordId={word.id} label={word.term} className="mt-0.5" />
 
         <div className="min-w-0 flex-1">
           <div className="flex items-baseline gap-2">
@@ -579,14 +586,19 @@ function WordRow({ word, course, onToggleFavorite, showRank, masked, onFlip, onS
 
         {onSpeak && (
           <button
-            onClick={e => { e.stopPropagation(); onSpeak() }}
+            {...speakPress.handlers}
             aria-label={`${t.listen} — ${word.term}`}
             aria-pressed={speaking}
+            title={onSpeakFrom ? t.speakFromHint : undefined}
             className={cn(
-              'pressable mt-0.5 grid size-9 shrink-0 place-items-center rounded-xl border',
+              // touch-pan-y, not touch-none: a finger that starts on the button
+              // must still be able to scroll the list
+              'pressable mt-0.5 grid size-9 shrink-0 place-items-center rounded-xl border select-none touch-pan-y transition-transform',
               speaking
                 ? 'border-primary/40 bg-info-soft text-primary'
                 : 'border-border bg-surface text-muted-foreground',
+              // The hold is invisible otherwise — the button shrinks while it counts
+              speakPress.holding && 'scale-90 border-primary/40 text-primary',
             )}
           >
             {speaking ? <Square size={14} /> : <Volume2 size={16} />}

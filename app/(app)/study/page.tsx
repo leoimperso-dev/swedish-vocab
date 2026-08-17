@@ -194,7 +194,7 @@ export default function StudyPage() {
   const current = exercises[currentIndex]
 
   return (
-    <div className="mx-auto min-h-dvh max-w-[430px] pb-24">
+    <div className="mx-auto min-h-dvh max-w-[430px] pb-28">
       <SessionProgress
         current={currentIndex}
         total={exercises.length}
@@ -202,6 +202,10 @@ export default function StudyPage() {
         results={results}
         onQuit={() => setConfirmQuit(true)}
         quitLabel={t.quit}
+        wordId={current.word.id}
+        wordLabel={current.word.term}
+        wordTranslation={current.word.translation}
+        exerciseType={current.exerciseType}
       />
 
       {confirmQuit && (

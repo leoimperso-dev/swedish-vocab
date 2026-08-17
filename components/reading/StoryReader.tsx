@@ -1,6 +1,6 @@
 'use client'
 
-import { useMemo } from 'react'
+import { useEffect, useMemo, useRef } from 'react'
 import Link from 'next/link'
 import { getStrings } from '@/lib/i18n'
 import { useCourse } from '@/components/CourseProvider'
@@ -42,6 +42,13 @@ export default function StoryReader({ story }: { story: Story }) {
     return { paragraphs: paragraphsWithIds, sentences: flat }
   }, [story.body])
 
+  // The voice reads on past the fold; the page has to follow it
+  const activeRef = useRef<HTMLSpanElement>(null)
+  useEffect(() => {
+    if (index === null) return
+    activeRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+  }, [index])
+
   const toggle = () => {
     if (playing) stop()
     else speak(sentences.map(text => ({ text, locale })))
@@ -71,6 +78,7 @@ export default function StoryReader({ story }: { story: Story }) {
               {paragraph.map(sentence => (
                 <span
                   key={sentence.id}
+                  ref={index === sentence.id ? activeRef : undefined}
                   className={cn(
                     'rounded transition-colors',
                     index === sentence.id && 'bg-warning-soft',

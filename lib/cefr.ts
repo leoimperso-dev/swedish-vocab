@@ -39,6 +39,34 @@ export function levelsAtOrAbove(level: CefrLevel): CefrLevel[] {
   return CEFR_LEVELS.slice(CEFR_LEVELS.indexOf(level))
 }
 
+/** True when a word's band is at the learner's level or above it. */
+export function isAtOrAbove(cefr: string | null | undefined, level: CefrLevel): boolean {
+  if (!isCefrLevel(cefr)) return true // unclassified: never demoted
+  return CEFR_LEVELS.indexOf(cefr) >= CEFR_LEVELS.indexOf(level)
+}
+
+/**
+ * How a due word competes for a slot in the session, lowest first.
+ *
+ * The declared level used to filter new words only, so a B2 learner still spent
+ * two thirds of every session on "du", "att" and "och" — words started long
+ * before, which spaced repetition then scheduled forever. Level alone cannot
+ * decide it either: an easy word the learner keeps failing is exactly what they
+ * should see. So an under-level word only competes when it is still unresolved.
+ */
+export function reviewPriority(
+  cefr: string | null | undefined,
+  level: CefrLevel | null,
+  stats: { correctCount: number; incorrectCount: number; approxCount: number },
+): number {
+  if (!level || isAtOrAbove(cefr, level)) return 0
+  const missed = stats.incorrectCount + stats.approxCount
+  // Still shaky below the level: worth revisiting, after everything at level
+  if (missed >= stats.correctCount) return 1
+  // Below the level and answered right more often than not: last in line
+  return 2
+}
+
 /** Reads User.levels, a { [learnedLanguage]: CefrLevel } map. */
 export function levelFor(levels: unknown, learned: string): CefrLevel | null {
   if (!levels || typeof levels !== 'object') return null

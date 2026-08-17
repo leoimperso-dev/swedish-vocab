@@ -3,11 +3,14 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { Volume2 } from 'lucide-react'
 import { speak, unlock } from '@/lib/tts'
+import { FavoriteStar } from '@/components/FavoriteStar'
+import { ReportButton } from '@/components/ReportButton'
 import type { Strings } from '@/lib/i18n'
 import { cn } from '@/lib/utils'
 
 interface DictResult {
   found: boolean
+  id?: string
   term?: string
   translation?: string
   forms?: string | null
@@ -70,6 +73,11 @@ function WordPopover({ entry, token, locale, t }: {
   return (
     <span
       ref={popRef}
+      // Capture, so a child that stops propagation (the star) still marks the
+      // event as "inside" and does not close the popover on its way out
+      onClickCapture={e => {
+        ;(e.nativeEvent as MouseEvent & { tappableTextClick?: boolean }).tappableTextClick = true
+      }}
       onClick={e => {
         e.stopPropagation()
         ;(e.nativeEvent as MouseEvent & { tappableTextClick?: boolean }).tappableTextClick = true
@@ -87,8 +95,22 @@ function WordPopover({ entry, token, locale, t }: {
         <span className="block text-sm text-muted-foreground">…</span>
       ) : entry.found ? (
         <span className="block">
-          <span className="block font-display text-lg font-semibold leading-tight text-foreground">
-            {entry.term}
+          <span className="flex items-start justify-between gap-2">
+            <span className="block font-display text-lg font-semibold leading-tight text-foreground">
+              {entry.term}
+            </span>
+            {/* Looking a word up while reading is exactly when it is worth
+                keeping — and when a wrong entry gets noticed */}
+            <span className="flex shrink-0 items-start">
+              {entry.id && <FavoriteStar wordId={entry.id} label={entry.term!} size={16} className="-mt-1" />}
+              <ReportButton
+                wordId={entry.id}
+                context="READING"
+                shownTerm={entry.term}
+                shownTranslation={entry.translation}
+                className="-mr-1 -mt-1"
+              />
+            </span>
           </span>
           <span className="mt-0.5 block text-sm leading-snug text-muted-foreground">
             {entry.translation}

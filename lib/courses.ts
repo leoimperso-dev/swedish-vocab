@@ -10,6 +10,9 @@
 
 export type Lang = 'fr' | 'sv' | 'en' | 'nl' | 'es'
 
+// Every language the app touches, for the settings that are not course-scoped
+export const LANGS: readonly Lang[] = ['fr', 'sv', 'en', 'nl', 'es']
+
 export type PairId = 'sv-fr' | 'en-fr' | 'nl-fr' | 'es-fr'
 
 export interface Pair {
