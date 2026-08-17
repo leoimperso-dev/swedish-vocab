@@ -13,6 +13,9 @@ export interface ExerciseWord {
   word: Word
   userWord: UserWord | null
   exerciseType: ExerciseType
+  // Set only when the exercises of one round do not share a direction — a blitz
+  // duel flips it per exercise. Absent means "the direction of the session".
+  direction?: Direction
   distractors?: string[]
   // Other words of the pair that share a sense with this one — accepted when the
   // learner has to produce the term, since several words can be equally right

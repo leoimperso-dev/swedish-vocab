@@ -1,7 +1,10 @@
 // Guards the duel scoring and the round/match resolution, which no UI test
 // covers: a wrong `winsNeeded` or a mis-ranked round would silently decide
 // matches. Pure functions only — no DB.
-import { scoreAnswer, maxRoundScore, winsNeeded, POINTS, COMBO_BONUS, COMBO_FROM, BLITZ_SECONDS, BLITZ_SPEED_BONUS, ROUND_SIZE } from '../lib/duel/rules'
+import {
+  scoreAnswer, maxRoundScore, winsNeeded, POINTS, COMBO_BONUS, COMBO_FROM,
+  BLITZ_SECONDS, BLITZ_SPEED_BONUS, ROUND_SIZE, ROUND_MIX,
+} from '../lib/duel/rules'
 import type { AnswerResult } from '../types'
 
 let failures = 0
@@ -61,6 +64,23 @@ const perfect = (mode: 'CLASSIC' | 'BLITZ') => {
 }
 check('classic perfect round hits the max', perfect('CLASSIC'), maxRoundScore('CLASSIC'))
 check('blitz perfect round hits the max', perfect('BLITZ'), maxRoundScore('BLITZ'))
+
+// --- Round composition ------------------------------------------------------
+// The quota list is dealt slot by slot, so a wrong length would silently drop
+// or repeat exercises.
+check('the mix fills exactly one round', ROUND_MIX.length, ROUND_SIZE)
+check('the mix holds no flashcard', ROUND_MIX.includes('FLASHCARD'), false)
+// Four options are guessable; a round both players ace decides nothing
+check(
+  'multiple choice stays a minority',
+  ROUND_MIX.filter(t => t === 'QCM').length <= ROUND_SIZE / 2,
+  true,
+)
+check(
+  'most slots make the learner produce the answer',
+  ROUND_MIX.filter(t => t === 'TYPING' || t === 'LISTENING').length >= ROUND_SIZE / 2,
+  true,
+)
 
 // --- Match length ----------------------------------------------------------
 check('best of 3', winsNeeded(3), 2)

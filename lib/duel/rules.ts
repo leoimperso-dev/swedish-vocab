@@ -3,7 +3,7 @@
 // Points are the game score and have nothing to do with XP. XP comes from the
 // StudySession the round is played as, so a duel round rewards exactly what the
 // same ten exercises would reward alone — plus a small bonus, see DUEL_XP.
-import type { AnswerResult } from '@/types'
+import type { AnswerResult, ExerciseType } from '@/types'
 
 export type DuelMode = 'CLASSIC' | 'BLITZ'
 export type DuelStatus = 'ACTIVE' | 'FINISHED' | 'DECLINED'
@@ -13,8 +13,20 @@ export const ROUND_LENGTH_OPTIONS = [3, 5, 7] as const
 export const DEFAULT_ROUNDS = 5
 /** Exercises in one round, for both players. */
 export const ROUND_SIZE = 10
-/** New words allowed in a round — the rest is revision, so a duel is not a lesson. */
-export const ROUND_NEW_WORDS = 2
+/**
+ * The exercise types dealt in one round, one entry per slot. Typing and
+ * dictation carry the round because they ask the learner to *produce* the
+ * answer; QCM is kept as a minority because four options are easy to guess.
+ * Must hold exactly ROUND_SIZE entries — guarded by scripts/check-duel-rules.ts.
+ */
+export const ROUND_MIX: readonly ExerciseType[] = [
+  'TYPING', 'TYPING', 'TYPING', 'TYPING',
+  'LISTENING', 'LISTENING', 'LISTENING',
+  'QCM', 'QCM', 'QCM',
+]
+
+/** How many typing slots may become a cloze or a conjugation, when the word allows. */
+export const ROUND_VARIANT_SLOTS = 2
 
 export const POINTS: Record<AnswerResult, number> = {
   correct: 10,

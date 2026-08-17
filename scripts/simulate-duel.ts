@@ -6,7 +6,7 @@
 import 'dotenv/config'
 import { db } from '../lib/db'
 import { submitRound, listDuels, pendingDuelCount } from '../lib/duel/service'
-import { winsNeeded, ROUND_SIZE, ROUND_NEW_WORDS } from '../lib/duel/rules'
+import { winsNeeded, ROUND_SIZE } from '../lib/duel/rules'
 import { buildExercises } from '../lib/study/build'
 import { getCourseWithLevel } from '../lib/current-course'
 import { courseDirections, defaultDirection } from '../lib/courses'
@@ -126,17 +126,95 @@ async function main() {
     const { course, level } = await getCourseWithLevel(learner.id)
     const direction =
       courseDirections(course).find(d => d === duel.direction) ?? defaultDirection(course)
-    const exercises = await buildExercises({
-      userId: learner.id, course, level, direction,
-      size: ROUND_SIZE, newWords: ROUND_NEW_WORDS, allowFlashcard: false,
+
+    // Give them a history: a real duellist has studied words, and they are what
+    // makes a typing or dictation prompt fair. Studied but NOT due, which is the
+    // case that used to serve a round of ten unseen words.
+    const known = await db.word.findMany({
+      where: { pair: expectedPair, studyable: true },
+      orderBy: { frequencyRank: { sort: 'asc', nulls: 'last' } },
+      take: 30,
+      select: { id: true },
     })
+    await db.userWord.createMany({
+      data: known.map(w => ({
+        userId: learner.id, wordId: w.id, direction,
+        repetitions: 4, interval: 30, easeFactor: 2.5,
+        nextReview: new Date(Date.now() + 7 * 86400000),
+        lastStudied: new Date(Date.now() - 86400000),
+        lastResult: 'correct',
+      })),
+    })
+
+    const round = () =>
+      buildExercises({
+        userId: learner.id, course, level, direction,
+        size: ROUND_SIZE, newWords: 0, policy: 'DUEL',
+      })
+
+    const exercises = await round()
+    const types = exercises.map(e => e.exerciseType)
     check(`${who} gets a full round`, exercises.length, ROUND_SIZE)
     check(`${who} is served their own pair`, [...new Set(exercises.map(e => e.word.pair))], [expectedPair])
-    check(`${who} gets no flashcard`, exercises.some(e => e.exerciseType === 'FLASHCARD'), false)
+    check(`${who} gets no flashcard`, types.includes('FLASHCARD'), false)
     check(
       `${who} answers in a direction of their own course`,
       courseDirections(course).includes(direction),
       true,
+    )
+    // The point of the quotas: a round both players can ace decides nothing.
+    check(
+      `${who} plays on words already met, not unseen ones`,
+      exercises.every(e => e.userWord !== null),
+      true,
+    )
+    check(`${who} gets at least three kinds of exercise`, new Set(types).size >= 3, true)
+    check(
+      `${who} gets a minority of multiple choice`,
+      types.filter(t => t === 'QCM').length <= ROUND_SIZE / 2,
+      true,
+    )
+    check(
+      `${who} has to produce the answer most of the time`,
+      types.filter(t => t === 'TYPING' || t === 'LISTENING' || t === 'CLOZE' || t === 'CONJUGATION').length
+        >= ROUND_SIZE / 2,
+      true,
+    )
+    console.log(`   ${who} classic round: ${types.join(', ')}`)
+
+    // Blitz flips the direction per exercise. Two rounds' worth of flippable
+    // exercises: both directions failing to appear is a 1-in-10000 fluke, a
+    // broken flip is every time.
+    const blitz = [
+      ...(await buildExercises({
+        userId: learner.id, course, level, direction,
+        size: ROUND_SIZE, newWords: 0, policy: 'DUEL', flipDirections: true,
+      })),
+      ...(await buildExercises({
+        userId: learner.id, course, level, direction,
+        size: ROUND_SIZE, newWords: 0, policy: 'DUEL', flipDirections: true,
+      })),
+    ]
+    const flippable = blitz.filter(e => e.exerciseType === 'QCM' || e.exerciseType === 'TYPING')
+    check(
+      `${who} is asked both ways in blitz`,
+      new Set(flippable.map(e => e.direction)).size,
+      2,
+    )
+    check(
+      `${who} only ever sees directions of their own course`,
+      blitz.every(e => courseDirections(course).includes(e.direction!)),
+      true,
+    )
+    // Dictation and cloze are authored one way round; flipping them would ask
+    // the learner to transcribe their own native language
+    check(
+      `${who} keeps dictation in the round's direction`,
+      blitz.filter(e => e.exerciseType === 'LISTENING').every(e => e.direction === direction),
+      true,
+    )
+    console.log(
+      `   ${who} blitz directions: ${flippable.map(e => e.direction).slice(0, 10).join(', ')}`,
     )
   }
 

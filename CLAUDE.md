@@ -168,8 +168,19 @@ a majority (`winsNeeded`) or on the last round.
   duel rewards exactly what the same ten exercises would alone, plus `DUEL_XP`. That is why
   the solo session route and the duel route share `lib/study/build.ts` rather than each
   drawing their own words.
-- **No flashcard in a duel** (`allowFlashcard: false` in `buildExercises`): nothing
-  self-assessed can carry a score, so an unseen word is served as QCM instead.
+- **A round is built with `policy: 'DUEL'`** (`lib/study/build.ts`), which differs from a solo
+  session in three ways, all aimed at making a round *decide* something:
+  - no flashcard — nothing self-assessed can carry a score;
+  - words already met come first (due, then studied-but-not-due, weakest recall first), and
+    unseen words only fill what is left. A learner with no history still gets a full round;
+  - exercise types are dealt from the `ROUND_MIX` quotas (4 typing, 3 dictation, 3 QCM, with
+    up to `ROUND_VARIANT_SLOTS` typing slots becoming cloze/conjugation) instead of being
+    chosen per word — see `lib/duel/mix.ts`. Left to the solo picker a round drifted to
+    near-pure QCM, which both players aced, and every match ended in a draw.
+- **Blitz flips the direction per exercise** (`flipDirections`), on QCM and typing only —
+  dictation and cloze are authored one way round. Each exercise then carries its own
+  `ExerciseWord.direction`, which the browser reports back per answer so SM-2 credits the
+  right progression; the server only accepts a direction belonging to that player's course.
 - The score is **recomputed server-side** from the results the browser reports — the client
   only says what was answered and how much clock was left.
 - A round's score stays hidden until both sides have played it, so nobody plays knowing the

@@ -31,6 +31,9 @@ interface SubmittedAnswer {
   wordId: string
   result: AnswerResult
   msLeft: number
+  // Blitz flips the direction per exercise, so SM-2 has to be told which one
+  // this answer belongs to rather than assuming the round's
+  direction: Direction
 }
 
 interface RoundResult {
@@ -96,14 +99,17 @@ export default function PlayRoundPage({ params }: { params: Promise<{ id: string
   const handleAnswer = useCallback(
     (result: AnswerResult, msLeft: number) => {
       if (!data) return
-      const word = data.exercises[index]?.word
-      if (!word || answeredIndex.current === index) return
+      const exercise = data.exercises[index]
+      if (!exercise || answeredIndex.current === index) return
       answeredIndex.current = index
 
       const streak = result === 'correct' ? consecutiveCorrect(answers) + 1 : 0
       setScore(s => s + scoreAnswer(data.mode, result, { streak, msLeft }))
 
-      const all = [...answers, { wordId: word.id, result, msLeft }]
+      const all = [
+        ...answers,
+        { wordId: exercise.word.id, result, msLeft, direction: exercise.direction ?? data.direction },
+      ]
       setAnswers(all)
       if (all.length >= data.exercises.length) submit(all, data.sessionId)
       else setIndex(i => i + 1)
@@ -164,11 +170,11 @@ export default function PlayRoundPage({ params }: { params: Promise<{ id: string
             onExpire={() => handleAnswer('incorrect', 0)}
             label={t.duelTimeUp}
             render={msLeft => (
-              <Exercise exercise={current} direction={data.direction} onAnswer={r => handleAnswer(r, msLeft)} />
+              <Exercise exercise={current} fallbackDirection={data.direction} onAnswer={r => handleAnswer(r, msLeft)} />
             )}
           />
         ) : (
-          <Exercise exercise={current} direction={data.direction} onAnswer={r => handleAnswer(r, 0)} />
+          <Exercise exercise={current} fallbackDirection={data.direction} onAnswer={r => handleAnswer(r, 0)} />
         )}
       </main>
     </div>
@@ -187,14 +193,16 @@ function consecutiveCorrect(answers: SubmittedAnswer[]): number {
 
 function Exercise({
   exercise,
-  direction,
+  fallbackDirection,
   onAnswer,
 }: {
   exercise: ExerciseWord
-  direction: Direction
+  fallbackDirection: Direction
   onAnswer: (result: AnswerResult) => void
 }) {
   const { word, exerciseType, distractors, alsoAccepted } = exercise
+  // Blitz asks some questions the other way round — see lib/study/build.ts
+  const direction = exercise.direction ?? fallbackDirection
   const answer = (result: AnswerResult) => onAnswer(result)
 
   // No flashcard here: a duel score cannot rest on self-assessment

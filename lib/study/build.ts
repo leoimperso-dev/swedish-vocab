@@ -6,7 +6,11 @@ import { db } from '@/lib/db'
 import { levelsAtOrAbove, reviewPriority, type CefrLevel } from '@/lib/cefr'
 import { answerableExamples } from '@/lib/cloze'
 import { glossSenses, glossesOverlap } from '@/lib/gloss'
-import { learnsTermLanguage, pairOf, promptLang, verbFormsFor, type Course, type Direction } from '@/lib/courses'
+import {
+  courseDirections, learnsTermLanguage, pairOf, promptLang, verbFormsFor,
+  type Course, type Direction,
+} from '@/lib/courses'
+import { assignDuelTypes } from '@/lib/duel/mix'
 import type { ExerciseType, ExerciseWord } from '@/types'
 import type { Word, UserWord } from '@prisma/client'
 
@@ -40,16 +44,14 @@ export function clozeEligible(word: Word): boolean {
   return answerableExamples(examples, word.translation).length > 0
 }
 
+/** Solo policy: ease into a word, then vary. Duels deal types from quotas instead. */
 function selectExerciseType(
   userWord: UserWord | null,
   word: Word,
   course: Course,
   termExercises: boolean,
-  // A duel has no flashcard: nothing self-assessed can carry a score
-  allowFlashcard: boolean,
 ): ExerciseType {
-  const early = !userWord || userWord.repetitions === 0
-  if (early) return allowFlashcard ? 'FLASHCARD' : 'QCM'
+  if (!userWord || userWord.repetitions === 0) return 'FLASHCARD'
   if (userWord.repetitions <= 2) return 'QCM'
   const pool: ExerciseType[] = ['TYPING']
   // Dictation always drills the learned language, whichever side it sits on
@@ -76,8 +78,20 @@ export interface BuildOptions {
   newWords: number
   /** Single exercise type for the whole list (solo mode picker). */
   forcedMode?: ExerciseType | null
-  /** False in a duel — see selectExerciseType. */
-  allowFlashcard?: boolean
+  /**
+   * SOLO teaches: it fills a short session with new words and eases the learner
+   * in with a flashcard. DUEL scores: it caps new words at `newWords`, tops the
+   * round up with vocabulary already met, and deals types from fixed quotas —
+   * see lib/duel/mix.ts for why.
+   */
+  policy?: 'SOLO' | 'DUEL'
+  /**
+   * Pick each exercise's direction at random among the course's two, instead of
+   * using `direction` throughout. Blitz duels do this: being asked "hus → ?"
+   * and "maison → ?" in the same round stops the learner from settling into a
+   * one-way reflex, which is a real skill gap and a good tie-breaker.
+   */
+  flipDirections?: boolean
 }
 
 /**
@@ -87,7 +101,7 @@ export interface BuildOptions {
 export async function buildExercises(opts: BuildOptions): Promise<ExerciseWord[]> {
   const { userId, course, level, direction, size, newWords: newWordsTargetBase } = opts
   const forcedMode = opts.forcedMode ?? null
-  const allowFlashcard = opts.allowFlashcard ?? true
+  const policy = opts.policy ?? 'SOLO'
   const pair = course.pair
   // Conjugation and cloze drill the pair's `term` language: only its learners get them
   const termExercises = learnsTermLanguage(course)
@@ -120,16 +134,52 @@ export async function buildExercises(opts: BuildOptions): Promise<ExerciseWord[]
     // Stable within a tier: the oldest due word still comes first
     .sort((a, b) => a.priority - b.priority || a.index - b.index)
     .map(entry => entry.uw)
-    .slice(0, size - newWordsTargetBase)
+    // Solo reserves seats for the new words it wants to teach; a duel gives
+    // every seat it can to revision and only tops up with new words at the end.
+    .slice(0, policy === 'DUEL' ? size : size - newWordsTargetBase)
 
-  // 2. New words (never studied in this direction)
+  // 2. Duel only: words already met but not due yet, weakest recall first.
+  //
+  // Typing and dictation are the exercises that separate two players, and both
+  // are unfair on a word never seen — so a duel prefers vocabulary the learner
+  // has actually studied, even when nothing is scheduled for review.
+  const paddingSeats = policy === 'DUEL' ? size - dueUserWords.length : 0
+  const padding =
+    paddingSeats > 0
+      ? (
+          await db.userWord.findMany({
+            where: {
+              userId,
+              direction,
+              nextReview: { gt: new Date() },
+              wordId: { notIn: dueUserWords.map(uw => uw.wordId) },
+              word: wordFilter,
+            },
+            include: { word: true },
+            // Shakiest recall first, then the least recently seen
+            orderBy: [{ lastResult: 'desc' }, { lastStudied: 'asc' }],
+            take: needsEligibility ? paddingSeats * 3 : paddingSeats,
+          })
+        )
+          .filter(uw => isEligible(uw.word))
+          .slice(0, paddingSeats)
+      : []
+
+  // 3. New words (never studied in this direction)
   const studiedWordIds = await db.userWord.findMany({
     where: { userId, direction },
     select: { wordId: true },
   })
   const studiedIds = studiedWordIds.map(uw => uw.wordId)
 
-  const newWordsTarget = Math.max(newWordsTargetBase, size - dueUserWords.length)
+  const seatsLeft = size - dueUserWords.length - padding.length
+  // Solo tops the session up with new words, because meeting new vocabulary is
+  // the point. A duel takes only the seats revision could not fill — none for a
+  // learner with a history, a whole round for a beginner who has none, since a
+  // round of three exercises is worse than an easy one.
+  const newWordsTarget = policy === 'DUEL'
+    ? seatsLeft
+    : Math.max(newWordsTargetBase, size - dueUserWords.length)
   // The declared level is a floor on new words: someone who says B1 is not asked
   // to translate "je" or "tu". Words already started keep coming back regardless.
   const levelFilter = level ? { cefr: { in: levelsAtOrAbove(level) } } : {}
@@ -148,21 +198,45 @@ export async function buildExercises(opts: BuildOptions): Promise<ExerciseWord[]
     newWords = (await drawNewWords({})).filter(isEligible).slice(0, newWordsTarget)
   }
 
-  const exercises = shuffleInPlace([
-    ...dueUserWords.map(uw => ({
-      word: uw.word,
-      userWord: uw as UserWord,
-      exerciseType: forcedMode ?? selectExerciseType(uw, uw.word, course, termExercises, allowFlashcard),
-    })),
-    ...newWords.map(w => ({
-      word: w,
-      userWord: null,
-      exerciseType: forcedMode ?? selectExerciseType(null, w, course, termExercises, allowFlashcard),
-    })),
+  const entries = shuffleInPlace([
+    ...dueUserWords.map(uw => ({ word: uw.word, userWord: uw as UserWord })),
+    ...padding.map(uw => ({ word: uw.word, userWord: uw as UserWord })),
+    ...newWords.map(w => ({ word: w, userWord: null })),
   ].slice(0, size))
 
-  const distractors = await buildDistractors(exercises, pair, direction)
-  const alsoAccepted = await buildAlternatives(exercises, pair, direction)
+  const duelTypes =
+    policy === 'DUEL'
+      ? assignDuelTypes(
+          entries.map(e => ({
+            isNew: e.userWord === null,
+            clozeEligible: termExercises && clozeEligible(e.word),
+            conjugationEligible:
+              termExercises && e.word.wordType === 'VERB' && hasFullVerbForms(e.word.forms, course),
+          })),
+        )
+      : null
+
+  // Cloze and conjugation are written in one direction only, so they keep the
+  // round's — flipping applies to the exercises that actually have two sides.
+  const bothWays = courseDirections(course)
+  const exercises = entries.map((entry, i) => {
+    const exerciseType =
+      forcedMode ??
+      duelTypes?.[i] ??
+      selectExerciseType(entry.userWord, entry.word, course, termExercises)
+    const flippable = exerciseType === 'QCM' || exerciseType === 'TYPING'
+    return {
+      ...entry,
+      exerciseType,
+      direction:
+        opts.flipDirections && flippable
+          ? bothWays[Math.floor(Math.random() * bothWays.length)]
+          : direction,
+    }
+  })
+
+  const distractors = await buildDistractors(exercises, pair)
+  const alsoAccepted = await buildAlternatives(exercises, pair)
 
   return exercises.map(e => ({
     ...e,
@@ -171,7 +245,8 @@ export async function buildExercises(opts: BuildOptions): Promise<ExerciseWord[]
   }))
 }
 
-type Pending = { word: Word; exerciseType: ExerciseType }
+// Each exercise carries its own direction: a blitz round mixes both.
+type Pending = { word: Word; exerciseType: ExerciseType; direction: Direction }
 
 function answerField(pair: string, direction: Direction): 'term' | 'translation' {
   return promptLang(direction) === pairOf(pair).term ? 'translation' : 'term'
@@ -183,14 +258,9 @@ const DISTRACTOR_POOL_SIZE = 300
 const MIN_TYPED_DISTRACTORS = 12
 
 /** QCM options, in one query for the whole list (no round trip per question). */
-async function buildDistractors(
-  exercises: Pending[],
-  pair: string,
-  direction: Direction,
-): Promise<Map<string, string[]>> {
+async function buildDistractors(exercises: Pending[], pair: string): Promise<Map<string, string[]>> {
   const byWordId = new Map<string, string[]>()
   if (!exercises.some(e => e.exerciseType === 'QCM')) return byWordId
-  const field = answerField(pair, direction)
 
   // Scattered sample, not a contiguous window. A window of 150 rows taken at
   // one random offset holds whatever was inserted together — often only three
@@ -207,6 +277,9 @@ async function buildDistractors(
   `
   for (const ex of exercises) {
     if (ex.exerciseType !== 'QCM') continue
+    // Options are read on the side this exercise answers in, which can differ
+    // from one question to the next in a blitz round
+    const field = answerField(pair, ex.direction)
     const sameType = pool.filter(p => p.wordType === ex.word.wordType)
     // Needs enough candidates to actually vary between questions, not just
     // enough to fill three slots
@@ -230,14 +303,11 @@ async function buildDistractors(
  * shown "crier, aboyer", a learner writes "bark" where the entry says "bay".
  * Every word of the pair sharing a sense is collected as an accepted answer.
  */
-async function buildAlternatives(
-  exercises: Pending[],
-  pair: string,
-  direction: Direction,
-): Promise<Map<string, string[]>> {
+async function buildAlternatives(exercises: Pending[], pair: string): Promise<Map<string, string[]>> {
   const byWordId = new Map<string, string[]>()
-  const producesTerm = answerField(pair, direction) === 'term'
-  const needing = exercises.filter(e => producesTerm || e.exerciseType === 'CLOZE')
+  const needing = exercises.filter(
+    e => answerField(pair, e.direction) === 'term' || e.exerciseType === 'CLOZE',
+  )
   if (needing.length === 0) return byWordId
 
   const senses = [...new Set(needing.flatMap(e => glossSenses(e.word.translation)))]

@@ -6,7 +6,7 @@ import { buildExercises } from '@/lib/study/build'
 import { recordAnswer } from '@/lib/study/answer'
 import { finalizeSession } from '@/lib/study/finalize'
 import { courseDirections, defaultDirection, type Course, type Direction } from '@/lib/courses'
-import { DUEL_XP, ROUND_NEW_WORDS, ROUND_SIZE, scoreAnswer, type DuelMode } from '@/lib/duel/rules'
+import { DUEL_XP, ROUND_SIZE, scoreAnswer, type DuelMode } from '@/lib/duel/rules'
 import { isParticipant, submitRound } from '@/lib/duel/service'
 import type { AnswerResult } from '@/types'
 
@@ -57,9 +57,14 @@ export async function POST(_req: NextRequest, { params }: Ctx) {
     level,
     direction,
     size: ROUND_SIZE,
-    newWords: ROUND_NEW_WORDS,
-    // Nothing self-assessed can carry a score
-    allowFlashcard: false,
+    // A duel never asks for new words on purpose: the DUEL policy fills the
+    // round with revision and only falls back to unseen words for a beginner
+    // who has none yet.
+    newWords: 0,
+    policy: 'DUEL',
+    // Blitz also flips the translation direction at random, exercise by
+    // exercise, so nobody settles into one-way reflexes
+    flipDirections: duel.mode === 'BLITZ',
   })
 
   const studySession = await db.studySession.create({ data: { userId } })
@@ -76,7 +81,7 @@ export async function POST(_req: NextRequest, { params }: Ctx) {
 interface SubmitBody {
   sessionId: string
   /** One entry per exercise, in the order they were answered. */
-  answers: Array<{ wordId: string; result: AnswerResult; msLeft?: number }>
+  answers: Array<{ wordId: string; result: AnswerResult; msLeft?: number; direction?: string }>
 }
 
 /** Ends the caller's turn: scores it, saves progress, advances the duel. */
@@ -97,9 +102,14 @@ export async function PUT(req: NextRequest, { params }: Ctx) {
 
   const round = duel.currentRound
   const mode = duel.mode as DuelMode
-  // Must match what the round was built with, or SM-2 would be credited to the
-  // wrong direction
-  const direction = directionForPlayer(await getCourse(userId), duel.direction)
+  const course = await getCourse(userId)
+  const roundDirection = directionForPlayer(course, duel.direction)
+  // A blitz round mixes both directions, so each answer reports its own. It is
+  // only ever accepted as one of this player's two — a wrong value would
+  // credit SM-2 to a direction their course does not even have.
+  const ownDirections = courseDirections(course)
+  const directionOf = (reported: string | undefined): Direction =>
+    ownDirections.find(d => d === reported) ?? roundDirection
 
   // The score is recomputed here, never taken from the client: the browser only
   // reports what was answered and how much clock was left.
@@ -119,7 +129,7 @@ export async function PUT(req: NextRequest, { params }: Ctx) {
     await recordAnswer(userId, {
       wordId: answer.wordId,
       result: answer.result,
-      direction,
+      direction: directionOf(answer.direction),
       sessionId: body.sessionId,
     })
   }
