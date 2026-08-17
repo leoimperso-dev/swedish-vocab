@@ -16,9 +16,22 @@ function levenshtein(a: string, b: string): number {
   return dp[m][n]
 }
 
-// Normalize: trim, lowercase, collapse spaces
+// Punctuation a learner may legitimately omit, mistype or add: none of it is
+// vocabulary. A missing full stop or a straight quote where the source has a
+// curly one used to cost the answer, which made a dictated sentence nearly
+// impossible to get right.
+const PUNCTUATION = /[.,!?¡¿;:"«»…„“”'’`()[\]{}\-–—]/g
+
+// Case and spacing only. Punctuation survives this step because the sense
+// separators and usage notes below are punctuation: "crier, aboyer" has to be
+// split before its comma can be dropped.
 function normalize(s: string): string {
   return s.trim().toLowerCase().replace(/\s+/g, ' ')
+}
+
+// What is actually compared: no punctuation at all
+function bare(s: string): string {
+  return s.replace(PUNCTUATION, ' ').replace(/\s+/g, ' ').trim()
 }
 
 // Strip formatting chars that shouldn't count as typos
@@ -38,6 +51,8 @@ const MARKERS = [
   'de', 'het',
   'el', 'la', 'los', 'las', 'un', 'una', 'unos', 'unas',
   'le', 'les', 'une', 'des', 'du',
+  // Elided article: normalize() has already turned "l'ami" into "l ami"
+  'l',
 ]
 const LEADING_MARKER = new RegExp(`^(?:${MARKERS.join('|')})\\s+|^l['’]`)
 
@@ -59,11 +74,12 @@ function dropNotes(s: string): string {
 function variants(s: string): string[] {
   const out = new Set<string>()
   const add = (v: string) => {
-    const trimmed = v.trim()
+    // Punctuation comes off here, once the variant has been carved out
+    const trimmed = bare(v)
     if (!trimmed) return
     out.add(trimmed)
-    const bare = stripMarker(trimmed)
-    if (bare) out.add(bare)
+    const withoutMarker = stripMarker(trimmed)
+    if (withoutMarker) out.add(withoutMarker)
   }
   const base = normalize(s)
   add(base)
@@ -74,10 +90,87 @@ function variants(s: string): string[] {
   return [...out]
 }
 
+/** Below this, the expected answer is a headword with its article, not a sentence. */
+const SENTENCE_MIN_TOKENS = 4
+
+function tokenize(s: string): string[] {
+  return s.replace(PUNCTUATION, ' ').split(/\s+/).filter(Boolean)
+}
+
+/**
+ * Which words are not graded: the capitalised ones, wherever they sit.
+ *
+ * A name cannot be spelled from hearing it, so it is never required — and many
+ * sentences open on one ("Tom est allé..."), which is why the first word is
+ * included even though it is capitalised by grammar rather than by being a
+ * name. The cost is that the opening word of every sentence goes ungraded; it
+ * is nearly always an article or a pronoun, and marking a whole dictation
+ * wrong over a name the learner could not possibly spell is worse.
+ */
+function freeTokens(expectedRaw: string): boolean[] {
+  return tokenize(expectedRaw).map(
+    token => token[0] === token[0].toLocaleUpperCase() && token[0] !== token[0].toLocaleLowerCase(),
+  )
+}
+
+/** Same word, allowing a slip that grows with its length. */
+function sameWord(a: string, b: string): boolean {
+  if (a === b) return true
+  const tolerance = b.length <= 3 ? 0 : b.length <= 6 ? 1 : 2
+  return levenshtein(a, b) <= tolerance
+}
+
+/**
+ * Word-level edit distance, where a proper name costs nothing however it was
+ * typed — or left out.
+ */
+function sentenceErrors(given: string[], expected: string[], free: boolean[]): number {
+  const m = given.length
+  const n = expected.length
+  // dp[i][j] = errors turning the first i given words into the first j expected ones
+  const dp: number[][] = Array.from({ length: m + 1 }, () => Array(n + 1).fill(0))
+  for (let j = 1; j <= n; j++) dp[0][j] = dp[0][j - 1] + (free[j - 1] ? 0 : 1)
+  for (let i = 1; i <= m; i++) dp[i][0] = i
+  for (let i = 1; i <= m; i++) {
+    for (let j = 1; j <= n; j++) {
+      const substitution = free[j - 1] || sameWord(given[i - 1], expected[j - 1]) ? 0 : 1
+      dp[i][j] = Math.min(
+        dp[i - 1][j - 1] + substitution,
+        dp[i - 1][j] + 1, // a word the learner added
+        dp[i][j - 1] + (free[j - 1] ? 0 : 1), // a word they left out
+      )
+    }
+  }
+  return dp[m][n]
+}
+
+/**
+ * A dictated sentence is graded word by word, not character by character.
+ *
+ * Two things a whole-string Levenshtein gets wrong on a sentence. One wrong
+ * word in the middle blows the character budget and reads as a failed answer
+ * even though the learner heard everything else — and proper names ("Tom",
+ * "Anna", "Göteborg") are not vocabulary at all. Only what the sentence
+ * teaches is graded.
+ */
+function evaluateSentence(input: string, expectedRaw: string): AnswerResult {
+  const expected = tokenize(bare(normalize(expectedRaw)))
+  const given = tokenize(bare(normalize(input)))
+  const errors = sentenceErrors(given, expected, freeTokens(expectedRaw))
+  if (errors === 0) return 'correct'
+  // One slip in a long sentence is a slip, not a misunderstanding
+  return errors <= (expected.length >= 8 ? 2 : 1) ? 'approximate' : 'incorrect'
+}
+
 export function evaluateAnswer(input: string, expected: string): AnswerResult {
   const given = variants(input)
   const accepted = variants(expected)
   if (given.some(v => accepted.includes(v))) return 'correct'
+
+  // Long enough to be a sentence (a dictation), not a headword with its article
+  if (tokenize(bare(normalize(expected))).length >= SENTENCE_MIN_TOKENS) {
+    return evaluateSentence(input, expected)
+  }
 
   // Typo tolerance, measured against the closest acceptable spelling so that a
   // missing article never eats the allowance
@@ -92,8 +185,8 @@ export function evaluateAnswer(input: string, expected: string): AnswerResult {
       }
     }
   }
-  // Scale tolerance with word length
-  const maxDist = bestLength <= 4 ? 1 : 2
+  // Scale tolerance with word length — a long compound has more places to slip
+  const maxDist = bestLength <= 4 ? 1 : bestLength <= 8 ? 2 : 3
   if (best <= maxDist) return 'approximate'
 
   return 'incorrect'

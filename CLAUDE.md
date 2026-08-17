@@ -70,9 +70,12 @@ signup, forgot-password, reset-password — over `components/auth/`.
   is random 32 bytes, the row stores only its SHA-256, it lasts an hour, and
   asking again voids the pending one. `/api/password/forgot` always answers ok,
   registered address or not — the response must not enumerate accounts.
-- **Email** goes through Brevo's HTTP API (`lib/email.ts`), not SMTP: outbound
-  SMTP is unreliable on serverless. With no `BREVO_API_KEY` the reset link is
-  logged to the server console, so the flow stays testable locally.
+- **Email** goes through Brevo's SMTP relay (`lib/email.ts`, nodemailer on 587 +
+  STARTTLS), the same provider Carnet de champs sends from. `EMAIL_FROM` must be
+  a sender verified in Brevo. With no `BREVO_SMTP_KEY` the reset link is logged
+  to the server console instead, so the flow stays testable locally. Check the
+  relay with `pnpm tsx --env-file=.env.local scripts/try-email.ts <address>`.
+  nodemailer is **pinned to v8** — v9 breaks next-auth's peer range.
 - A Google-only account has no hash and is unreachable by password until its
   owner sets one through the reset flow.
 - `middleware.ts` lists the routes reachable without a session — a new auth page
@@ -371,6 +374,7 @@ pnpm tsx scripts/simulate-duel.ts          # QA: full duel against the DB (self-
 pnpm tsx scripts/check-mixed-session.ts <email>  # QA: a MIXED session keeps each card's direction
 pnpm tsx scripts/check-mastered.ts         # QA: "I know these perfectly" (throwaway account)
 pnpm tsx scripts/check-password-auth.ts    # QA: hashing + reset tokens (throwaway account)
+pnpm tsx --env-file=.env.local scripts/try-email.ts <address>  # sends one real email through Brevo
 ```
 After touching stories or vocabulary, run the coverage check — only proper
 nouns and numbers may stay unresolved (the reader shows « Nom propre » for
@@ -400,7 +404,15 @@ This machine requires `NODE_OPTIONS=--use-system-ca` for Prisma binary downloads
   sense at a time ("crier, aboyer" is answered by either). Entries are inconsistent about
   articles across languages, so this is what makes them interchangeable — not the data.
   `pnpm tsx scripts/check-answer-matching.ts` guards the rules.
-- Levenshtein distance ≤ 2 against the closest acceptable spelling = approximate (not wrong)
+- **Punctuation is never graded** — it is stripped from both sides before comparing. Losing a
+  dictation over a missing full stop or a curly apostrophe made the exercise unwinnable.
+- An expected answer of 4+ words is a **dictated sentence** and is graded word by word
+  (`evaluateSentence`), not by character distance: one wrong word in the middle used to blow the
+  whole character budget. **Capitalised words are free** — a name cannot be spelled from hearing
+  it. That includes the sentence's first word, since many open on a name; the trade-off is that
+  the opening word goes ungraded.
+- Otherwise Levenshtein against the closest acceptable spelling = approximate (not wrong),
+  tolerating 1 slip up to 4 characters, 2 up to 8, 3 beyond
 - For verbs: each form (present/prétérit/supin) evaluated separately via `evaluateVerbForms`
 
 Content scripts take the pair as their last argument (default `sv-fr`):

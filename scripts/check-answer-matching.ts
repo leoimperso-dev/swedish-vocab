@@ -31,6 +31,24 @@ const CASES: Array<[input: string, expected: string, want: AnswerResult]> = [
   ['', 'un chat', 'incorrect'],
   // A typo stays a typo
   ['chats', 'chat', 'approximate'],
+
+  // --- Dictated sentences -------------------------------------------------
+  // Punctuation is not vocabulary: none of it may cost the answer
+  ['tom est allé à la maison', 'Tom est allé à la maison.', 'correct'],
+  ['où est ma valise', 'Où est ma valise ?', 'correct'],
+  ["j'ai dit non", "J'ai dit : « non ».", 'correct'],
+  ['il ne peut pas venir aujourd hui', "Il ne peut pas venir aujourd'hui.", 'correct'],
+  // A name cannot be spelled from hearing it — never graded
+  ['marc est allé à la maison', 'Tom est allé à la maison.', 'correct'],
+  ['xyz est allé à la maison', 'Tom est allé à la maison.', 'correct'],
+  ['est allé à la maison', 'Tom est allé à la maison.', 'correct'],
+  ['je vis à sockholm depuis 2 ans', 'Je vis à Stockholm depuis 2 ans.', 'correct'],
+  // The first word is capitalised whatever it is, so it stays graded
+  ['le chien dort sur le canapé', 'Le chat dort sur le canapé.', 'approximate'],
+  // One wrong word is a slip; a sentence understood differently is not
+  ['il mange une pomme rouge', 'Il mange une poire rouge.', 'approximate'],
+  ['je ne sais pas du tout', 'Il mange une poire rouge.', 'incorrect'],
+  ['', 'Tom est allé à la maison.', 'incorrect'],
 ]
 
 let failures = 0
