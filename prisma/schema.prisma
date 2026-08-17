@@ -40,7 +40,7 @@ model User {
   streakCurrent Int       @default(0)
   streakBest    Int       @default(0)
   freezeCount   Int       @default(2) // streak freezes available (max 2, +1 every 7-day milestone)
-  dailyGoalXp   Int       @default(3)
+  dailyGoalXp   Int       @default(15)
   lastStudiedAt DateTime?
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
@@ -51,6 +51,12 @@ model User {
   studySessions StudySession[]
   achievements  UserAchievement[]
   favorites     Favorite[]
+  errorReports  ErrorReport[]
+  chatUsage     ChatUsage[]
+  duelsSent     Duel[]        @relation("DuelChallenger")
+  duelsReceived Duel[]        @relation("DuelOpponent")
+  duelRounds    DuelRound[]
+  pushSubs      PushSubscription[]
 }
 
 model Account {
@@ -120,6 +126,7 @@ model Word {
 
   userProgress UserWord[]
   favorites    Favorite[]
+  errorReports ErrorReport[]
 
   @@unique([pair, term, wordType, source], map: "Word_pair_term_wordType_source_key")
   @@index([pair, frequencyRank], map: "Word_pair_frequencyRank_idx")
@@ -185,6 +192,48 @@ model Favorite {
   @@unique([userId, wordId])
 }
 
+// A learner meets far more cards than any audit script reads, so they are the
+// best detector of a wrong gloss left in the data. One report = one card the
+// reporter judged wrong, with their own words for what is wrong with it.
+model ErrorReport {
+  id        String   @id @default(cuid())
+  userId    String
+  // The card being shown. Kept nullable so a report survives a word deletion.
+  wordId    String?
+  pair      String
+  // What the learner was doing: "TYPING", "QCM", "READING"… — a wrong gloss and
+  // a wrong example sentence are not the same bug
+  context   String?
+  // Copy of the term and translation as displayed, so the report stays readable
+  // after the entry is corrected
+  shownTerm String?
+  shownTranslation String?
+  message   String
+  resolved  Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  user User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  word Word? @relation(fields: [wordId], references: [id], onDelete: SetNull)
+
+  @@index([resolved, createdAt])
+}
+
+// One row per learner per day, holding everything the chat needs to throttle:
+// how many turns they have spent today, and when the last one was. Counting
+// stored messages instead would mean a scan on the hot path, and the chat
+// deliberately keeps no transcript.
+model ChatUsage {
+  id            String    @id @default(cuid())
+  userId        String
+  day           String // "YYYY-MM-DD", UTC — a shifted boundary costs nothing to an abuse cap
+  messageCount  Int       @default(0)
+  lastMessageAt DateTime?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, day])
+}
+
 model UserWord {
   id             String    @id @default(cuid())
   userId         String
@@ -245,4 +294,81 @@ model UserAchievement {
   achievement Achievement @relation(fields: [achievementId], references: [id])
 
   @@unique([userId, achievementId])
+}
+
+// Asynchronous duel between two learners of the same content pair. Nobody
+// plays at the same time: one takes their round, the turn passes, the other
+// answers the same round number on their OWN words — drawn at their own CEFR
+// level, so an A2 and a B2 can meet without either being served the other's
+// vocabulary. Only self-corrected exercises are used (no flashcard), so a
+// score is a fact rather than a self-assessment.
+model Duel {
+  id        String @id @default(cuid())
+  pair      String // both players study this pair (lib/courses.ts)
+  direction String // both play the same translation direction
+  mode      String @default("CLASSIC") // "CLASSIC" | "BLITZ" — see lib/duel/rules.ts
+  rounds    Int    @default(5) // best-of N
+  // "ACTIVE" | "FINISHED" | "DECLINED" — a challenge is accepted by playing it
+  status    String @default("ACTIVE")
+
+  challengerId String
+  opponentId   String
+  // Round wins, not points: a round goes to whoever scored highest in it
+  challengerWins Int @default(0)
+  opponentWins   Int @default(0)
+  // Whose move it is, null once the duel is over
+  turnUserId String?
+  // Round number the turn holder has to play
+  currentRound Int @default(1)
+  winnerId   String? // null on a draw or while running
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+  finishedAt DateTime?
+
+  challenger User        @relation("DuelChallenger", fields: [challengerId], references: [id], onDelete: Cascade)
+  opponent   User        @relation("DuelOpponent", fields: [opponentId], references: [id], onDelete: Cascade)
+  duelRounds DuelRound[]
+
+  @@index([challengerId, status])
+  @@index([opponentId, status])
+  @@index([turnUserId])
+}
+
+// One player's take on one round. `score` is the game score (lib/duel/rules.ts),
+// unrelated to XP: XP and SM-2 go through the StudySession the round created,
+// exactly like a solo session.
+model DuelRound {
+  id       String @id @default(cuid())
+  duelId   String
+  userId   String
+  round    Int
+  score    Int    @default(0)
+  correct  Int    @default(0)
+  approx   Int    @default(0)
+  wrong    Int    @default(0)
+  // The solo session this round was played as — its XP is the round's XP
+  sessionId String?
+  playedAt DateTime @default(now())
+
+  duel Duel @relation(fields: [duelId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([duelId, userId, round])
+  @@index([duelId, round])
+}
+
+// Web Push endpoint of one device. A learner has one per browser they play on,
+// and the whole feature is optional: with no VAPID keys configured the app
+// never asks and never sends (see lib/push.ts).
+model PushSubscription {
+  id        String   @id @default(cuid())
+  userId    String
+  endpoint  String   @unique
+  p256dh    String
+  auth      String
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
 }

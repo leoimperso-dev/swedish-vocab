@@ -16,18 +16,35 @@ Dark-only, mobile-first (max-w-[430px]), ported from the svensk-spark Lovable de
 - Utilities: `card-surface`, `pressable` (cursor + active scale), `text-hero-word`, `bg-gradient-nordic`, `bg-gradient-xp`, `safe-top/bottom`
 - Fonts: Inter (`font-sans`) + Space Grotesk (`font-display` — headings, big numbers) via next/font
 - Primitives: `components/ui/` (Card, Chip, ProgressBar, Segmented, TextField, Button + `buttonClasses()` for Links — no cva/radix)
+- `components/FavoritesProvider.tsx`: the starred-word set, seeded by the (app) layout. A word
+  is starred from the vocabulary list, the session header and the story word popover, so the
+  set lives above all three — `/api/words` deliberately does not carry it (that list is cached
+  in sessionStorage). Star with `<FavoriteStar wordId label />`.
 - `components/AppShell.tsx`: sticky page header (title + `CoursePicker` + streak/freeze/XP chips fed by `StatsProvider` from the (app) layout). Used by all pages except session/login/results.
 - `components/ui/flags.tsx`: `<Flag lang>` SVG marks. Text-only contexts (Segmented labels) use `flagOf()` emoji instead.
 - Icons: lucide-react (no emojis in UI chrome; emojis stay in content data)
 
 ## Key files
 - `lib/sm2.ts` — SM-2 spaced repetition algorithm
+- `lib/study/build.ts` — draws a player's exercises (due words ranked by level, topped up with
+  new ones) and their QCM distractors / accepted alternatives. Shared by the solo session and
+  a duel round, which is why neither route holds that logic.
+- `lib/study/answer.ts` / `lib/study/finalize.ts` — one answer (SM-2 + session counters) and
+  the end of a session (XP, streak, achievements, daily goal), both reused by duels
 - `lib/fuzzy.ts` — Levenshtein fuzzy matching for answer evaluation
-- `lib/xp.ts` — XP calculation and level system
+- `lib/xp.ts` — XP calculation, level system, daily-goal bounds (floor 15 XP ≈ one session)
+- `lib/tts.ts` — speech synthesis; picks the best-scoring voice for a locale unless the
+  learner chose one in the profile (voice and rate live per device in localStorage, not on
+  the account). English is listed natural-voices-only (`NATURAL_ONLY_LANGS`) — desktops ship
+  a dozen legacy SAPI voices for it that bury the good ones; the profile has a checkbox to
+  see every installed voice anyway.
 - `lib/streak.ts` — Daily streak logic (timezone-aware) + streak freezes (max 2, absorb missed days, +1 earned per 7-day milestone)
 - `lib/achievements.ts` — Achievement definitions and unlock checks
 - `lib/courses.ts` — Language registry: pairs, courses, directions, locales, verb forms
-- `lib/morphology.ts` — Surface form → headword rules, per learned language
+- `lib/morphology.ts` — Surface form → headword rules, per learned language. Derivational
+  suffixes (`-heid`, `-ing`, `-het`, `-ning`…) resolve to their base **and** are barred from
+  being a compound head: splitting "kortademigheid" as "kortademig" + "heid" once answered
+  "un païen". A derived word points at its base, never at its suffix.
 - `auth.ts` — NextAuth config (Google provider + PrismaAdapter)
 - `scripts/parse-vocabulary.ts` — Parser for the vocabulary files of every pair
 - `scripts/merge-core.ts` — Merges agent-generated vocab chunks into a core file (dedup by headword)
@@ -70,11 +87,20 @@ Every user declares a level per learned language (`User.levels`, a JSON map
 `{ "sv": "A2" }`). `Word.cefr` is derived from `frequencyRank` by `lib/cefr.ts`
 (A1 ≤ 600, A2 ≤ 1200, B1 ≤ 2500, B2 ≤ 5000, C1 ≤ 10000, C2 beyond / unranked).
 
-The level is a **floor on new words only**: study sessions draw new words from
-that band and above, and fall back to the whole pair if the band runs dry. Words
-already started keep coming back, and the vocabulary list shows every level with
-its own filter chips. `scripts/assign-cefr.ts` recomputes the column — run it
-after `apply-frequency`.
+The level is a **floor on new words**, and a **priority on reviews**. New words are
+drawn from that band and above, falling back to the whole pair if the band runs dry (measured:
+it never does — every band holds 9-11k unstudied words). Due words are drawn from a wide pool
+and ranked by `reviewPriority()`: at-or-above level first, then under-level words the learner
+still gets wrong, then the rest. Without that ranking a B2 learner spent two thirds of every
+session on "du", "att", "och" — started long ago and rescheduled forever, since only 5 of 15
+cards are new. Guarded by `scripts/check-review-priority.ts`; diagnose with
+`scripts/audit-levels.ts`.
+
+`scripts/assign-cefr.ts` recomputes the column — run it after `apply-frequency`. It scores a
+multi-word expression by its hardest component, **resolving inflections through
+`lemmaCandidates()`**: without that, "neem me niet kwalijk" failed on "neem" (imperative of
+"nemen") and fell to C2, hiding an A1 courtesy phrase. A phrase must never inherit a rank from
+its first word either — `scripts/fix-phrase-ranks.ts` clears those, then rerun assign-cefr.
 
 ## Conversation
 `Dialogue` table (96 turn-by-turn conversations, 3 levels) under `/conversation`.
@@ -88,6 +114,80 @@ Each `you` turn carries `accepts[]`, other correct wordings of the same line, so
 learner is not marked wrong for saying it differently (`evaluateSpokenAlternatives`
 keeps the best verdict across them). Generated per language and attached with
 `scripts/import-dialogue-variants.ts <dir>`; sources in `Desktop\pro\dialoguesariants\`.
+
+## Free conversation (AI)
+`/conversation/chat` — an open conversation with a Groq-backed partner, next to the scripted
+`Dialogue` list. Available to **every** course, unlike reading/grammar/dialogues: it is generated,
+not authored for the pair's `term` side.
+
+- `lib/chat/prompt.ts` — system prompt (level-aware) and `splitCorrection()`. The model ends with an
+  optional `⟦fix⟧` line; the split holds back any tail that could still grow into the marker, so a
+  correction never flashes as reply text mid-stream. Guarded by `scripts/check-chat-prompt.ts`.
+- `lib/chat/models.ts` — providers, chain and token budget. `CHAT_CHAIN` spans **several providers**
+  so an outage or an exhausted budget does not take the chat down: Groq's `llama-3.3-70b`, then the
+  *same model* on Cloudflare Workers AI (free, ~200 turns/day in the daily neuron allocation), and only
+  after both a weaker model. A provider with no key — or, for Cloudflare, no account id — is
+  silently skipped, so every rung past the first is optional. Providers are reached through the
+  **`openai` client, never a vendor SDK**: `groq-sdk` hardcodes `/openai/v1/chat/completions`, so
+  re-pointing its baseURL 404s instead of calling.
+  OpenRouter's free models were measured and rejected as a rung: `gemma-4-31b:free` failed 8/8 with
+  "rate-limited upstream", `glm-5.2:free` answered 3/8 at 27s a call. Cloudflare's fp8 quantisation
+  costs nothing in quality — it also scores 8/8, at 1.3s a call against Groq's 0.25s.
+  `pnpm tsx scripts/bench-chat-models.ts` scores models on real mistakes across four languages and
+  is what settled the order: llama-3.3-70b 8/8, llama-3.1-8b 7/8, gpt-oss 3/8 (never corrects),
+  qwen3.6 1/8 and leaks its own reasoning into the reply. Detection is ~7/8 runs at TEMPERATURE 0.4;
+  an *invented* correction never occurred, so the residual error is benign. Topics use `TOPICS_MODEL`.
+- `lib/chat/stream.ts` — fallback across models. Groq raises 429 from `create()` before any chunk,
+  so the whole chain resolves before a 200 is returned and errors can still be JSON. Always passes
+  `{ maxRetries: 0, timeout }` — the SDK's defaults (2 retries, 60s) would eat the function budget.
+- `lib/chat/usage.ts` — `ChatUsage(userId, day)`: daily cap and a 4s minimum between turns, one
+  upsert, no scan. Refunded when every model was saturated.
+- `lib/chat/diff.ts` — word-level diff between what the learner wrote and the corrected sentence,
+  computed client-side so the changed words can be highlighted. Free, and the model cannot mis-mark
+  what it never marks.
+- No transcript is stored. The entry card is hidden unless `GROQ_API_KEY` is set.
+- `pnpm tsx scripts/try-chat.ts [lang] ["phrase"]` sends one real turn, to check the key end to end.
+
+## Duels
+Asynchronous matches between two learners of the same **pair**, under `/duels` (the nav's
+trophy slot; `CompeteTabs` switches between duels and the leaderboard, so the bar keeps six
+entries). Nobody plays at the same time: the challenger opens a round, the turn passes, the
+opponent answers the *same round number* on **their own words**, drawn at their own CEFR
+level. The higher score takes the round, a tie gives nobody the point, and the match ends on
+a majority (`winsNeeded`) or on the last round.
+
+- `lib/duel/rules.ts` — sizes, the two game modes and `scoreAnswer`. **CLASSIC**: 10 / 5 / 0
+  with a `+2` bonus once three correct answers are chained. **BLITZ**: `BLITZ_SECONDS` per
+  exercise, up to `+6` for answering fast; a timeout is scored as wrong. Guarded by
+  `scripts/check-duel-rules.ts`.
+- `lib/duel/service.ts` — the state machine (`submitRound`, `pendingDuelCount`, `listDuels`).
+  Guarded end-to-end against the real DB by `scripts/simulate-duel.ts`, which plays a full
+  best-of-3 with two throwaway accounts and deletes them.
+- **A round is a normal `StudySession`.** Answers go through `lib/study/answer.ts` (SM-2) and
+  the round closes with `lib/study/finalize.ts` (XP, streak, achievements, daily goal), so a
+  duel rewards exactly what the same ten exercises would alone, plus `DUEL_XP`. That is why
+  the solo session route and the duel route share `lib/study/build.ts` rather than each
+  drawing their own words.
+- **No flashcard in a duel** (`allowFlashcard: false` in `buildExercises`): nothing
+  self-assessed can carry a score, so an unseen word is served as QCM instead.
+- The score is **recomputed server-side** from the results the browser reports — the client
+  only says what was answered and how much clock was left.
+- A round's score stays hidden until both sides have played it, so nobody plays knowing the
+  number to beat.
+
+### Notifications
+Two layers. The badge on the nav is fed by `pendingDuelCount` through the (app) layout and
+`StatsProvider`, and always works. Web Push (`lib/push.ts`, `PushSubscription`, the `push` /
+`notificationclick` handlers in `public/sw.js`, opt-in per device from the profile) is
+**entirely optional**: with no VAPID keys `pushEnabled` is false, the profile card is hidden
+and `notify()` is a no-op. Notifications are written in the *recipient's* interface language.
+
+**iOS only delivers Web Push to an app launched from the home screen** — in a Safari tab the
+API is absent, so `PushToggle` detects that case (`needsHomeScreenInstall`) and tells the user
+to install rather than claiming the device is unsupported. That is what the `appleWebApp`
+metadata and the `icons.apple` entry in `app/layout.tsx` are for; iOS ignores the manifest
+icons for the home screen and would otherwise use a screenshot of the page. Requesting the
+permission must stay inside a real tap (the button), which Apple enforces.
 
 ## Reading
 `Story` table (48 graded stories, 4 levels) under `/reading`; `StoryReader` makes every word
@@ -128,6 +228,19 @@ about that review**: re-running it restores entries the review dropped, so follo
 with `scripts/import-wiki-glosses.ts <dir> --apply` (sources in
 `Desktop\pro\wiki-glosses\`).
 
+Adjective degrees were filled the same way, per language, with `export-adjective-forms.ts`
+→ review → `import-adjective-forms.ts <dir> --apply` (sources in `Desktop\pro\adjective-degrees\`).
+A non-gradable adjective (`dead`, `getrouwd`, `inre`, ordinals, nationalities) keeps no degree —
+an invented one is worse than none. Spanish is deliberately absent: only its four suppletive
+adjectives are stored, the rest builds with `más`. `scripts/audit-forms.ts` reports coverage.
+
+Glosses are cross-checked against WikDict (CC BY-SA, built from Wiktionary/DBnary,
+`Desktop\pro\wikdict\<pair>.sqlite3`) with `scripts/cross-check-glosses.ts`. WikDict is a
+second opinion, never a source of truth — it says `bueno → allo`. A disagreement is a review
+request; most turn out to be synonyms. `scripts/audit-glosses.ts` catches malformed glosses,
+`scripts/audit-duplicates.ts` the same word served as two cards, and `scripts/dedupe-words.ts`
+merges them (the ranked row survives and adopts the best gloss of the group).
+
 Tatoeba is a general-purpose corpus and carries sentences unfit for a learning app;
 `scripts/filter-examples.ts --apply` strips them, with blocklists per language. After each vocabulary batch, re-run `apply-frequency`
 then `build-examples` (in that order — example ownership reads the fresh ranks;
@@ -142,6 +255,14 @@ the UI. Parenthesised forms are the verb's `(past, pastParticiple)`, the adjecti
 left out. `pnpm db:seed` is idempotent: `[pair, term, wordType, source]` is unique, so re-running it
 only inserts what's new (which also means two senses of one word must share a single entry).
 
+## Error reports
+`ErrorReport` collects what learners flag as wrong, from the session header (every exercise
+type, via `SessionProgress`) and the story word popover. `<ReportButton wordId context
+shownTerm shownTranslation />` posts to `/api/report`; the shown text is copied into the row so
+the report stays readable after the entry is fixed. Triage with
+`pnpm tsx scripts/list-reports.ts` (`--all`, `--resolve <id>`). This is the only detector for a
+gloss that is wrong but well formed — no audit script can see those.
+
 ## Commands
 ```
 pnpm dev                      # dev server
@@ -151,6 +272,8 @@ pnpm parse                    # test vocabulary parser
 pnpm tsx scripts/check-story-coverage.ts   # QA: every story token must resolve
 pnpm tsx scripts/mark-studyable.ts         # recompute Word.studyable (after each seed)
 pnpm tsx scripts/assign-cefr.ts            # recompute Word.cefr (after apply-frequency)
+pnpm tsx scripts/check-duel-rules.ts       # QA: duel scoring and match resolution
+pnpm tsx scripts/simulate-duel.ts          # QA: full duel against the DB (self-cleaning)
 ```
 After touching stories or vocabulary, run the coverage check — only proper
 nouns and numbers may stay unresolved (the reader shows « Nom propre » for
@@ -175,7 +298,12 @@ This machine requires `NODE_OPTIONS=--use-system-ca` for Prisma binary downloads
 
 ## Answer evaluation
 - `evaluateAnswer(input, expected)` returns 'correct' | 'approximate' | 'incorrect'
-- Levenshtein distance ≤ 2 = approximate (not wrong)
+- Both sides expand to their acceptable spellings first: with and without the leading
+  article or infinitive particle ("un monstre" / "monster"), without usage notes, and one
+  sense at a time ("crier, aboyer" is answered by either). Entries are inconsistent about
+  articles across languages, so this is what makes them interchangeable — not the data.
+  `pnpm tsx scripts/check-answer-matching.ts` guards the rules.
+- Levenshtein distance ≤ 2 against the closest acceptable spelling = approximate (not wrong)
 - For verbs: each form (present/prétérit/supin) evaluated separately via `evaluateVerbForms`
 
 Content scripts take the pair as their last argument (default `sv-fr`):

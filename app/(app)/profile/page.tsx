@@ -1,6 +1,9 @@
 import { auth, signOut } from '@/auth'
 import { db } from '@/lib/db'
-import { getLevelForXp, levelLadder, levelTitle, xpToNextLevel } from '@/lib/xp'
+import {
+  DAILY_GOAL_PRESETS, MAX_DAILY_GOAL, MIN_DAILY_GOAL,
+  getLevelForXp, levelLadder, levelTitle, xpToNextLevel,
+} from '@/lib/xp'
 import { ACHIEVEMENTS } from '@/lib/achievements'
 import { MAX_FREEZES, FREEZE_EARN_EVERY } from '@/lib/streak'
 import { asLang, getStrings } from '@/lib/i18n'
@@ -10,20 +13,22 @@ import Image from 'next/image'
 import { AppShell } from '@/components/AppShell'
 import { Card, CardTitle, Chip, ProgressBar, SectionLabel } from '@/components/ui/primitives'
 import { LevelSettings } from '@/components/LevelSettings'
+import { VoiceSettings } from '@/components/VoiceSettings'
+import { PushToggle } from '@/components/duel/PushToggle'
+import { pushEnabled } from '@/lib/push'
 import { asLangOrDefault, resolveCourse } from '@/lib/courses'
 import { Button } from '@/components/ui/button'
 import { Check, Flame, Lock, LogOut, Snowflake, Trophy, Zap } from 'lucide-react'
 
-const DAILY_GOAL_OPTIONS = [1, 2, 3, 5]
-
 async function setDailyGoal(formData: FormData) {
   'use server'
-  const goal = Number(formData.get('goal'))
-  if (!DAILY_GOAL_OPTIONS.includes(goal)) return
+  const goal = Math.round(Number(formData.get('goal')))
+  if (!Number.isFinite(goal) || goal < MIN_DAILY_GOAL || goal > MAX_DAILY_GOAL) return
   const session = await auth()
   if (!session?.user?.id) return
   await db.user.update({ where: { id: session.user.id }, data: { dailyGoalXp: goal } })
   revalidatePath('/profile')
+  revalidatePath('/dashboard')
 }
 
 export default async function ProfilePage() {
@@ -146,11 +151,30 @@ export default async function ProfilePage() {
           />
         </Card>
 
+        {/* Duel notifications, per device — hidden when no VAPID key is set */}
+        {pushEnabled && (
+          <Card>
+            <CardTitle>{t.pushTitle}</CardTitle>
+            <div className="mt-3">
+              <PushToggle />
+            </div>
+          </Card>
+        )}
+
+        {/* Reading voice, per device */}
+        <Card>
+          <CardTitle>{t.voiceSetting}</CardTitle>
+          <div className="mt-3">
+            <VoiceSettings />
+          </div>
+        </Card>
+
         {/* Daily goal setting */}
         <Card>
           <CardTitle>{t.dailyGoalSetting}</CardTitle>
+          <p className="mt-1 text-xs text-muted-foreground">{t.dailyGoalHint(MIN_DAILY_GOAL)}</p>
           <form action={setDailyGoal} className="mt-3 grid grid-cols-4 gap-2">
-            {DAILY_GOAL_OPTIONS.map(goal => {
+            {DAILY_GOAL_PRESETS.map(goal => {
               const selected = user.dailyGoalXp === goal
               return (
                 <button
@@ -170,6 +194,24 @@ export default async function ProfilePage() {
                 </button>
               )
             })}
+          </form>
+          {/* Any goal in range, for whoever the presets don't fit */}
+          <form action={setDailyGoal} className="mt-2 flex items-center gap-2">
+            <label className="sr-only" htmlFor="custom-goal">{t.dailyGoalCustom}</label>
+            <input
+              id="custom-goal"
+              type="number"
+              name="goal"
+              min={MIN_DAILY_GOAL}
+              max={MAX_DAILY_GOAL}
+              step={1}
+              defaultValue={user.dailyGoalXp}
+              className="w-24 rounded-xl border border-border bg-surface px-3 py-2.5 text-sm font-semibold tabular-nums text-foreground outline-none focus:border-primary"
+            />
+            <span className="text-sm text-muted-foreground">XP</span>
+            <Button type="submit" variant="secondary" size="sm" className="ml-auto">
+              {t.save}
+            </Button>
           </form>
           <div className="mt-3 flex items-start gap-2 rounded-xl bg-freeze-soft p-3">
             <Snowflake size={16} className="mt-0.5 shrink-0 text-freeze" />

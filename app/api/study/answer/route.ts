@@ -1,10 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@/auth'
-import { db } from '@/lib/db'
-import { sm2Update, qualityFromResult } from '@/lib/sm2'
-import { calculateSessionXp, getLevelForXp } from '@/lib/xp'
-import { updateStreak, toLocalDateString } from '@/lib/streak'
-import { checkNewAchievements } from '@/lib/achievements'
+import { recordAnswer } from '@/lib/study/answer'
+import { finalizeSession } from '@/lib/study/finalize'
 import { isDirection, DEFAULT_COURSE, defaultDirection } from '@/lib/courses'
 import type { AnswerPayload } from '@/types'
 
@@ -12,49 +9,14 @@ export async function POST(req: NextRequest) {
   const session = await auth()
   if (!session?.user?.id) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  const userId = session.user.id
   const body: AnswerPayload = await req.json()
-  const { wordId, result, sessionId } = body
   const direction = isDirection(body.direction) ? body.direction : defaultDirection(DEFAULT_COURSE)
 
-  // 1. Update or create UserWord with SM-2 (per direction)
-  const existing = await db.userWord.findUnique({
-    where: { userId_wordId_direction: { userId, wordId, direction } },
-  })
-
-  const quality = qualityFromResult(result)
-  const currentState = existing ?? { easeFactor: 2.5, interval: 0, repetitions: 0, nextReview: new Date() }
-  const newState = sm2Update(currentState, quality)
-
-  const userWord = await db.userWord.upsert({
-    where: { userId_wordId_direction: { userId, wordId, direction } },
-    create: {
-      userId, wordId, direction,
-      ...newState,
-      correctCount: result === 'correct' ? 1 : 0,
-      incorrectCount: result === 'incorrect' ? 1 : 0,
-      approxCount: result === 'approximate' ? 1 : 0,
-      lastResult: result,
-      lastStudied: new Date(),
-    },
-    update: {
-      ...newState,
-      correctCount: result === 'correct' ? { increment: 1 } : undefined,
-      incorrectCount: result === 'incorrect' ? { increment: 1 } : undefined,
-      approxCount: result === 'approximate' ? { increment: 1 } : undefined,
-      lastResult: result,
-      lastStudied: new Date(),
-    },
-  })
-
-  // 2. Update session stats
-  await db.studySession.update({
-    where: { id: sessionId },
-    data: {
-      wordsStudied: { increment: 1 },
-      wordsCorrect: result === 'correct' ? { increment: 1 } : undefined,
-      wordsApprox: result === 'approximate' ? { increment: 1 } : undefined,
-    },
+  const userWord = await recordAnswer(session.user.id, {
+    wordId: body.wordId,
+    result: body.result,
+    direction,
+    sessionId: body.sessionId,
   })
 
   return NextResponse.json({ userWord })
@@ -65,102 +27,8 @@ export async function PUT(req: NextRequest) {
   const session = await auth()
   if (!session?.user?.id) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  const userId = session.user.id
   const { sessionId, results, bestCombo } = await req.json()
-
-  const user = await db.user.findUnique({
-    where: { id: userId },
-    include: { achievements: { include: { achievement: true } } },
-  })
-  if (!user) return NextResponse.json({ error: 'User not found' }, { status: 404 })
-
-  // Streak (freezes can absorb missed days)
-  const streakUpdate = updateStreak(
-    user.lastStudiedAt, user.streakCurrent, user.streakBest, user.timezone, user.freezeCount
-  )
-
-  // XP
-  const { total: xpGained, breakdown } = calculateSessionXp(results, streakUpdate.isFirstStudyOfDay)
-  const newXp = user.xp + xpGained
-  const oldLevel = user.level
-  const newLevel = getLevelForXp(newXp).level
-
-  // Achievements — word counts are per distinct word (directions don't double-count)
-  const todayStart = new Date(); todayStart.setHours(0, 0, 0, 0)
-  const [studiedRows, masteredVerbRows, todayRows] = await Promise.all([
-    db.userWord.findMany({ where: { userId }, select: { wordId: true }, distinct: ['wordId'] }),
-    db.userWord.findMany({
-      where: { userId, interval: { gt: 21 }, word: { wordType: 'VERB' } },
-      select: { wordId: true },
-      distinct: ['wordId'],
-    }),
-    db.userWord.findMany({
-      where: { userId, lastStudied: { gte: todayStart } },
-      select: { wordId: true },
-      distinct: ['wordId'],
-    }),
-  ])
-  const totalStudied = studiedRows.length
-  const masteredVerbs = masteredVerbRows.length
-  const studiedToday = todayRows.length
-
-  const unlockedSlugs = user.achievements.map(ua => ua.achievement.slug)
-  const newAchievements = checkNewAchievements(unlockedSlugs, {
-    totalWordsStudied: totalStudied,
-    streakCurrent: streakUpdate.streakCurrent,
-    wordsStudiedToday: studiedToday,
-    masteredVerbCount: masteredVerbs,
-    sessionPerfect: results.every((r: string) => r === 'correct') && results.length >= 15,
-  })
-
-  // Daily goal — XP earned today (user timezone) including this session
-  const today = toLocalDateString(new Date(), user.timezone)
-  const recentSessions = await db.studySession.findMany({
-    where: { userId, endedAt: { not: null }, startedAt: { gte: new Date(Date.now() - 36 * 3600000) } },
-    select: { startedAt: true, xpGained: true },
-  })
-  const priorXpToday = recentSessions
-    .filter(s => toLocalDateString(s.startedAt, user.timezone) === today)
-    .reduce((sum, s) => sum + s.xpGained, 0)
-
-  // Save everything
-  const achievementXp = newAchievements.reduce((sum, a) => sum + a.xpReward, 0)
-
-  const achievementDefs = await db.achievement.findMany({
-    where: { slug: { in: newAchievements.map(a => a.slug) } },
-  })
-
-  await db.$transaction([
-    db.user.update({
-      where: { id: userId },
-      data: {
-        xp: newXp + achievementXp,
-        level: newLevel,
-        streakCurrent: streakUpdate.streakCurrent,
-        streakBest: streakUpdate.streakBest,
-        freezeCount: streakUpdate.freezeCount,
-        lastStudiedAt: new Date(),
-      },
-    }),
-    db.studySession.update({
-      where: { id: sessionId },
-      data: { endedAt: new Date(), xpGained, bestCombo },
-    }),
-    ...achievementDefs.map(ach =>
-      db.userAchievement.create({ data: { userId, achievementId: ach.id } })
-    ),
-  ])
-
-  const xpToday = priorXpToday + xpGained + achievementXp
-  return NextResponse.json({
-    xpGained: xpGained + achievementXp,
-    xpBreakdown: breakdown,
-    newAchievements: newAchievements.map(a => ({ slug: a.slug, name: a.name, icon: a.icon })),
-    streakCurrent: streakUpdate.streakCurrent,
-    freezesUsed: streakUpdate.freezesUsed,
-    freezeCount: streakUpdate.freezeCount,
-    dailyGoal: { goal: user.dailyGoalXp, xpToday, reached: xpToday >= user.dailyGoalXp },
-    leveledUp: newLevel > oldLevel,
-    newLevel,
-  })
+  const outcome = await finalizeSession(session.user.id, sessionId, results, bestCombo)
+  if (!outcome) return NextResponse.json({ error: 'User not found' }, { status: 404 })
+  return NextResponse.json(outcome)
 }

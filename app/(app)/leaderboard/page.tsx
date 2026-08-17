@@ -1,14 +1,15 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import Image from 'next/image'
 import { Flame, Trophy, Zap } from 'lucide-react'
 import { getStrings } from '@/lib/i18n'
 import { useLang } from '@/components/CourseProvider'
 import { cn } from '@/lib/utils'
 import { AppShell } from '@/components/AppShell'
 import { Card, Segmented } from '@/components/ui/primitives'
+import { Avatar } from '@/components/ui/avatar'
 import { EmptyState, ListSkeleton } from '@/components/ui/feedback'
+import { CompeteTabs } from '@/components/CompeteTabs'
 
 interface RankedUser {
   rank: number
@@ -49,6 +50,7 @@ export default function LeaderboardPage() {
   return (
     <AppShell title={t.leaderboardTitle} subtitle={period === 'week' ? t.thisWeek : t.allTime}>
       <div className="space-y-4">
+        <CompeteTabs active="leaderboard" />
         <Segmented
           value={period}
           onChange={v => setPeriod(v as Period)}
@@ -87,7 +89,7 @@ export default function LeaderboardPage() {
                   <span className="w-6 shrink-0 text-center text-sm font-semibold tabular-nums text-muted-foreground">
                     {user.rank}
                   </span>
-                  <Avatar user={user} size={36} />
+                  <Avatar name={user.name} image={user.image} size={36} />
                   <div className="min-w-0 flex-1">
                     <p className="truncate text-sm font-semibold">
                       {user.name}
@@ -124,7 +126,7 @@ export default function LeaderboardPage() {
 function PodiumSlot({ user, height, size }: { user: RankedUser; height: string; size: number }) {
   return (
     <div className="flex min-w-0 flex-col items-center gap-2">
-      <Avatar user={user} size={size} />
+      <Avatar name={user.name} image={user.image} size={size} />
       <p className="w-full truncate text-center text-xs font-semibold">{user.name}</p>
       <div
         className={cn(
@@ -139,25 +141,3 @@ function PodiumSlot({ user, height, size }: { user: RankedUser; height: string; 
   )
 }
 
-function Avatar({ user, size }: { user: RankedUser; size: number }) {
-  if (user.image) {
-    return (
-      <Image
-        src={user.image}
-        alt={user.name ?? ''}
-        width={size}
-        height={size}
-        className="shrink-0 rounded-full object-cover"
-        style={{ width: size, height: size }}
-      />
-    )
-  }
-  return (
-    <span
-      style={{ width: size, height: size }}
-      className="grid shrink-0 place-items-center rounded-full bg-gradient-nordic font-display text-sm font-semibold text-primary-foreground"
-    >
-      {user.name?.[0]?.toUpperCase() ?? '?'}
-    </span>
-  )
-}

@@ -12,6 +12,16 @@ export const metadata: Metadata = {
   title: 'Svenska — Apprends le suédois',
   description: 'Application de vocabulaire suédois avec répétition espacée',
   manifest: '/manifest.json',
+  // iOS ignores the manifest icons for the home screen and screenshots the page
+  // instead unless an apple-touch-icon is declared.
+  icons: { apple: '/icon-192.png' },
+  // Duel notifications only exist on iOS once the app is on the home screen,
+  // so the standalone hints are load-bearing here, not decoration.
+  appleWebApp: {
+    capable: true,
+    title: 'Svenska',
+    statusBarStyle: 'black-translucent',
+  },
 }
 
 export const viewport: Viewport = {
