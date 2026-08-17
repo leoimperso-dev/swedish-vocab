@@ -10,7 +10,7 @@ import { getStrings } from '@/lib/i18n'
 import { useCourse, useLang } from '@/components/CourseProvider'
 import { courseDirections, flagOf, promptLang, answerLang, type Direction, type Lang } from '@/lib/courses'
 import { Flag } from '@/components/ui/flags'
-import { BLITZ_SECONDS, DEFAULT_ROUNDS, ROUND_LENGTH_OPTIONS, type DuelMode } from '@/lib/duel/rules'
+import { BLITZ_RANGE, DEFAULT_ROUNDS, ROUND_LENGTH_OPTIONS, type DuelMode } from '@/lib/duel/rules'
 import { cn } from '@/lib/utils'
 
 interface Opponent {
@@ -69,7 +69,7 @@ export function NewDuelForm({
 
   const modes: Array<{ value: DuelMode; label: string; desc: string }> = [
     { value: 'CLASSIC', label: t.duelModeClassic, desc: t.duelModeClassicDesc },
-    { value: 'BLITZ', label: t.duelModeBlitz, desc: t.duelModeBlitzDesc(BLITZ_SECONDS) },
+    { value: 'BLITZ', label: t.duelModeBlitz, desc: t.duelModeBlitzDesc(BLITZ_RANGE[0], BLITZ_RANGE[1]) },
   ]
 
   return (

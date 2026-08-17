@@ -14,9 +14,9 @@ import { Card, ProgressBar } from '@/components/ui/primitives'
 import { buttonClasses } from '@/components/ui/button'
 import { getStrings } from '@/lib/i18n'
 import { useLang } from '@/components/CourseProvider'
-import { BLITZ_SECONDS, scoreAnswer, type DuelMode } from '@/lib/duel/rules'
+import { blitzSeconds, scoreAnswer, type DuelMode } from '@/lib/duel/rules'
 import { cn } from '@/lib/utils'
-import type { AnswerResult, ExerciseWord } from '@/types'
+import type { AnswerResult, ExerciseType, ExerciseWord } from '@/types'
 import type { Direction } from '@/lib/courses'
 
 interface RoundData {
@@ -34,6 +34,8 @@ interface SubmittedAnswer {
   // Blitz flips the direction per exercise, so SM-2 has to be told which one
   // this answer belongs to rather than assuming the round's
   direction: Direction
+  // Each type has its own blitz clock, so msLeft is meaningless without it
+  exerciseType: ExerciseType
 }
 
 interface RoundResult {
@@ -104,11 +106,18 @@ export default function PlayRoundPage({ params }: { params: Promise<{ id: string
       answeredIndex.current = index
 
       const streak = result === 'correct' ? consecutiveCorrect(answers) + 1 : 0
-      setScore(s => s + scoreAnswer(data.mode, result, { streak, msLeft }))
+      const exerciseType = exercise.exerciseType
+      setScore(s => s + scoreAnswer(data.mode, result, { streak, msLeft, exerciseType }))
 
       const all = [
         ...answers,
-        { wordId: exercise.word.id, result, msLeft, direction: exercise.direction ?? data.direction },
+        {
+          wordId: exercise.word.id,
+          result,
+          msLeft,
+          direction: exercise.direction ?? data.direction,
+          exerciseType,
+        },
       ]
       setAnswers(all)
       if (all.length >= data.exercises.length) submit(all, data.sessionId)
@@ -167,6 +176,7 @@ export default function PlayRoundPage({ params }: { params: Promise<{ id: string
         {data.mode === 'BLITZ' ? (
           <BlitzTimer
             key={index}
+            seconds={blitzSeconds(current.exerciseType)}
             onExpire={() => handleAnswer('incorrect', 0)}
             label={t.duelTimeUp}
             render={msLeft => (
@@ -227,16 +237,19 @@ function Exercise({
  * costs no re-render; the bar redraws on its own ticks.
  */
 function BlitzTimer({
+  seconds,
   onExpire,
   label,
   render,
 }: {
+  /** This exercise's budget — a dictation gets more than a QCM, see BLITZ_SECONDS. */
+  seconds: number
   onExpire: () => void
   label: string
   /** Milliseconds left, refreshed every 100ms — precise enough for a speed bonus. */
   render: (msLeft: number) => React.ReactNode
 }) {
-  const total = BLITZ_SECONDS * 1000
+  const total = seconds * 1000
   // The clock starts when the exercise mounts, not when it was rendered
   const deadline = useRef(0)
   const [left, setLeft] = useState(total)
@@ -261,17 +274,17 @@ function BlitzTimer({
     return () => clearInterval(tick)
   }, [total])
 
-  const seconds = Math.ceil(left / 1000)
+  const secondsLeft = Math.ceil(left / 1000)
 
   return (
     <div className="space-y-3">
       <div className="flex items-center gap-2">
-        <Timer size={14} className={cn(seconds <= 3 ? 'text-danger' : 'text-muted-foreground')} />
+        <Timer size={14} className={cn(secondsLeft <= 3 ? 'text-danger' : 'text-muted-foreground')} />
         <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-surface-raised">
           <div
             className={cn(
               'h-full rounded-full transition-[width] duration-100 ease-linear',
-              seconds <= 3 ? 'bg-danger' : 'bg-accent',
+              secondsLeft <= 3 ? 'bg-danger' : 'bg-accent',
             )}
             style={{ width: `${(left / total) * 100}%` }}
           />
@@ -279,10 +292,10 @@ function BlitzTimer({
         <span
           className={cn(
             'w-8 text-right font-display text-sm font-semibold tabular-nums',
-            seconds <= 3 ? 'text-danger' : 'text-muted-foreground',
+            secondsLeft <= 3 ? 'text-danger' : 'text-muted-foreground',
           )}
         >
-          {left === 0 ? label : `${seconds}s`}
+          {left === 0 ? label : `${secondsLeft}s`}
         </span>
       </div>
       {render(left)}

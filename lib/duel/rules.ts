@@ -39,8 +39,38 @@ export const POINTS: Record<AnswerResult, number> = {
 export const COMBO_FROM = 3
 export const COMBO_BONUS = 2
 
-/** BLITZ: seconds per exercise, and the most a fast answer can add. */
-export const BLITZ_SECONDS = 8
+/**
+ * BLITZ: the clock, per exercise type.
+ *
+ * A single budget for the whole round was unplayable: eight seconds is brisk
+ * for tapping one of four options, and not enough to even hear a dictation
+ * before typing it. Each type gets the time its *task* takes — reading a
+ * sentence, replaying audio, typing three verb forms — so the pressure is
+ * comparable everywhere instead of impossible on half the round.
+ */
+export const BLITZ_SECONDS: Record<ExerciseType, number> = {
+  QCM: 8,
+  TYPING: 14,
+  // Hearing the word, often twice, before a single character can be typed
+  LISTENING: 20,
+  // A whole sentence to read before the gap makes sense
+  CLOZE: 20,
+  // Three forms to type, not one
+  CONJUGATION: 24,
+  // Self-assessed, so never dealt in a duel — here only to keep the map total
+  FLASHCARD: 8,
+}
+
+export function blitzSeconds(type: ExerciseType): number {
+  return BLITZ_SECONDS[type] ?? BLITZ_SECONDS.QCM
+}
+
+/** Shortest and longest clock a duel can deal, for the mode description. */
+export const BLITZ_RANGE: [number, number] = [
+  Math.min(...ROUND_MIX.map(blitzSeconds)),
+  Math.max(...[...ROUND_MIX, 'CLOZE' as ExerciseType, 'CONJUGATION' as ExerciseType].map(blitzSeconds)),
+]
+
 export const BLITZ_SPEED_BONUS = 6
 
 export const DUEL_XP = {
@@ -67,16 +97,20 @@ export function roundsCount(value: unknown): number {
  *
  * @param streak consecutive correct answers *including* this one (CLASSIC)
  * @param msLeft milliseconds left on the clock when answered (BLITZ)
+ * @param exerciseType which clock that time is measured against (BLITZ) — the
+ *   bonus is a fraction of the exercise's own budget, so answering a dictation
+ *   in half its time is worth exactly what acing a QCM in half of its is
  */
 export function scoreAnswer(
   mode: DuelMode,
   result: AnswerResult,
-  { streak = 0, msLeft = 0 }: { streak?: number; msLeft?: number } = {},
+  { streak = 0, msLeft = 0, exerciseType = 'QCM' }:
+    { streak?: number; msLeft?: number; exerciseType?: ExerciseType } = {},
 ): number {
   const base = POINTS[result]
   if (result === 'incorrect') return 0
   if (mode === 'BLITZ') {
-    const ratio = Math.max(0, Math.min(1, msLeft / (BLITZ_SECONDS * 1000)))
+    const ratio = Math.max(0, Math.min(1, msLeft / (blitzSeconds(exerciseType) * 1000)))
     return base + Math.round(BLITZ_SPEED_BONUS * ratio)
   }
   return base + (result === 'correct' && streak >= COMBO_FROM ? COMBO_BONUS : 0)

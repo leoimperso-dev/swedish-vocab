@@ -3,8 +3,9 @@
 // matches. Pure functions only — no DB.
 import {
   scoreAnswer, maxRoundScore, winsNeeded, POINTS, COMBO_BONUS, COMBO_FROM,
-  BLITZ_SECONDS, BLITZ_SPEED_BONUS, ROUND_SIZE, ROUND_MIX,
+  blitzSeconds, BLITZ_SPEED_BONUS, ROUND_SIZE, ROUND_MIX,
 } from '../lib/duel/rules'
+import type { ExerciseType } from '../types'
 import type { AnswerResult } from '../types'
 
 let failures = 0
@@ -41,7 +42,8 @@ check(
 )
 
 // --- Blitz scoring ---------------------------------------------------------
-const full = BLITZ_SECONDS * 1000
+// Every assertion below is written against the QCM clock, the default type
+const full = blitzSeconds('QCM') * 1000
 check('blitz instant answer', scoreAnswer('BLITZ', 'correct', { msLeft: full }), POINTS.correct + BLITZ_SPEED_BONUS)
 check('blitz at the buzzer', scoreAnswer('BLITZ', 'correct', { msLeft: 0 }), POINTS.correct)
 check(
@@ -53,6 +55,30 @@ check('blitz timeout scores nothing', scoreAnswer('BLITZ', 'incorrect', { msLeft
 // A clock read after expiry must not pay a bonus, and never a negative one
 check('blitz clamps a negative clock', scoreAnswer('BLITZ', 'correct', { msLeft: -5000 }), POINTS.correct)
 check('blitz clamps an over-full clock', scoreAnswer('BLITZ', 'correct', { msLeft: full * 3 }), POINTS.correct + BLITZ_SPEED_BONUS)
+
+// --- Per-exercise blitz clocks ----------------------------------------------
+// A dictation cannot be heard and typed in the time it takes to tap one of four
+// options — that is the whole reason the clock is per type.
+check('dictation gets more time than a QCM', blitzSeconds('LISTENING') > blitzSeconds('QCM'), true)
+check('typing gets more time than a QCM', blitzSeconds('TYPING') > blitzSeconds('QCM'), true)
+check('conjugation gets the longest clock', blitzSeconds('CONJUGATION') >= blitzSeconds('TYPING'), true)
+// The bonus is a fraction of the exercise's own budget, so the same *effort*
+// pays the same everywhere — otherwise a long clock would be worth more points
+const half = (type: ExerciseType) =>
+  scoreAnswer('BLITZ', 'correct', { msLeft: (blitzSeconds(type) * 1000) / 2, exerciseType: type })
+check(
+  'half of any clock is worth the same',
+  new Set((['QCM', 'TYPING', 'LISTENING', 'CONJUGATION'] as ExerciseType[]).map(half)).size,
+  1,
+)
+// Answering a dictation with 8s left is fast for a QCM and ordinary for a
+// dictation: the type is what tells them apart
+check(
+  'the same time left scores less on a longer clock',
+  scoreAnswer('BLITZ', 'correct', { msLeft: full, exerciseType: 'LISTENING' }) <
+    scoreAnswer('BLITZ', 'correct', { msLeft: full, exerciseType: 'QCM' }),
+  true,
+)
 
 // --- A perfect round matches the advertised maximum -------------------------
 const perfect = (mode: 'CLASSIC' | 'BLITZ') => {

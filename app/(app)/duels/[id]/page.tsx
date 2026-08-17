@@ -10,7 +10,7 @@ import { Card, Chip, SectionLabel } from '@/components/ui/primitives'
 import { Button, buttonClasses } from '@/components/ui/button'
 import { getStrings } from '@/lib/i18n'
 import { useLang } from '@/components/CourseProvider'
-import { BLITZ_SECONDS } from '@/lib/duel/rules'
+import { BLITZ_RANGE } from '@/lib/duel/rules'
 import { cn } from '@/lib/utils'
 import type { DuelDetail } from '@/app/api/duels/[id]/route'
 
@@ -61,7 +61,9 @@ export default function DuelPage({ params }: { params: Promise<{ id: string }> }
     <AppShell
       title={name}
       subtitle={[
-        duel.mode === 'BLITZ' ? `${t.duelModeBlitz} · ${BLITZ_SECONDS}s` : t.duelModeClassic,
+        duel.mode === 'BLITZ'
+          ? `${t.duelModeBlitz} · ${BLITZ_RANGE[0]}-${BLITZ_RANGE[1]}s`
+          : t.duelModeClassic,
         t.duelRoundsValue(duel.rounds),
       ].join(' · ')}
     >

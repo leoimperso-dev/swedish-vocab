@@ -6,9 +6,9 @@ import { buildExercises } from '@/lib/study/build'
 import { recordAnswer } from '@/lib/study/answer'
 import { finalizeSession } from '@/lib/study/finalize'
 import { courseDirections, defaultDirection, type Course, type Direction } from '@/lib/courses'
-import { DUEL_XP, ROUND_SIZE, scoreAnswer, type DuelMode } from '@/lib/duel/rules'
+import { BLITZ_SECONDS, DUEL_XP, ROUND_SIZE, scoreAnswer, type DuelMode } from '@/lib/duel/rules'
 import { isParticipant, submitRound } from '@/lib/duel/service'
-import type { AnswerResult } from '@/types'
+import type { AnswerResult, ExerciseType } from '@/types'
 
 interface Ctx {
   params: Promise<{ id: string }>
@@ -81,7 +81,14 @@ export async function POST(_req: NextRequest, { params }: Ctx) {
 interface SubmitBody {
   sessionId: string
   /** One entry per exercise, in the order they were answered. */
-  answers: Array<{ wordId: string; result: AnswerResult; msLeft?: number; direction?: string }>
+  answers: Array<{
+    wordId: string
+    result: AnswerResult
+    msLeft?: number
+    direction?: string
+    /** Which blitz clock `msLeft` was measured against — see scoreAnswer. */
+    exerciseType?: string
+  }>
 }
 
 /** Ends the caller's turn: scores it, saves progress, advances the duel. */
@@ -107,6 +114,14 @@ export async function PUT(req: NextRequest, { params }: Ctx) {
   // A blitz round mixes both directions, so each answer reports its own. It is
   // only ever accepted as one of this player's two — a wrong value would
   // credit SM-2 to a direction their course does not even have.
+  // Blitz gives each exercise type its own clock, so the reported time only
+  // means something alongside the type it was measured against. The round's
+  // exercises are not stored, so this is taken on trust — like msLeft itself,
+  // and no more exploitable: a full clock already pays the maximum bonus
+  // whichever type is claimed.
+  const exerciseTypeOf = (reported: string | undefined): ExerciseType =>
+    reported && reported in BLITZ_SECONDS ? (reported as ExerciseType) : 'QCM'
+
   const ownDirections = courseDirections(course)
   const directionOf = (reported: string | undefined): Direction =>
     ownDirections.find(d => d === reported) ?? roundDirection
@@ -120,7 +135,11 @@ export async function PUT(req: NextRequest, { params }: Ctx) {
   for (const answer of answers) {
     streak = answer.result === 'correct' ? streak + 1 : 0
     bestCombo = Math.max(bestCombo, streak)
-    score += scoreAnswer(mode, answer.result, { streak, msLeft: answer.msLeft ?? 0 })
+    score += scoreAnswer(mode, answer.result, {
+      streak,
+      msLeft: answer.msLeft ?? 0,
+      exerciseType: exerciseTypeOf(answer.exerciseType),
+    })
     results.push(answer.result)
   }
 
