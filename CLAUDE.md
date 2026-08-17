@@ -28,7 +28,10 @@ Dark-only, mobile-first (max-w-[430px]), ported from the svensk-spark Lovable de
 - `lib/sm2.ts` — SM-2 spaced repetition algorithm
 - `lib/study/build.ts` — draws a player's exercises (due words ranked by level, topped up with
   new ones) and their QCM distractors / accepted alternatives. Shared by the solo session and
-  a duel round, which is why neither route holds that logic.
+  a duel round, which is why neither route holds that logic. A MIX session deals its types from
+  `SOLO_MIX` quotas, the easiest slots going to the least-known words: chosen per word, the
+  type followed that word's own progression, so a beginner — whose list is nearly all new words
+  — got a flashcard every single time and MIX drilled one type.
 - `lib/study/answer.ts` / `lib/study/finalize.ts` — one answer (SM-2 + session counters) and
   the end of a session (XP, streak, achievements, daily goal), both reused by duels
 - `lib/fuzzy.ts` — Levenshtein fuzzy matching for answer evaluation

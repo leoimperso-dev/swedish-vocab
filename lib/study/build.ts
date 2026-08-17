@@ -44,21 +44,61 @@ export function clozeEligible(word: Word): boolean {
   return answerableExamples(examples, word.translation).length > 0
 }
 
-/** Solo policy: ease into a word, then vary. Duels deal types from quotas instead. */
-function selectExerciseType(
-  userWord: UserWord | null,
-  word: Word,
+// How a MIX session spreads its exercise types, hardest last.
+//
+// Chosen per word, the type followed the word's own progression — a flashcard
+// until it had been answered, a QCM until three repetitions. That reads well
+// for one card and collapses for a session: a learner's list is mostly new
+// words, so every card came out a flashcard and MIX drilled a single type. The
+// quotas are dealt over the session instead, and it is the *ranking* that keeps
+// the progression: the easiest slots go to the least-known words.
+const SOLO_MIX: ExerciseType[] = [
+  'FLASHCARD', 'FLASHCARD', 'FLASHCARD', 'FLASHCARD',
+  'QCM', 'QCM', 'QCM', 'QCM',
+  'LISTENING', 'LISTENING', 'LISTENING',
+  'TYPING', 'TYPING', 'TYPING', 'TYPING',
+]
+// Difficulty order of the slots above; the same order ranks the words
+const SOLO_DIFFICULTY: ExerciseType[] = ['FLASHCARD', 'QCM', 'LISTENING', 'TYPING']
+// At most this many typing slots become their richer variant (cloze/conjugation)
+const SOLO_VARIANT_SLOTS = 2
+
+interface SoloCandidate {
+  userWord: UserWord | null
+  word: Word
+}
+
+/** Solo policy: quotas over the session, easiest slots to the least-known words. */
+function assignSoloTypes(
+  candidates: SoloCandidate[],
   course: Course,
   termExercises: boolean,
-): ExerciseType {
-  if (!userWord || userWord.repetitions === 0) return 'FLASHCARD'
-  if (userWord.repetitions <= 2) return 'QCM'
-  const pool: ExerciseType[] = ['TYPING']
-  // Dictation always drills the learned language, whichever side it sits on
-  pool.push('LISTENING')
-  if (termExercises && word.wordType === 'VERB' && hasFullVerbForms(word.forms, course)) pool.push('CONJUGATION')
-  if (termExercises && clozeEligible(word)) pool.push('CLOZE')
-  return pool[Math.floor(Math.random() * pool.length)]
+): ExerciseType[] {
+  const slots: ExerciseType[] = []
+  while (slots.length < candidates.length) slots.push(...SOLO_MIX)
+  slots.length = candidates.length
+  slots.sort((a, b) => SOLO_DIFFICULTY.indexOf(a) - SOLO_DIFFICULTY.indexOf(b))
+
+  const order = candidates
+    .map((candidate, i) => ({ i, repetitions: candidate.userWord?.repetitions ?? -1 }))
+    .sort((a, b) => a.repetitions - b.repetitions)
+
+  const types: ExerciseType[] = new Array(candidates.length)
+  order.forEach(({ i }, rank) => { types[i] = slots[rank] })
+
+  // A typing slot becomes cloze or conjugation where the word allows it, so a
+  // session is not four identical prompts in a row.
+  let variants = 0
+  for (let i = 0; i < candidates.length && variants < SOLO_VARIANT_SLOTS; i++) {
+    if (types[i] !== 'TYPING' || !termExercises) continue
+    const { word } = candidates[i]
+    if (word.wordType === 'VERB' && hasFullVerbForms(word.forms, course)) types[i] = 'CONJUGATION'
+    else if (clozeEligible(word)) types[i] = 'CLOZE'
+    else continue
+    variants++
+  }
+
+  return types
 }
 
 /** Filter keeping the first row of each word — one card per word per session. */
@@ -229,8 +269,9 @@ export async function buildExercises(opts: BuildOptions): Promise<ExerciseWord[]
     ...newWords.map(w => ({ word: w, userWord: null })),
   ].slice(0, size))
 
-  const duelTypes =
-    policy === 'DUEL'
+  const mixedTypes = forcedMode
+    ? null
+    : policy === 'DUEL'
       ? assignDuelTypes(
           entries.map(e => ({
             isNew: e.userWord === null,
@@ -239,13 +280,10 @@ export async function buildExercises(opts: BuildOptions): Promise<ExerciseWord[]
               termExercises && e.word.wordType === 'VERB' && hasFullVerbForms(e.word.forms, course),
           })),
         )
-      : null
+      : assignSoloTypes(entries, course, termExercises)
 
   const exercises = entries.map((entry, i) => {
-    const exerciseType =
-      forcedMode ??
-      duelTypes?.[i] ??
-      selectExerciseType(entry.userWord, entry.word, course, termExercises)
+    const exerciseType = forcedMode ?? mixedTypes![i]
     // A scheduled card is asked in its own direction; a word never seen has no
     // schedule yet, so a mixed session picks one for it.
     const own = (entry.userWord?.direction as Direction | undefined)
