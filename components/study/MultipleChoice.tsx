@@ -8,6 +8,7 @@ import { answerLang, type Direction } from '@/lib/courses'
 import { getStrings } from '@/lib/i18n'
 import { useCourse } from '@/components/CourseProvider'
 import { Card } from '@/components/ui/primitives'
+import { ReplayButton } from '@/components/study/ReplayButton'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 import type { Word } from '@prisma/client'
@@ -53,10 +54,12 @@ export default function MultipleChoice({ word, direction, distractors, onAnswer 
     if (selected) return
     setSelected(option)
     unlock()
-    speakSequence(learnedSpeech(word, course))
-
-    // Right answers flow on; a wrong one waits so the correct option can be read
-    if (option === correctOption) setTimeout(() => onAnswer('correct', 'QCM'), 800)
+    // Right answers flow on, but only once the word has been said in full —
+    // cutting the voice off mid-superlative teaches half the word
+    const done = option === correctOption
+      ? () => setTimeout(() => onAnswer('correct', 'QCM'), 400)
+      : undefined
+    speakSequence(learnedSpeech(word, course), { onDone: done })
   }
 
   if (loading) return <div className="text-center text-muted-foreground">{t.loading}</div>
@@ -69,9 +72,12 @@ export default function MultipleChoice({ word, direction, distractors, onAnswer 
       </Card>
 
       {selected && selected !== correctOption && (
-        <Button size="lg" className="w-full" onClick={() => onAnswer('incorrect', 'QCM')}>
-          {t.nextTurn}
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button size="lg" className="w-full" onClick={() => onAnswer('incorrect', 'QCM')}>
+            {t.nextTurn}
+          </Button>
+          <ReplayButton word={word} className="size-11" />
+        </div>
       )}
 
       <div className="grid grid-cols-2 gap-3">

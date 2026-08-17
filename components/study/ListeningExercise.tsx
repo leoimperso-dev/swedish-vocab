@@ -6,6 +6,7 @@ import { Check, Minus, Volume2, X } from 'lucide-react'
 import { speak, unlock } from '@/lib/tts'
 import { evaluateAnswer } from '@/lib/fuzzy'
 import { learnedLocale, learnedText } from '@/lib/word-display'
+import { learnsTermLanguage } from '@/lib/courses'
 import { getStrings } from '@/lib/i18n'
 import { useCourse } from '@/components/CourseProvider'
 import { Card, TextField } from '@/components/ui/primitives'
@@ -48,8 +49,15 @@ export default function ListeningExercise({ word, onAnswer }: Props) {
 
   // Prefer a real sentence when the word has one — dictation of a lone word is
   // much easier. Picked once per word so replays say the same thing.
+  //
+  // Example sentences are authored in the pair's `term` language, so they are
+  // only usable when that is the language being learned: dictating a Swedish
+  // sentence to someone learning French read it in a French voice and never
+  // once said a French word.
   const [prompt] = useState(() => {
-    const examples = (Array.isArray(word.examples) ? word.examples : []) as unknown as ClozeExample[]
+    const examples = (learnsTermLanguage(course) && Array.isArray(word.examples)
+      ? word.examples
+      : []) as unknown as ClozeExample[]
     const usable = examples.filter(e => e?.term && e.term.split(/\s+/).length <= 12)
     if (usable.length > 0) {
       const picked = usable[Math.floor(Math.random() * usable.length)]

@@ -46,11 +46,14 @@ check(
 const full = blitzSeconds('QCM') * 1000
 check('blitz instant answer', scoreAnswer('BLITZ', 'correct', { msLeft: full }), POINTS.correct + BLITZ_SPEED_BONUS)
 check('blitz at the buzzer', scoreAnswer('BLITZ', 'correct', { msLeft: 0 }), POINTS.correct)
+// The bonus is measured against half the clock, not the whole of it: a
+// generous deadline keeps the exercise possible, a short par keeps it ranking
 check(
-  'blitz half time',
-  scoreAnswer('BLITZ', 'correct', { msLeft: full / 2 }),
+  'blitz quarter spent',
+  scoreAnswer('BLITZ', 'correct', { msLeft: (full * 3) / 4 }),
   POINTS.correct + BLITZ_SPEED_BONUS / 2,
 )
+check('blitz bonus is gone by mid-clock', scoreAnswer('BLITZ', 'correct', { msLeft: full / 2 }), POINTS.correct)
 check('blitz timeout scores nothing', scoreAnswer('BLITZ', 'incorrect', { msLeft: 0 }), 0)
 // A clock read after expiry must not pay a bonus, and never a negative one
 check('blitz clamps a negative clock', scoreAnswer('BLITZ', 'correct', { msLeft: -5000 }), POINTS.correct)
@@ -64,11 +67,14 @@ check('typing gets more time than a QCM', blitzSeconds('TYPING') > blitzSeconds(
 check('conjugation gets the longest clock', blitzSeconds('CONJUGATION') >= blitzSeconds('TYPING'), true)
 // The bonus is a fraction of the exercise's own budget, so the same *effort*
 // pays the same everywhere — otherwise a long clock would be worth more points
-const half = (type: ExerciseType) =>
-  scoreAnswer('BLITZ', 'correct', { msLeft: (blitzSeconds(type) * 1000) / 2, exerciseType: type })
+const quarterSpent = (type: ExerciseType) =>
+  scoreAnswer('BLITZ', 'correct', {
+    msLeft: (blitzSeconds(type) * 1000 * 3) / 4,
+    exerciseType: type,
+  })
 check(
-  'half of any clock is worth the same',
-  new Set((['QCM', 'TYPING', 'LISTENING', 'CONJUGATION'] as ExerciseType[]).map(half)).size,
+  'the same share of any clock is worth the same',
+  new Set((['QCM', 'TYPING', 'LISTENING', 'CONJUGATION'] as ExerciseType[]).map(quarterSpent)).size,
   1,
 )
 // Answering a dictation with 8s left is fast for a QCM and ordinary for a

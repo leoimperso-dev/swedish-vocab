@@ -192,10 +192,12 @@ a majority (`winsNeeded`) or on the last round.
   `ExerciseWord.direction`, which the browser reports back per answer so SM-2 credits the
   right progression; the server only accepts a direction belonging to that player's course.
 - **The blitz clock is per exercise type** (`BLITZ_SECONDS`, `blitzSeconds()`): 8s for a QCM,
-  up to 24s for a conjugation. One budget for the whole round made dictation and cloze
-  unplayable — the time is set by what the *task* takes, not by the question. The speed bonus
-  is a fraction of that exercise's own budget, so the same effort pays the same everywhere,
-  which is why the answer reports its `exerciseType` alongside `msLeft`.
+  40s for a dictation. One budget for the whole round made dictation and cloze unplayable —
+  the time is set by what the *task* takes. The deadline is deliberately generous and the
+  **speed bonus is measured against half of it** (`BLITZ_PAR_RATIO`), because a bonus spread
+  over a long clock puts every honest answer near the maximum and stops ranking anyone. Both
+  are relative to the exercise's own budget, so the same share of any clock pays the same —
+  hence the answer reports its `exerciseType` alongside `msLeft`.
 - The score is **recomputed server-side** from the results the browser reports — the client
   only says what was answered and how much clock was left.
 - A round's score stays hidden until both sides have played it, so nobody plays knowing the

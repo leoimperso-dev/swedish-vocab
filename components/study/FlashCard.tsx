@@ -13,6 +13,7 @@ import { getStrings } from '@/lib/i18n'
 import { useCourse } from '@/components/CourseProvider'
 import { SectionLabel } from '@/components/ui/primitives'
 import { Button } from '@/components/ui/button'
+import { ReplayButton } from '@/components/study/ReplayButton'
 import type { Word } from '@prisma/client'
 import type { AnswerResult } from '@/types'
 
@@ -39,13 +40,6 @@ export default function FlashCard({ word, direction, onAnswer }: Props) {
     if (answered) return
     setAnswered(true)
     onAnswer(result, 'FLASHCARD')
-  }
-
-  // The card is dragged once flipped, so replaying must not start a swipe
-  const replay = (e: React.MouseEvent) => {
-    e.stopPropagation()
-    unlock()
-    speakSequence(learnedSpeech(word, course))
   }
 
   const handleFlip = () => {
@@ -99,7 +93,7 @@ export default function FlashCard({ word, direction, onAnswer }: Props) {
             <p className="text-sm text-muted-foreground">{t.tapToReveal}</p>
           </div>
         ) : (
-          <FlashCardBack word={word} direction={direction} onReplay={replay} />
+          <FlashCardBack word={word} direction={direction} />
         )}
       </motion.div>
 
@@ -143,11 +137,7 @@ export default function FlashCard({ word, direction, onAnswer }: Props) {
   )
 }
 
-function FlashCardBack({ word, direction, onReplay }: {
-  word: Word
-  direction: Direction
-  onReplay: (e: React.MouseEvent) => void
-}) {
+function FlashCardBack({ word, direction }: { word: Word; direction: Direction }) {
   const course = useCourse()
   const t = getStrings(course.native)
   const forms = formatForms(word.forms)
@@ -167,14 +157,7 @@ function FlashCardBack({ word, direction, onReplay }: {
       </p>
       <div className="flex items-center justify-center gap-2">
         <p className="font-display text-2xl font-semibold text-primary">{mainAnswer}</p>
-        <button
-          onClick={onReplay}
-          aria-label={t.listen}
-          title={t.listen}
-          className="pressable grid size-9 shrink-0 place-items-center rounded-xl border border-border bg-surface text-muted-foreground"
-        >
-          <Volume2 size={16} />
-        </button>
+        <ReplayButton word={word} />
       </div>
       {!formsOnPrompt && forms && (
         <p className="text-xs text-muted-foreground">({forms})</p>

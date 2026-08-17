@@ -10,6 +10,7 @@ import { answerLang, type Direction } from '@/lib/courses'
 import { getStrings } from '@/lib/i18n'
 import { useCourse } from '@/components/CourseProvider'
 import { Card, TextField } from '@/components/ui/primitives'
+import { ReplayButton } from '@/components/study/ReplayButton'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 import type { Word } from '@prisma/client'
@@ -52,13 +53,16 @@ export default function TypingExercise({ word, direction, alsoAccepted, onAnswer
   const handleSubmit = () => {
     if (!input.trim() || result) return
     unlock()
-    speakSequence(learnedSpeech(word, course))
-
     const evaluation = evaluateAlternatives(input, [expected, ...(alsoAccepted ?? [])])
     setResult(evaluation)
 
-    // A correct answer flows on; a wrong one waits for the learner to read it
-    if (evaluation === 'correct') setTimeout(() => onAnswer(evaluation, 'TYPING'), 1200)
+    // A correct answer flows on once the word has been said in full; a wrong one
+    // waits for the learner to read it
+    speakSequence(learnedSpeech(word, course), {
+      onDone: evaluation === 'correct'
+        ? () => setTimeout(() => onAnswer(evaluation, 'TYPING'), 400)
+        : undefined,
+    })
   }
 
   return (
@@ -107,9 +111,12 @@ export default function TypingExercise({ word, direction, alsoAccepted, onAnswer
             {t.submit}
           </Button>
         ) : result !== 'correct' ? (
-          <Button size="lg" className="w-full" onClick={() => onAnswer(result, 'TYPING')}>
-            {t.nextTurn}
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button size="lg" className="w-full" onClick={() => onAnswer(result, 'TYPING')}>
+              {t.nextTurn}
+            </Button>
+            <ReplayButton word={word} className="size-11" />
+          </div>
         ) : null}
       </div>
     </div>

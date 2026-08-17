@@ -240,13 +240,19 @@ export default function WordsPage() {
   const speakWords = useCallback((list: ApiWord[]) => {
     const learnedLocale = localeOf(course.learned)
     const nativeLocale = localeOf(course.native)
+    // `term` is the pair's side, not the learner's: a Swede learning French has
+    // it as their native language. Reading it in the learned voice said every
+    // word in the wrong language, and never once in the one being learned.
+    const learnsTerm = learnsTermLanguage(course)
     setPlaylist(list.map(w => w.id))
-    // Each word reads as "term, then translation" — two utterances, two languages
-    speak(list.flatMap(w => [
-      { text: w.term.replace(/\(.*?\)/g, '').trim(), locale: learnedLocale, pauseAfter: 250 },
-      { text: w.translation, locale: nativeLocale, pauseAfter: 450 },
-    ]))
-  }, [course.learned, course.native, speak])
+    // Each word reads as "learned side, then native side" — two languages
+    speak(list.flatMap(w => {
+      const term = { text: w.term.replace(/\(.*?\)/g, '').trim(), locale: learnsTerm ? learnedLocale : nativeLocale }
+      const translation = { text: w.translation, locale: learnsTerm ? nativeLocale : learnedLocale }
+      const [first, second] = learnsTerm ? [term, translation] : [translation, term]
+      return [{ ...first, pauseAfter: 250 }, { ...second, pauseAfter: 450 }]
+    }))
+  }, [course, speak])
 
   const toggleSpeak = () => {
     if (playing) stop()
@@ -632,7 +638,11 @@ function WordRow({ word, course, showRank, masked, onFlip, onSwipe, speaking, on
             examples.map(ex => (
               <div key={ex.term}>
                 <p className="text-sm leading-snug text-foreground">
-                  <TappableText text={ex.term} locale={localeOf(course.learned)} t={t} />
+                  <TappableText
+                    text={ex.term}
+                    locale={localeOf(learnsTerm ? course.learned : course.native)}
+                    t={t}
+                  />
                 </p>
                 {ex.translation && (
                   <p className="text-xs italic leading-snug text-muted-foreground">{ex.translation}</p>

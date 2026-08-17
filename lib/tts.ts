@@ -171,21 +171,53 @@ export function speak(text: string, locale: string, rate = getRate()): void {
   window.speechSynthesis.speak(utterance)
 }
 
-// Reads a few short items back to back, in one language. For a headword and its
-// inflected forms — long playlists belong to `useSpeechQueue`, which guards
-// Chrome's watchdog; a handful of words never runs long enough to trip it.
-export function speakSequence(items: { text: string; locale: string }[], rate = getRate()): void {
-  if (typeof window === 'undefined' || items.length === 0) return
+// Nothing waits on the voice for longer than this: a device that never fires
+// `onend` (it happens) must not leave a session stuck on an answered card.
+const SPEECH_TIMEOUT_MS = 8000
+
+/**
+ * Reads a few short items back to back, in one language, and calls `onDone`
+ * when the last one has been spoken — an exercise waits for that before moving
+ * on, so a comparative is never cut off by the next word.
+ *
+ * For a headword and its inflected forms. Long playlists belong to
+ * `useSpeechQueue`, which guards Chrome's watchdog; a handful of words never
+ * runs long enough to trip it.
+ */
+export function speakSequence(
+  items: { text: string; locale: string }[],
+  { rate = getRate(), onDone }: { rate?: number; onDone?: () => void } = {},
+): void {
+  const finish = () => {
+    if (!onDone || settled) return
+    settled = true
+    clearTimeout(guard)
+    onDone()
+  }
+  let settled = false
+  let guard: ReturnType<typeof setTimeout> | undefined
+
+  if (typeof window === 'undefined' || !isSupported() || items.length === 0) {
+    onDone?.()
+    return
+  }
+  guard = setTimeout(finish, SPEECH_TIMEOUT_MS)
   window.speechSynthesis.cancel()
-  for (const item of items) {
+
+  items.forEach((item, i) => {
     const utterance = new SpeechSynthesisUtterance(speakable(item.text))
     utterance.lang = item.locale
     const voice = getVoiceFor(item.locale)
     if (voice) utterance.voice = voice
     utterance.rate = rate
     utterance.pitch = 1
+    if (i === items.length - 1) {
+      utterance.onend = finish
+      // A missing voice fires onerror instead — the card still has to move on
+      utterance.onerror = finish
+    }
     window.speechSynthesis.speak(utterance)
-  }
+  })
 }
 
 export function isSupported(): boolean {

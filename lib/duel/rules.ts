@@ -49,17 +49,32 @@ export const COMBO_BONUS = 2
  * comparable everywhere instead of impossible on half the round.
  */
 export const BLITZ_SECONDS: Record<ExerciseType, number> = {
+  // Four options are read and tapped — no writing, so the original clock stands
   QCM: 8,
-  TYPING: 14,
+  TYPING: 22,
   // Hearing the word, often twice, before a single character can be typed
-  LISTENING: 20,
+  LISTENING: 40,
   // A whole sentence to read before the gap makes sense
-  CLOZE: 20,
+  CLOZE: 34,
   // Three forms to type, not one
-  CONJUGATION: 24,
+  CONJUGATION: 40,
   // Self-assessed, so never dealt in a duel — here only to keep the map total
   FLASHCARD: 8,
 }
+
+/**
+ * The share of the clock a full speed bonus is measured against.
+ *
+ * The deadline and the bonus answer two different questions. The deadline only
+ * has to keep an exercise *possible* — a dictation nobody can finish scores
+ * everyone zero and separates nobody. The bonus is what actually ranks two
+ * players, and it has to run out well before the deadline does: measured
+ * against a generous clock, every honest answer lands near the maximum and the
+ * mode stops discriminating, which is the "both players ace it" failure this
+ * duel already had once. So: answer within half the clock to earn anything,
+ * instantly to earn it all.
+ */
+export const BLITZ_PAR_RATIO = 0.5
 
 export function blitzSeconds(type: ExerciseType): number {
   return BLITZ_SECONDS[type] ?? BLITZ_SECONDS.QCM
@@ -110,7 +125,10 @@ export function scoreAnswer(
   const base = POINTS[result]
   if (result === 'incorrect') return 0
   if (mode === 'BLITZ') {
-    const ratio = Math.max(0, Math.min(1, msLeft / (blitzSeconds(exerciseType) * 1000)))
+    const budget = blitzSeconds(exerciseType) * 1000
+    const elapsed = Math.max(0, Math.min(budget, budget - msLeft))
+    // Full bonus for an instant answer, nothing left by mid-clock — see BLITZ_PAR_RATIO
+    const ratio = Math.max(0, 1 - elapsed / (budget * BLITZ_PAR_RATIO))
     return base + Math.round(BLITZ_SPEED_BONUS * ratio)
   }
   return base + (result === 'correct' && streak >= COMBO_FROM ? COMBO_BONUS : 0)
