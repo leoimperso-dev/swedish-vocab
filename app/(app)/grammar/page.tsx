@@ -3,6 +3,8 @@ import { auth } from '@/auth'
 import Link from 'next/link'
 import { BookOpen, ChevronRight } from 'lucide-react'
 import { getStrings } from '@/lib/i18n'
+import { redirect } from 'next/navigation'
+import { learnsTermLanguage } from '@/lib/courses'
 import { getCourse } from '@/lib/current-course'
 import { AppShell } from '@/components/AppShell'
 import { SectionLabel } from '@/components/ui/primitives'
@@ -10,6 +12,12 @@ import { SectionLabel } from '@/components/ui/primitives'
 export default async function GrammarPage() {
   const session = await auth()
   const course = await getCourse(session!.user!.id)
+  // Stories, dialogues and grammar are authored in the pair's `term` language:
+  // to a learner of the other side they are their own native language, read by
+  // a voice of the language they are learning. Hiding the links is not enough —
+  // the URL stays reachable.
+  if (!learnsTermLanguage(course)) redirect('/study')
+
   const lessons = await db.grammarLesson.findMany({
     where: { pair: course.pair },
     select: { slug: true, title: true, category: true, order: true },

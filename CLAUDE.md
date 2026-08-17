@@ -310,6 +310,7 @@ pnpm tsx scripts/assign-cefr.ts            # recompute Word.cefr (after apply-fr
 pnpm tsx scripts/check-duel-rules.ts       # QA: duel scoring and match resolution
 pnpm tsx scripts/simulate-duel.ts          # QA: full duel against the DB (self-cleaning)
 pnpm tsx scripts/check-mixed-session.ts <email>  # QA: a MIXED session keeps each card's direction
+pnpm tsx scripts/check-mastered.ts         # QA: "I know these perfectly" (throwaway account)
 ```
 After touching stories or vocabulary, run the coverage check — only proper
 nouns and numbers may stay unresolved (the reader shows « Nom propre » for
@@ -356,3 +357,11 @@ Their inputs (`en_50k.txt`, `tatoeba\`) are downloads, not repo content.
 - 3 = approximate (partial credit, doesn't advance)
 - 4 = correct (advances normally)
 - Mastered = interval > 21 days
+
+The vocabulary list can also declare words known outright: the ✓ button next to the read-aloud
+one turns rows into checkboxes, and `/api/words/mastered` (`lib/words/mastered.ts`) writes
+`MASTERED_STATE()` to the selection in **both directions** — `interval` clears the ladder's top
+rung, `repetitions` clears the SM-2 warm-up so the next real review multiplies instead of
+restarting. It awards **no XP** on purpose: a claim over hundreds of words would mint more in one
+tap than a month of sessions. A wrong answer later still resets everything. Guarded by
+`scripts/check-mastered.ts`.

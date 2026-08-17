@@ -4,6 +4,7 @@ import { notFound } from 'next/navigation'
 import Link from 'next/link'
 import { ChevronLeft, ChevronRight } from 'lucide-react'
 import { getStrings } from '@/lib/i18n'
+import { learnsTermLanguage } from '@/lib/courses'
 import { getCourse } from '@/lib/current-course'
 import MarkdownLite from '@/components/grammar/MarkdownLite'
 import { AppShell } from '@/components/AppShell'
@@ -16,7 +17,8 @@ export default async function GrammarLessonPage({ params }: { params: Promise<{ 
     db.grammarLesson.findUnique({ where: { slug } }),
   ])
   // A lesson from another pair is not part of this course
-  if (!lesson || lesson.pair !== course.pair) notFound()
+  // ...and it teaches the pair's `term` language, in its `translation` one
+  if (!lesson || lesson.pair !== course.pair || !learnsTermLanguage(course)) notFound()
   const t = getStrings(course.native)
 
   const [previous, next] = await Promise.all([

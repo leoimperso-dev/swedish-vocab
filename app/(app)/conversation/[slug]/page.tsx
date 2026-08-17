@@ -1,6 +1,7 @@
 import { auth } from '@/auth'
 import { db } from '@/lib/db'
 import { notFound } from 'next/navigation'
+import { learnsTermLanguage } from '@/lib/courses'
 import { getCourse } from '@/lib/current-course'
 import DialoguePlayer from '@/components/conversation/DialoguePlayer'
 
@@ -12,7 +13,8 @@ export default async function DialoguePage({ params }: { params: Promise<{ slug:
     db.dialogue.findUnique({ where: { slug } }),
   ])
   // A dialogue from another pair is not part of this course
-  if (!dialogue || dialogue.pair !== course.pair) notFound()
+  // ...and it is spoken in the pair's `term` language — see the conversation page
+  if (!dialogue || dialogue.pair !== course.pair || !learnsTermLanguage(course)) notFound()
 
   return <DialoguePlayer dialogue={dialogue} />
 }

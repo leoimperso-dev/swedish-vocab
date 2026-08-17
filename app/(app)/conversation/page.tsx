@@ -1,5 +1,6 @@
 import { auth } from '@/auth'
 import { db } from '@/lib/db'
+import { learnsTermLanguage } from '@/lib/courses'
 import { getCourse } from '@/lib/current-course'
 import DialogueBrowser from '@/components/conversation/DialogueBrowser'
 
@@ -7,7 +8,10 @@ export default async function ConversationPage() {
   const session = await auth()
   const course = await getCourse(session!.user!.id)
 
-  const dialogues = await db.dialogue.findMany({
+  // Scripted dialogues are authored in the pair's `term` language: to a learner
+  // of the other side they are their own native language, read by a voice of
+  // the language they are learning. The free chat is generated and stays.
+  const dialogues = !learnsTermLanguage(course) ? [] : await db.dialogue.findMany({
     where: { pair: course.pair },
     select: { slug: true, title: true, titleTranslated: true, level: true, turns: true },
     orderBy: { createdAt: 'asc' },

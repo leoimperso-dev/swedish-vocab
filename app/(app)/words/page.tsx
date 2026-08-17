@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { motion, useMotionValue, useTransform } from 'framer-motion'
-import { Check, ChevronDown, Eye, EyeOff, MessageSquare, Search, Square, Star, Volume2, X } from 'lucide-react'
+import { Check, ChevronDown, Eye, EyeOff, ListChecks, MessageSquare, Search, Square, Star, Volume2, X } from 'lucide-react'
 import { formatForms, parseDetails } from '@/lib/word-display'
 import { MAX_KNOWLEDGE_LEVEL } from '@/lib/sm2'
 import { getStrings } from '@/lib/i18n'
@@ -18,6 +18,7 @@ import { cn } from '@/lib/utils'
 import { AppShell } from '@/components/AppShell'
 import { LevelDots, Segmented, SectionLabel } from '@/components/ui/primitives'
 import { CEFR_LEVELS } from '@/lib/cefr'
+import { Button } from '@/components/ui/button'
 import { EmptyState, ListSkeleton } from '@/components/ui/feedback'
 import TappableText from '@/components/TappableText'
 
@@ -95,6 +96,21 @@ export default function WordsPage() {
 
   const flipCard = (wordId: string) => {
     setRevealed(prev => {
+      const next = new Set(prev)
+      if (next.has(wordId)) next.delete(wordId)
+      else next.add(wordId)
+      return next
+    })
+  }
+
+  // Bulk tidy-up: tick the words already known perfectly and send them to the
+  // top of the ladder in one go, instead of swiping them one by one
+  const [selecting, setSelecting] = useState(false)
+  const [selected, setSelected] = useState<Set<string>>(new Set())
+  const [saving, setSaving] = useState(false)
+
+  const toggleSelected = (wordId: string) => {
+    setSelected(prev => {
       const next = new Set(prev)
       if (next.has(wordId)) next.delete(wordId)
       else next.add(wordId)
@@ -219,8 +235,9 @@ export default function WordsPage() {
     })
   }
 
-  // What the read-aloud button plays: whatever the current view shows
-  const spokenWords = useMemo(() => {
+  // Whatever the current view shows, in order — what the read-aloud button
+  // plays and what "select all" ticks
+  const shownWords = useMemo(() => {
     if (query.trim()) return searchResults.slice(0, searchVisible)
     if (tab === 'favorites') return favoriteWords
     if (tab === 'top') return topWords.slice(0, topVisible)
@@ -256,15 +273,38 @@ export default function WordsPage() {
 
   const toggleSpeak = () => {
     if (playing) stop()
-    else speakWords(spokenWords)
+    else speakWords(shownWords)
   }
 
   // Read on from one word to the end of what the list currently shows — the
   // same queue as the header button, entered in the middle
   const speakFrom = useCallback((wordId: string) => {
-    const start = spokenWords.findIndex(w => w.id === wordId)
-    speakWords(start >= 0 ? spokenWords.slice(start) : spokenWords)
-  }, [spokenWords, speakWords])
+    const start = shownWords.findIndex(w => w.id === wordId)
+    speakWords(start >= 0 ? shownWords.slice(start) : shownWords)
+  }, [shownWords, speakWords])
+
+  const markSelectedMastered = async () => {
+    const wordIds = [...selected]
+    if (wordIds.length === 0) return
+    setSaving(true)
+    try {
+      const res = await fetch('/api/words/mastered', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ wordIds }),
+      })
+      if (!res.ok) throw new Error()
+      const ids = new Set(wordIds)
+      setWords(ws => ws.map(w => (ids.has(w.id) ? { ...w, known: true, level: MAX_KNOWLEDGE_LEVEL } : w)))
+      // The cached copy still holds the old dots — drop it rather than let the
+      // next visit flash them before the refresh lands
+      try { sessionStorage.removeItem(`words-cache-v3-${course.pair}`) } catch {}
+      setSelected(new Set())
+      setSelecting(false)
+      router.refresh()
+    } catch {}
+    setSaving(false)
+  }
 
   const tabOptions = [
     { value: 'categories', label: t.tabCategories },
@@ -331,11 +371,25 @@ export default function WordsPage() {
             onToggle={toggleSpeak}
             label={t.speakList}
             stopLabel={t.stopReading}
-            className={spokenWords.length === 0 ? 'pointer-events-none opacity-40' : undefined}
+            className={shownWords.length === 0 ? 'pointer-events-none opacity-40' : undefined}
           />
+          <button
+            onClick={() => { setSelecting(v => !v); setSelected(new Set()) }}
+            title={t.selectWords}
+            aria-label={t.selectWords}
+            aria-pressed={selecting}
+            className={cn(
+              'pressable grid size-10 shrink-0 place-items-center rounded-xl border',
+              selecting
+                ? 'border-primary/40 bg-info-soft text-primary'
+                : 'border-border bg-surface text-muted-foreground',
+            )}
+          >
+            <ListChecks size={17} />
+          </button>
         </div>
         {/* A hold is invisible until someone says so */}
-        {spokenWords.length > 0 && (
+        {shownWords.length > 0 && (
           <p className="mt-1.5 text-[11px] text-muted-foreground/80">{t.speakFromHint}</p>
         )}
 
@@ -370,7 +424,9 @@ export default function WordsPage() {
           })}
         </div>
 
-        <p className="text-center text-[11px] text-muted-foreground/70">{t.swipeListHint}</p>
+        <p className="text-center text-[11px] text-muted-foreground/70">
+          {selecting ? t.selectWordsHint : t.swipeListHint}
+        </p>
         {missingVoice && (
           <p className="text-center text-[11px] text-warning">
             {t.noVoiceForLanguage(t.languageName[course.learned])}
@@ -386,7 +442,7 @@ export default function WordsPage() {
             <div className="space-y-2">
               <SectionLabel>{t.searchResults(searchResults.length)}</SectionLabel>
               {searchResults.slice(0, searchVisible).map(word => (
-                <WordRow key={word.id} word={word} course={course} masked={flashcards && !revealed.has(word.id)} onFlip={flashcards ? () => flipCard(word.id) : undefined} onSwipe={known => swipeWord(word.id, known)} speaking={spokenWordId === word.id} onSpeak={() => (spokenWordId === word.id ? stop() : speakWords([word]))} onSpeakFrom={() => speakFrom(word.id)} />
+                <WordRow key={word.id} word={word} course={course} selecting={selecting} selected={selected.has(word.id)} onSelect={() => toggleSelected(word.id)} masked={flashcards && !revealed.has(word.id)} onFlip={flashcards ? () => flipCard(word.id) : undefined} onSwipe={known => swipeWord(word.id, known)} speaking={spokenWordId === word.id} onSpeak={() => (spokenWordId === word.id ? stop() : speakWords([word]))} onSpeakFrom={() => speakFrom(word.id)} />
               ))}
               {searchVisible < searchResults.length && (
                 <LoadMoreSentinel onMore={() => setSearchVisible(v => v + PAGE_STEP)} />
@@ -421,7 +477,7 @@ export default function WordsPage() {
                   {open ? (
                     <div className="animate-rise space-y-2 border-t border-border bg-background/40 p-2">
                       {groupWords.slice(0, catVisible[label] ?? PAGE_STEP).map(word => (
-                        <WordRow key={word.id} word={word} course={course} masked={flashcards && !revealed.has(word.id)} onFlip={flashcards ? () => flipCard(word.id) : undefined} onSwipe={known => swipeWord(word.id, known)} speaking={spokenWordId === word.id} onSpeak={() => (spokenWordId === word.id ? stop() : speakWords([word]))} onSpeakFrom={() => speakFrom(word.id)} />
+                        <WordRow key={word.id} word={word} course={course} selecting={selecting} selected={selected.has(word.id)} onSelect={() => toggleSelected(word.id)} masked={flashcards && !revealed.has(word.id)} onFlip={flashcards ? () => flipCard(word.id) : undefined} onSwipe={known => swipeWord(word.id, known)} speaking={spokenWordId === word.id} onSpeak={() => (spokenWordId === word.id ? stop() : speakWords([word]))} onSpeakFrom={() => speakFrom(word.id)} />
                       ))}
                       {(catVisible[label] ?? PAGE_STEP) < groupWords.length && (
                         <LoadMoreSentinel
@@ -440,7 +496,7 @@ export default function WordsPage() {
           <div className="space-y-2">
             <SectionLabel>{t.topWordsHint}</SectionLabel>
             {topWords.slice(0, topVisible).map(word => (
-              <WordRow key={word.id} word={word} course={course} showRank masked={flashcards && !revealed.has(word.id)} onFlip={flashcards ? () => flipCard(word.id) : undefined} onSwipe={known => swipeWord(word.id, known)} speaking={spokenWordId === word.id} onSpeak={() => (spokenWordId === word.id ? stop() : speakWords([word]))} onSpeakFrom={() => speakFrom(word.id)} />
+              <WordRow key={word.id} word={word} course={course} selecting={selecting} selected={selected.has(word.id)} onSelect={() => toggleSelected(word.id)} showRank masked={flashcards && !revealed.has(word.id)} onFlip={flashcards ? () => flipCard(word.id) : undefined} onSwipe={known => swipeWord(word.id, known)} speaking={spokenWordId === word.id} onSpeak={() => (spokenWordId === word.id ? stop() : speakWords([word]))} onSpeakFrom={() => speakFrom(word.id)} />
             ))}
             {topVisible < topWords.length && (
               <LoadMoreSentinel onMore={() => setTopVisible(v => v + PAGE_STEP)} />
@@ -449,23 +505,61 @@ export default function WordsPage() {
         ) : favoriteWords.length > 0 ? (
           <div className="space-y-2">
             {favoriteWords.map(word => (
-              <WordRow key={word.id} word={word} course={course} masked={flashcards && !revealed.has(word.id)} onFlip={flashcards ? () => flipCard(word.id) : undefined} onSwipe={known => swipeWord(word.id, known)} speaking={spokenWordId === word.id} onSpeak={() => (spokenWordId === word.id ? stop() : speakWords([word]))} onSpeakFrom={() => speakFrom(word.id)} />
+              <WordRow key={word.id} word={word} course={course} selecting={selecting} selected={selected.has(word.id)} onSelect={() => toggleSelected(word.id)} masked={flashcards && !revealed.has(word.id)} onFlip={flashcards ? () => flipCard(word.id) : undefined} onSwipe={known => swipeWord(word.id, known)} speaking={spokenWordId === word.id} onSpeak={() => (spokenWordId === word.id ? stop() : speakWords([word]))} onSpeakFrom={() => speakFrom(word.id)} />
             ))}
           </div>
         ) : (
           <EmptyState icon={<Star size={22} className="text-accent" />} title={t.noFavorites} />
         )}
       </div>
+
+      {/* Action bar, above the nav: the selection is worthless without a way to
+          act on it without scrolling back to the top */}
+      {selecting && (
+        <div className="safe-bottom fixed inset-x-0 bottom-[72px] z-50 mx-auto max-w-[430px] px-4">
+          <div className="card-surface animate-rise space-y-2 border-primary/30 p-3 shadow-[var(--shadow-glow)]">
+            <div className="flex items-center gap-2">
+              <span className="min-w-0 flex-1 truncate text-sm font-semibold">
+                {t.selectedCount(selected.size)}
+              </span>
+              <button
+                onClick={() => setSelected(new Set(shownWords.map(w => w.id)))}
+                className="pressable shrink-0 rounded-lg border border-border bg-surface px-2.5 py-1.5 text-xs font-semibold text-muted-foreground"
+              >
+                {t.selectAllShown}
+              </button>
+              <button
+                onClick={() => setSelected(new Set())}
+                className="pressable shrink-0 rounded-lg border border-border bg-surface px-2.5 py-1.5 text-xs font-semibold text-muted-foreground"
+              >
+                {t.clearSelection}
+              </button>
+            </div>
+            <Button
+              size="lg"
+              className="w-full"
+              disabled={selected.size === 0 || saving}
+              onClick={markSelectedMastered}
+            >
+              {t.markMastered}
+            </Button>
+          </div>
+        </div>
+      )}
     </AppShell>
   )
 }
 
 const SWIPE_THRESHOLD = 90
 
-function WordRow({ word, course, showRank, masked, onFlip, onSwipe, speaking, onSpeak, onSpeakFrom }: {
+function WordRow({ word, course, showRank, masked, onFlip, onSwipe, speaking, onSpeak, onSpeakFrom, selecting, selected, onSelect }: {
   word: ApiWord
   course: Course
   showRank?: boolean
+  // Selection mode: the whole row is a checkbox, and nothing else fires
+  selecting?: boolean
+  selected?: boolean
+  onSelect?: () => void
   // Flashcard mode: masked hides the translation side; onFlip toggles the reveal
   masked?: boolean
   onFlip?: () => void
@@ -539,24 +633,39 @@ function WordRow({ word, course, showRank, masked, onFlip, onSwipe, speaking, on
       </motion.div>
 
       <motion.div
-        onClick={onFlip}
-        drag={onSwipe ? 'x' : false}
+        onClick={selecting ? onSelect : onFlip}
+        // Swiping is off while selecting: the two gestures would fight, and a
+        // swipe that also ticked the row would assess the word twice
+        drag={onSwipe && !selecting ? 'x' : false}
         dragSnapToOrigin
         dragElastic={0.6}
         style={{ x }}
         onDragEnd={(_, info) => {
-          if (!onSwipe) return
+          if (!onSwipe || selecting) return
           if (info.offset.x > SWIPE_THRESHOLD) onSwipe(true)
           else if (info.offset.x < -SWIPE_THRESHOLD) onSwipe(false)
         }}
         className={cn(
           'card-surface overflow-hidden',
-          onFlip && 'pressable cursor-pointer',
+          (onFlip || selecting) && 'pressable cursor-pointer',
           speaking && 'border-primary/50 bg-info-soft',
+          selecting && selected && 'border-success/50 bg-success-soft',
         )}
       >
       <div className={cn('flex items-start gap-2.5', masked ? 'p-2.5 px-3.5' : 'p-3.5')}>
-        <FavoriteStar wordId={word.id} label={word.term} className="mt-0.5" />
+        {selecting ? (
+          <span
+            aria-hidden="true"
+            className={cn(
+              'mt-0.5 grid size-5 shrink-0 place-items-center rounded-md border',
+              selected ? 'border-success bg-success text-background' : 'border-border',
+            )}
+          >
+            {selected && <Check size={13} strokeWidth={3} />}
+          </span>
+        ) : (
+          <FavoriteStar wordId={word.id} label={word.term} className="mt-0.5" />
+        )}
 
         <div className="min-w-0 flex-1">
           <div className="flex items-baseline gap-2">
@@ -590,7 +699,7 @@ function WordRow({ word, course, showRank, masked, onFlip, onSwipe, speaking, on
           <LevelDots level={word.level} total={MAX_KNOWLEDGE_LEVEL} className={masked ? 'mt-1.5' : 'mt-2'} />
         </div>
 
-        {onSpeak && (
+        {onSpeak && !selecting && (
           <button
             {...speakPress.handlers}
             aria-label={`${t.listen} — ${word.term}`}
@@ -611,7 +720,7 @@ function WordRow({ word, course, showRank, masked, onFlip, onSwipe, speaking, on
           </button>
         )}
 
-        {word.hasExamples && !masked && (
+        {word.hasExamples && !masked && !selecting && (
           <button
             onClick={e => { e.stopPropagation(); toggleExamples() }}
             aria-expanded={showExamples}

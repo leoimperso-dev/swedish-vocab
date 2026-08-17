@@ -49,6 +49,21 @@ export function knowledgeLevel(interval: number | null | undefined): number {
   return 5
 }
 
+/**
+ * The state of a word the learner declares they already know perfectly.
+ *
+ * `interval` is what the visible ladder reads, so it has to clear the top rung
+ * (60 days) rather than merely be large. `repetitions` is set past the SM-2
+ * warm-up so the next honest review multiplies the interval instead of
+ * restarting the 1-day / 6-day ramp — and a wrong answer still resets
+ * everything, which is what keeps this claim honest.
+ */
+export function MASTERED_STATE(): SM2State & { repetitions: number } {
+  const nextReview = new Date()
+  nextReview.setDate(nextReview.getDate() + 60)
+  return { easeFactor: 2.5, interval: 60, repetitions: 5, nextReview }
+}
+
 export function qualityFromResult(result: 'correct' | 'approximate' | 'incorrect'): Quality {
   switch (result) {
     case 'correct': return 4
