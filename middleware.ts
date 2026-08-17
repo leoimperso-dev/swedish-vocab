@@ -1,13 +1,18 @@
 import { NextResponse, type NextRequest } from 'next/server'
 
+// Reachable without a session: the (auth) screens and the endpoints they post to.
+const PUBLIC_PAGES = ['/login', '/signup', '/forgot-password', '/reset-password']
+const PUBLIC_APIS = ['/api/auth', '/api/register', '/api/password']
+
 // Lightweight redirect layer only — runs on Edge so it cannot query the DB.
 // Real auth enforcement happens via auth() in pages and API routes.
 export default function middleware(req: NextRequest) {
   const hasSession =
     req.cookies.has('authjs.session-token') ||
     req.cookies.has('__Secure-authjs.session-token')
-  const isAuthPage = req.nextUrl.pathname.startsWith('/login')
-  const isApiAuth = req.nextUrl.pathname.startsWith('/api/auth')
+  const { pathname } = req.nextUrl
+  const isAuthPage = PUBLIC_PAGES.some(p => pathname.startsWith(p))
+  const isApiAuth = PUBLIC_APIS.some(p => pathname.startsWith(p))
 
   if (isApiAuth) return NextResponse.next()
   if (!hasSession && !isAuthPage) {

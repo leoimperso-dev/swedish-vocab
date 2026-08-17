@@ -6,11 +6,12 @@ import { useRouter } from 'next/navigation'
 import { signIn } from 'next-auth/react'
 import { Button } from '@/components/ui/button'
 import { TextField } from '@/components/ui/primitives'
-import { GoogleIcon } from '@/components/auth/AuthBrand'
 import { AuthError, AuthLinks } from '@/components/auth/AuthForm'
+import { MIN_PASSWORD_LENGTH } from '@/lib/auth/password'
 
-export default function LoginPage() {
+export default function SignupPage() {
   const router = useRouter()
+  const [name, setName] = useState('')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState<string | null>(null)
@@ -20,11 +21,25 @@ export default function LoginPage() {
     e.preventDefault()
     setError(null)
     setLoading(true)
-    const res = await signIn('credentials', { email, password, redirect: false })
-    setLoading(false)
 
-    if (res?.error) {
-      setError('Email ou mot de passe incorrect.')
+    const res = await fetch('/api/register', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ name, email, password }),
+    })
+
+    if (!res.ok) {
+      const body = await res.json().catch(() => null)
+      setError(body?.error ?? 'La création du compte a échoué.')
+      setLoading(false)
+      return
+    }
+
+    // No email confirmation: the account is usable straight away.
+    const signedIn = await signIn('credentials', { email, password, redirect: false })
+    setLoading(false)
+    if (signedIn?.error) {
+      setError('Compte créé, mais la connexion a échoué. Essaie de te connecter.')
       return
     }
     router.push('/dashboard')
@@ -34,6 +49,12 @@ export default function LoginPage() {
   return (
     <>
       <form onSubmit={handleSubmit} className="mt-9 space-y-3 text-left">
+        <TextField
+          label="Prénom"
+          autoComplete="given-name"
+          value={name}
+          onChange={e => setName(e.target.value)}
+        />
         <TextField
           label="Email"
           type="email"
@@ -45,44 +66,25 @@ export default function LoginPage() {
         <TextField
           label="Mot de passe"
           type="password"
-          autoComplete="current-password"
+          autoComplete="new-password"
           required
+          minLength={MIN_PASSWORD_LENGTH}
+          hint={`${MIN_PASSWORD_LENGTH} caractères minimum.`}
           value={password}
           onChange={e => setPassword(e.target.value)}
         />
         <Button type="submit" size="lg" className="w-full" disabled={loading}>
-          {loading ? 'Connexion…' : 'Se connecter'}
+          {loading ? 'Création…' : 'Créer mon compte'}
         </Button>
       </form>
 
       {error ? <AuthError>{error}</AuthError> : null}
 
-      <div className="my-6 flex items-center gap-3 text-xs text-muted-foreground/70">
-        <span className="h-px flex-1 bg-border" />
-        ou
-        <span className="h-px flex-1 bg-border" />
-      </div>
-
-      <Button
-        onClick={() => signIn('google', { callbackUrl: '/dashboard' })}
-        variant="secondary"
-        size="lg"
-        className="w-full"
-      >
-        <GoogleIcon />
-        Continuer avec Google
-      </Button>
-
       <AuthLinks>
-        <p>
-          <Link href="/forgot-password" className="text-muted-foreground hover:underline">
-            Mot de passe oublié ?
-          </Link>
-        </p>
         <p className="text-muted-foreground">
-          Pas encore de compte ?{' '}
-          <Link href="/signup" className="text-primary underline">
-            Créer un compte
+          Déjà un compte ?{' '}
+          <Link href="/login" className="text-primary underline">
+            Se connecter
           </Link>
         </p>
       </AuthLinks>
