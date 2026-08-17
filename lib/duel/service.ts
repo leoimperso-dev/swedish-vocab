@@ -4,6 +4,7 @@
 // number on their own words. When both have played, the round goes to the
 // higher score (a tie gives nobody the point) and the next round opens.
 import { db } from '@/lib/db'
+import { duelRecords } from '@/lib/profile-stats'
 import { DUEL_XP, winsNeeded, type DuelMode } from '@/lib/duel/rules'
 import { notify } from '@/lib/push'
 import { getStrings } from '@/lib/i18n'
@@ -193,6 +194,8 @@ export interface DuelSummaryRow {
   winnerId: string | null
   youWon: boolean | null
   opponent: { id: string; name: string | null; image: string | null }
+  /** The opponent's record, so you know who you are up against before playing. */
+  opponentRecord: { won: number; played: number; winStreak: number }
   /** What the opponent is drilling — not necessarily what this user studies. */
   opponentLearning: Lang
   updatedAt: string
@@ -210,9 +213,14 @@ export async function listDuels(userId: string): Promise<DuelSummaryRow[]> {
     take: 50,
   })
 
+  // One pass over the opponents, not one query per row
+  const opponentIds = [...new Set(duels.map(d => (d.challengerId === userId ? d.opponentId : d.challengerId)))]
+  const records = await duelRecords(opponentIds)
+
   return duels.map(d => {
     const youAreChallenger = d.challengerId === userId
     const them = youAreChallenger ? d.opponent : d.challenger
+    const record = records.get(them.id)
     return {
       id: d.id,
       mode: d.mode as DuelMode,
@@ -225,6 +233,11 @@ export async function listDuels(userId: string): Promise<DuelSummaryRow[]> {
       winnerId: d.winnerId,
       youWon: d.status !== 'FINISHED' ? null : d.winnerId === null ? null : d.winnerId === userId,
       opponent: { id: them.id, name: them.name, image: them.image },
+      opponentRecord: {
+        won: record?.won ?? 0,
+        played: record?.played ?? 0,
+        winStreak: record?.winStreak ?? 0,
+      },
       opponentLearning: resolveCourse(them.nativeLanguage, them.learningLanguage).learned,
       updatedAt: d.updatedAt.toISOString(),
     }

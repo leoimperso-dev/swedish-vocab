@@ -9,6 +9,8 @@ import { StatsProvider } from '@/components/StatsProvider'
 import { pendingDuelCount } from '@/lib/duel/service'
 import BottomNav from '@/components/BottomNav'
 
+const LAST_SEEN_THROTTLE_MS = 5 * 60 * 1000
+
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   const session = await auth()
   if (!session) redirect('/login')
@@ -23,12 +25,19 @@ export default async function AppLayout({ children }: { children: React.ReactNod
         xp: true,
         streakCurrent: true,
         freezeCount: true,
+        lastSeenAt: true,
       },
     }),
     // Ids are unique across pairs, so one set serves every course
     db.favorite.findMany({ where: { userId: session.user!.id }, select: { wordId: true } }),
     pendingDuelCount(session.user!.id),
   ])
+  // "Last seen" on a public profile. Written at most once per window so that
+  // opening five pages in a row is one write, not five.
+  if (!user?.lastSeenAt || Date.now() - user.lastSeenAt.getTime() > LAST_SEEN_THROTTLE_MS) {
+    await db.user.update({ where: { id: session.user!.id }, data: { lastSeenAt: new Date() } })
+  }
+
   const course = resolveCourse(user?.nativeLanguage, user?.learningLanguage)
   const stats = {
     streak: user?.streakCurrent ?? 0,

@@ -6,7 +6,7 @@ before adding another.
 
 ## Stack
 - Next.js 16 App Router, TypeScript, Tailwind CSS v4
-- Auth: NextAuth v5 (beta) + Google OAuth
+- Auth: NextAuth v5 (beta) — Google OAuth + email/password (see "Auth")
 - DB: PostgreSQL via Supabase + Prisma ORM (**pinned to v6** — v7 dropped `url` in schema datasource and requires driver adapters; do not upgrade without migrating the config)
 - Animations: Framer Motion (exercises) + CSS keyframes (`animate-rise/pop/shake`)
 
@@ -49,9 +49,34 @@ Dark-only, mobile-first (max-w-[430px]), ported from the svensk-spark Lovable de
   suffixes (`-heid`, `-ing`, `-het`, `-ning`…) resolve to their base **and** are barred from
   being a compound head: splitting "kortademigheid" as "kortademig" + "heid" once answered
   "un païen". A derived word points at its base, never at its suffix.
-- `auth.ts` — NextAuth config (Google provider + PrismaAdapter)
+- `auth.ts` — NextAuth config (Google + Credentials providers, PrismaAdapter)
 - `scripts/parse-vocabulary.ts` — Parser for the vocabulary files of every pair
 - `scripts/merge-core.ts` — Merges agent-generated vocab chunks into a core file (dedup by headword)
+
+## Auth
+Two ways in, both landing on the same account: Google, and email/password
+(NextAuth's `Credentials` provider). Screens live in `app/(auth)/` — login,
+signup, forgot-password, reset-password — over `components/auth/`.
+
+- **An email is one learner.** The hash sits on `User.passwordHash`, not in an
+  `Account` row (Credentials has no adapter account), and Google carries
+  `allowDangerousEmailAccountLinking` so signing in the other way joins the
+  existing account rather than forking its progression. Safe because Google
+  verifies the address. `/api/register` follows the same rule: an address that
+  only had Google gains a password instead of a second account.
+- **No email confirmation** — signup signs you straight in. The address is only
+  used for the reset link, so an unverified one costs nothing.
+- **Reset** (`PasswordResetToken`, `lib/auth/reset-token.ts`): the emailed token
+  is random 32 bytes, the row stores only its SHA-256, it lasts an hour, and
+  asking again voids the pending one. `/api/password/forgot` always answers ok,
+  registered address or not — the response must not enumerate accounts.
+- **Email** goes through Brevo's HTTP API (`lib/email.ts`), not SMTP: outbound
+  SMTP is unreliable on serverless. With no `BREVO_API_KEY` the reset link is
+  logged to the server console, so the flow stays testable locally.
+- A Google-only account has no hash and is unreachable by password until its
+  owner sets one through the reset flow.
+- `middleware.ts` lists the routes reachable without a session — a new auth page
+  or endpoint must be added to `PUBLIC_PAGES` / `PUBLIC_APIS`.
 
 ## Languages
 Two levels, both defined in **`lib/courses.ts`** — the single place to touch when adding a language:
@@ -220,6 +245,22 @@ a majority (`winsNeeded`) or on the last round.
 - A round's score stays hidden until both sides have played it, so nobody plays knowing the
   number to beat.
 
+### Champion of the week & public profiles
+`WeeklyWin` records who earned the most XP in a finished week, one row per winner (ties all
+win — the key is `[weekStart, userId]`). `lib/weekly.ts` closes a week **lazily**, on the first
+read of the leaderboard after it ends, and catches up to `MAX_WEEKS_BEHIND` weeks at once, so
+there is no cron to keep alive. A closed week is never recomputed: a title cannot be taken back
+by a later change to the ranking. Everyone is ranked on the same week in `CONTEST_TIMEZONE` —
+the running week used to start on each viewer's own Monday, which gave players in different
+countries different deadlines.
+
+`/profile/[id]` is the public profile, reachable from the leaderboard and the duel list: XP,
+streak, weeks won, duel record and last seen. `lib/profile-stats.ts` computes it.
+**`xpByLanguage()` is an estimate and the UI says so** — XP is stored globally on the user and
+a `StudySession` does not record which language it drilled, so the split is inferred from how
+the learner's vocabulary is spread across pairs. `User.lastSeenAt` is written by the (app)
+layout, at most once per `LAST_SEEN_THROTTLE_MS`.
+
 ### Notifications
 Two layers. The badge on the nav is fed by `pendingDuelCount` through the (app) layout and
 `StatsProvider`, and always works. Web Push (`lib/push.ts`, `PushSubscription`, the `push` /
@@ -329,6 +370,7 @@ pnpm tsx scripts/check-speech-language.ts  # QA: every course only ever speaks t
 pnpm tsx scripts/simulate-duel.ts          # QA: full duel against the DB (self-cleaning)
 pnpm tsx scripts/check-mixed-session.ts <email>  # QA: a MIXED session keeps each card's direction
 pnpm tsx scripts/check-mastered.ts         # QA: "I know these perfectly" (throwaway account)
+pnpm tsx scripts/check-password-auth.ts    # QA: hashing + reset tokens (throwaway account)
 ```
 After touching stories or vocabulary, run the coverage check — only proper
 nouns and numbers may stay unresolved (the reader shows « Nom propre » for

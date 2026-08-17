@@ -12,6 +12,8 @@ import { revalidatePath } from 'next/cache'
 import Image from 'next/image'
 import { AppShell } from '@/components/AppShell'
 import { Card, CardTitle, Chip, ProgressBar, SectionLabel } from '@/components/ui/primitives'
+import { Flag } from '@/components/ui/flags'
+import { xpByLanguage } from '@/lib/profile-stats'
 import { LevelSettings } from '@/components/LevelSettings'
 import { VoiceSettings } from '@/components/VoiceSettings'
 import { PushToggle } from '@/components/duel/PushToggle'
@@ -35,12 +37,13 @@ export default async function ProfilePage() {
   const session = await auth()
   const userId = session!.user!.id
 
-  const [user, unlockedAchievements] = await Promise.all([
+  const [user, unlockedAchievements, weeklyWins] = await Promise.all([
     db.user.findUnique({ where: { id: userId } }),
     db.userAchievement.findMany({
       where: { userId },
       include: { achievement: true },
     }),
+    db.weeklyWin.count({ where: { userId } }),
   ])
 
   if (!user) return null
@@ -51,6 +54,7 @@ export default async function ProfilePage() {
   const ladder = levelLadder(course.learned, user.xp)
   const { current, needed, progress } = xpToNextLevel(user.xp)
   const unlockedSlugs = unlockedAchievements.map(ua => ua.achievement.slug)
+  const languages = await xpByLanguage(userId, user.xp)
 
   return (
     <AppShell title={t.navProfile}>
@@ -140,6 +144,31 @@ export default async function ProfilePage() {
             <p className="text-[11px] text-muted-foreground">{t.record}</p>
           </Card>
         </div>
+
+        {/* Where the XP went, and how many weeks were topped */}
+        <Card className="space-y-3">
+          <CardTitle>{t.xpByLanguage}</CardTitle>
+          <p className="flex items-center gap-1.5 text-sm">
+            <Trophy size={14} className="shrink-0 text-accent" />
+            <span className="font-semibold tabular-nums">{weeklyWins}</span>
+            <span className="text-muted-foreground">{t.weeklyWinsLabel}</span>
+          </p>
+          {languages.map(entry => (
+            <div key={entry.lang} className="space-y-1.5">
+              <div className="flex items-center gap-2 text-sm">
+                <Flag lang={entry.lang} />
+                <span className="min-w-0 flex-1 truncate font-medium">{t.languageName[entry.lang]}</span>
+                <span className="shrink-0 tabular-nums text-muted-foreground">
+                  {entry.xp} XP · {entry.words} {t.words}
+                </span>
+              </div>
+              <ProgressBar value={Math.round(entry.share * 100)} />
+            </div>
+          ))}
+          {languages.length > 0 && (
+            <p className="text-[11px] text-muted-foreground">{t.xpByLanguageEstimate}</p>
+          )}
+        </Card>
 
         {/* CEFR level, one per language the user can study */}
         <Card>

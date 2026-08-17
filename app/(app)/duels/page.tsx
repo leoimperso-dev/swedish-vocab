@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { Swords, ChevronRight, Plus } from 'lucide-react'
+import { Swords, ChevronRight, Flame, Plus, Trophy } from 'lucide-react'
 import { AppShell } from '@/components/AppShell'
 import { CompeteTabs } from '@/components/CompeteTabs'
 import { Avatar } from '@/components/ui/avatar'
@@ -123,6 +123,18 @@ function DuelRow({ duel }: { duel: DuelSummaryRow }) {
         <p className="truncate text-xs text-muted-foreground">
           {duel.mode === 'BLITZ' ? t.duelModeBlitz : t.duelModeClassic} ·{' '}
           {t.duelRoundOf(Math.min(duel.currentRound, duel.rounds), duel.rounds)}
+        </p>
+        {/* Who you are up against: their record, and the run they are on */}
+        <p className="flex items-center gap-1.5 truncate text-[11px] text-muted-foreground/80">
+          <Trophy size={11} className="shrink-0 text-accent" />
+          <span className="tabular-nums">
+            {duel.opponentRecord.won}/{duel.opponentRecord.played} {t.duelsWon}
+          </span>
+          {duel.opponentRecord.winStreak > 1 && (
+            <span className="flex shrink-0 items-center gap-0.5 text-streak">
+              <Flame size={11} /> {duel.opponentRecord.winStreak}
+            </span>
+          )}
         </p>
       </div>
       <div className="flex shrink-0 items-center gap-2">

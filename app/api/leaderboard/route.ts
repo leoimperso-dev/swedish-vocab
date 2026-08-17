@@ -4,17 +4,14 @@ import { db } from '@/lib/db'
 import { getLevelForXp, levelTitle } from '@/lib/xp'
 import { toLocalDateString } from '@/lib/streak'
 import { getCourse } from '@/lib/current-course'
-
-function mondayOfCurrentWeek(timezone: string): string {
-  const today = toLocalDateString(new Date(), timezone)
-  const dayOfWeek = new Date(today).getUTCDay() // 0 = Sunday
-  const daysSinceMonday = (dayOfWeek + 6) % 7
-  return new Date(Date.parse(today) - daysSinceMonday * 86400000).toISOString().slice(0, 10)
-}
+import { CONTEST_TIMEZONE, closeFinishedWeeks, currentWeekStart, weeklyWinCounts } from '@/lib/weekly'
 
 export async function GET(req: NextRequest) {
   const session = await auth()
   if (!session?.user?.id) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+  // A finished week is settled on the first read after it ends — no cron
+  await closeFinishedWeeks()
 
   const period = req.nextUrl.searchParams.get('period') === 'week' ? 'week' : 'all'
   // Rank names follow the reader's course: a board mixing five languages of
@@ -32,6 +29,7 @@ export async function GET(req: NextRequest) {
       level: true,
       timezone: true,
       streakCurrent: true,
+      lastSeenAt: true,
       _count: { select: { wordProgress: true } },
     },
   })
@@ -39,16 +37,16 @@ export async function GET(req: NextRequest) {
   let entries = users.map(u => ({ user: u, xp: u.xp, wordsStudied: u._count.wordProgress }))
 
   if (period === 'week') {
-    const viewer = users.find(u => u.id === session.user!.id)
-    const monday = mondayOfCurrentWeek(viewer?.timezone ?? 'Europe/Brussels')
+    // One week for everyone, in the contest timezone: a race whose finish line
+    // moves with the viewer's timezone is not a race — see lib/weekly.ts
+    const monday = currentWeekStart()
     const weekSessions = await db.studySession.findMany({
       where: { endedAt: { not: null }, startedAt: { gte: new Date(Date.now() - 8 * 86400000) } },
       select: { userId: true, startedAt: true, xpGained: true, wordsStudied: true },
     })
     const byUser = new Map<string, { xp: number; words: number }>()
     for (const s of weekSessions) {
-      const tz = users.find(u => u.id === s.userId)?.timezone ?? 'Europe/Brussels'
-      if (toLocalDateString(s.startedAt, tz) < monday) continue
+      if (toLocalDateString(s.startedAt, CONTEST_TIMEZONE) < monday) continue
       const agg = byUser.get(s.userId) ?? { xp: 0, words: 0 }
       agg.xp += s.xpGained
       agg.words += s.wordsStudied
@@ -62,6 +60,8 @@ export async function GET(req: NextRequest) {
     entries.sort((a, b) => b.xp - a.xp)
   }
 
+  const wins = await weeklyWinCounts(users.map(u => u.id))
+
   const ranked = entries.map((e, i) => ({
     rank: i + 1,
     id: e.user.id,
@@ -72,6 +72,8 @@ export async function GET(req: NextRequest) {
     levelTitle: levelTitle(getLevelForXp(e.user.xp), course.learned),
     streak: e.user.streakCurrent,
     wordsStudied: e.wordsStudied,
+    weeklyWins: wins.get(e.user.id) ?? 0,
+    lastSeenAt: e.user.lastSeenAt?.toISOString() ?? null,
     isCurrentUser: e.user.id === session.user!.id,
   }))
 

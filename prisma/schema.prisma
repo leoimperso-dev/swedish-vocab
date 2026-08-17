@@ -26,6 +26,9 @@ model User {
   email         String    @unique
   emailVerified DateTime?
   image         String?
+  // Set only for accounts created with the email/password provider. A Google-only
+  // account has none until its owner asks for a password through the reset flow.
+  passwordHash  String?
   timezone      String    @default("Europe/Brussels")
   // Interface language: "fr" | "sv" | "en"
   nativeLanguage String   @default("fr")
@@ -42,6 +45,8 @@ model User {
   freezeCount   Int       @default(2) // streak freezes available (max 2, +1 every 7-day milestone)
   dailyGoalXp   Int       @default(15)
   lastStudiedAt DateTime?
+  // Last time the app was opened, study or not — shown on a public profile
+  lastSeenAt    DateTime?
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
 
@@ -57,6 +62,23 @@ model User {
   duelsReceived Duel[]        @relation("DuelOpponent")
   duelRounds    DuelRound[]
   pushSubs      PushSubscription[]
+  weeklyWins    WeeklyWin[]
+  resetTokens   PasswordResetToken[]
+}
+
+// Password reset links. Only the SHA-256 of the token is stored, so a database
+// dump cannot be replayed as a reset link.
+model PasswordResetToken {
+  id        String    @id @default(cuid())
+  userId    String
+  tokenHash String    @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
 }
 
 model Account {
@@ -370,5 +392,22 @@ model PushSubscription {
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
+  @@index([userId])
+}
+
+// One finished week, and who topped it on XP earned during it. Written once the
+// week is over and never recomputed, so a title cannot be taken back by a later
+// change to the ranking. Ties all win: the key is [week, user], not the week.
+model WeeklyWin {
+  id        String   @id @default(cuid())
+  userId    String
+  // Monday of the week won, in the contest timezone (lib/weekly.ts)
+  weekStart DateTime @db.Date
+  xp        Int
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([weekStart, userId])
   @@index([userId])
 }
