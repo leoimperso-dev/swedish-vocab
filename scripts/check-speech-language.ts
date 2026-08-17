@@ -16,13 +16,17 @@ import fs from 'fs'
 import { db } from '../lib/db'
 import { buildExercises } from '../lib/study/build'
 import { learnedSpeech } from '../lib/word-display'
-import { COURSES, courseDirections, learnsTermLanguage, localeOf, pairOf, type Course } from '../lib/courses'
+import { COURSES, answerLang, courseDirections, learnsTermLanguage, localeOf, pairOf } from '../lib/courses'
 import type { CefrLevel } from '../lib/cefr'
 import type { ExerciseType } from '../types'
 
 // The exercise types whose spoken content is drawn from the pair's `term` side,
 // and which therefore may only reach a learner of that side
 const TERM_SIDE_TYPES: ExerciseType[] = ['CLOZE', 'CONJUGATION']
+
+// Exercises whose answer is the learned language whatever the card's schedule
+// says — see exerciseDirection in lib/study/build.ts
+const PRODUCES_LEARNED: ExerciseType[] = ['LISTENING', 'CLOZE', 'CONJUGATION']
 
 const SESSION_SIZE = 15
 
@@ -80,6 +84,25 @@ async function main() {
         if (TERM_SIDE_TYPES.includes(exercise.exerciseType)) {
           problems.push(`${exercise.exerciseType} sert du contenu en ${pairOf(course.pair).term}`)
         }
+      }
+    }
+
+    // 3. A blitz round flips directions at random. Whatever it flips, the
+    // exercises that can only be answered in the learned language must still
+    // be asked that way round — a dictation credited to `learned → native` has
+    // the learner typing English while the French schedule advances.
+    const blitz = await buildExercises({
+      userId: user.id, course, level: 'A2' as CefrLevel,
+      direction: courseDirections(course)[0],
+      size: SESSION_SIZE, newWords: 0, policy: 'DUEL', flipDirections: true,
+    })
+    for (const exercise of blitz) {
+      if (PRODUCES_LEARNED.includes(exercise.exerciseType) && answerLang(exercise.direction!) !== course.learned) {
+        problems.push(`${exercise.exerciseType} répond en ${answerLang(exercise.direction!)} (${exercise.direction})`)
+      }
+      // Only multiple choice may be flipped: typing the native language drills nothing
+      if (exercise.exerciseType === 'TYPING' && answerLang(exercise.direction!) !== course.learned) {
+        problems.push(`TYPING fait écrire en ${answerLang(exercise.direction!)}`)
       }
     }
 

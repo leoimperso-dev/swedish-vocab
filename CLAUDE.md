@@ -85,6 +85,12 @@ ways is kept once). A never-seen word gets a random one. Nothing is flipped afte
 would advance a schedule that was not due; the client posts `ExerciseWord.direction`, not the
 picker's value.
 
+`exerciseDirection()` overrides both of those for **dictation, cloze and conjugation**: their
+answer *is* the learned language, so they always carry the `native → learned` direction whatever
+the card was scheduled as. Left on a `learned → native` card, the learner typed English while the
+French schedule advanced. The card simply stays due. Guarded by `scripts/check-speech-language.ts`
+(step 3) and `scripts/check-mixed-session.ts`.
+
 ## Content tied to the `term` side
 Verb forms, Tatoeba sentences, stories and grammar lessons are authored for the pair's `term`
 language and written in its `translation` language. `learnsTermLanguage(course)` gates conjugation,
@@ -197,8 +203,9 @@ a majority (`winsNeeded`) or on the last round.
     up to `ROUND_VARIANT_SLOTS` typing slots becoming cloze/conjugation) instead of being
     chosen per word — see `lib/duel/mix.ts`. Left to the solo picker a round drifted to
     near-pure QCM, which both players aced, and every match ended in a draw.
-- **Blitz flips the direction per exercise** (`flipDirections`), on QCM and typing only —
-  dictation and cloze are authored one way round. Each exercise then carries its own
+- **Blitz flips the direction per exercise** (`flipDirections`), on **multiple choice only** —
+  picking a translation out of four options is a fair drill either way round, writing one is
+  not. Each exercise then carries its own
   `ExerciseWord.direction`, which the browser reports back per answer so SM-2 credits the
   right progression; the server only accepts a direction belonging to that player's course.
 - **The blitz clock is per exercise type** (`BLITZ_SECONDS`, `blitzSeconds()`): 8s for a QCM,

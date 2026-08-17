@@ -9,7 +9,7 @@ import { submitRound, listDuels, pendingDuelCount } from '../lib/duel/service'
 import { winsNeeded, ROUND_SIZE } from '../lib/duel/rules'
 import { buildExercises } from '../lib/study/build'
 import { getCourseWithLevel } from '../lib/current-course'
-import { courseDirections, defaultDirection } from '../lib/courses'
+import { answerLang, courseDirections, defaultDirection } from '../lib/courses'
 
 let failures = 0
 
@@ -195,7 +195,9 @@ async function main() {
         size: ROUND_SIZE, newWords: 0, policy: 'DUEL', flipDirections: true,
       })),
     ]
-    const flippable = blitz.filter(e => e.exerciseType === 'QCM' || e.exerciseType === 'TYPING')
+    // Multiple choice is the only exercise blitz flips: picking a translation
+    // out of four options is fair either way round, writing one is not
+    const flippable = blitz.filter(e => e.exerciseType === 'QCM')
     check(
       `${who} is asked both ways in blitz`,
       new Set(flippable.map(e => e.direction)).size,
@@ -206,11 +208,13 @@ async function main() {
       blitz.every(e => courseDirections(course).includes(e.direction!)),
       true,
     )
-    // Dictation and cloze are authored one way round; flipping them would ask
-    // the learner to transcribe their own native language
+    // Everything that makes the learner *produce* an answer must produce the
+    // language being learned — typing or transcribing their own is no drill
     check(
-      `${who} keeps dictation in the round's direction`,
-      blitz.filter(e => e.exerciseType === 'LISTENING').every(e => e.direction === direction),
+      `${who} only ever produces the language being learned`,
+      blitz
+        .filter(e => e.exerciseType !== 'QCM')
+        .every(e => answerLang(e.direction!) === course.learned),
       true,
     )
     console.log(

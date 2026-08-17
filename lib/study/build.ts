@@ -107,6 +107,38 @@ function uniqueWords(): (uw: { wordId: string }) => boolean {
   return uw => (seen.has(uw.wordId) ? false : (seen.add(uw.wordId), true))
 }
 
+/**
+ * Exercises whose answer *is* the language being learned, whatever the card's
+ * schedule says: a dictation is heard and typed in that language, a cloze fills
+ * a sentence written in it, a conjugation types its verb forms.
+ */
+const PRODUCES_LEARNED: readonly ExerciseType[] = ['LISTENING', 'CLOZE', 'CONJUGATION']
+
+/**
+ * Which way round one exercise is asked.
+ *
+ * Two rules, both about never making the learner produce their own language by
+ * accident:
+ * - an exercise that can only produce the learned language always carries the
+ *   direction that ends there. Left on a `learned → native` card it credited
+ *   the wrong SM-2 schedule — the learner typed English and the French
+ *   progression moved.
+ * - blitz only flips multiple choice. Flipping a typing exercise asked the
+ *   learner to *write* in their own language, which drills nothing; picking a
+ *   translation out of four options is a fair drill in either direction.
+ */
+function exerciseDirection(
+  exerciseType: ExerciseType,
+  own: Direction,
+  bothWays: [Direction, Direction],
+  flip: boolean,
+): Direction {
+  // courseDirections is native-first, so [0] is the one answering in the learned language
+  if (PRODUCES_LEARNED.includes(exerciseType)) return bothWays[0]
+  if (flip && exerciseType === 'QCM') return bothWays[Math.floor(Math.random() * bothWays.length)]
+  return own
+}
+
 export function shuffleInPlace<T>(items: T[]): T[] {
   for (let i = items.length - 1; i > 0; i--) {
     const j = Math.floor(Math.random() * (i + 1))
@@ -288,13 +320,10 @@ export async function buildExercises(opts: BuildOptions): Promise<ExerciseWord[]
     // schedule yet, so a mixed session picks one for it.
     const own = (entry.userWord?.direction as Direction | undefined)
       ?? (mixed ? randomDirection() : fallbackDirection)
-    // Blitz overrides that at random, but only on the exercises that have two
-    // sides — cloze and conjugation are authored one way round.
-    const flippable = exerciseType === 'QCM' || exerciseType === 'TYPING'
     return {
       ...entry,
       exerciseType,
-      direction: opts.flipDirections && flippable ? randomDirection() : own,
+      direction: exerciseDirection(exerciseType, own, bothWays, opts.flipDirections ?? false),
     }
   })
 

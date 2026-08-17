@@ -10,7 +10,7 @@ import 'dotenv/config'
 import { db } from '../lib/db'
 import { levelFor } from '../lib/cefr'
 import { buildExercises } from '../lib/study/build'
-import { courseDirections, resolveCourse } from '../lib/courses'
+import { answerLang, courseDirections, resolveCourse } from '../lib/courses'
 
 const SESSION_SIZE = 15
 
@@ -58,7 +58,13 @@ async function main() {
   })
   const known = new Map<string, string[]>()
   for (const row of scheduled) known.set(row.wordId, [...(known.get(row.wordId) ?? []), row.direction])
+  // Dictation, cloze and conjugation are the exception: they can only be
+  // answered in the language being learned, so they always carry that
+  // direction even when the card was scheduled the other way — the card simply
+  // stays due. See exerciseDirection in lib/study/build.ts.
+  const producesLearned = ['LISTENING', 'CLOZE', 'CONJUGATION']
   const mismatched = exercises.filter(ex => {
+    if (producesLearned.includes(ex.exerciseType)) return false
     const dirs = known.get(ex.word.id)
     return dirs && !dirs.includes(ex.direction!)
   })
@@ -66,6 +72,12 @@ async function main() {
     'un mot déjà étudié est demandé dans le sens où il est programmé',
     mismatched.length === 0,
     mismatched.map(m => `${m.word.term}:${m.direction}`).join(', '),
+  )
+  check(
+    'dictée, texte à trou et conjugaison répondent dans la langue apprise',
+    exercises
+      .filter(ex => producesLearned.includes(ex.exerciseType))
+      .every(ex => answerLang(ex.direction!) === course.learned),
   )
 
   const spread = both.map(d => `${d}:${exercises.filter(e => e.direction === d).length}`).join('  ')
