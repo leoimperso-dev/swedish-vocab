@@ -25,7 +25,7 @@ import { useCourse, useLang, useLevel } from '@/components/CourseProvider'
 import { LevelPicker } from '@/components/LevelPicker'
 import {
   courseDirections, defaultDirection, flagOf, learnsTermLanguage, promptLang, answerLang,
-  type Course, type Direction,
+  type Course, type Direction, type DirectionChoice,
 } from '@/lib/courses'
 import type { ExerciseWord, AnswerResult, ExerciseType } from '@/types'
 
@@ -51,7 +51,7 @@ export default function StudyPage() {
   // new words the session draws from
   const declaredLevel = useLevel()
   const [levelAsked, setLevelAsked] = useState(false)
-  const [direction, setDirection] = useState<Direction>(defaultDirection(course))
+  const [direction, setDirection] = useState<DirectionChoice>(defaultDirection(course))
   const [sessionId, setSessionId] = useState<string | null>(null)
   const [exercises, setExercises] = useState<ExerciseWord[]>([])
   const [currentIndex, setCurrentIndex] = useState(0)
@@ -100,12 +100,15 @@ export default function StudyPage() {
     if (!sessionId || !exercises[currentIndex]) return
 
     const word = exercises[currentIndex].word
+    // A mixed session asks each card in the direction it is scheduled in, so
+    // the answer is credited to that one, not to the picker's value
+    const answered = exercises[currentIndex].direction ?? defaultDirection(course)
     // Progress is saved answer by answer — a failed save must not block the session
     try {
       await fetch('/api/study/answer', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ wordId: word.id, result, exerciseType, direction, timeSpent: 0, sessionId }),
+        body: JSON.stringify({ wordId: word.id, result, exerciseType, direction: answered, timeSpent: 0, sessionId }),
       })
     } catch {}
 
@@ -145,7 +148,7 @@ export default function StudyPage() {
     } else {
       setCurrentIndex(i => i + 1)
     }
-  }, [sessionId, exercises, currentIndex, results, combo, bestCombo, router, direction, missed])
+  }, [sessionId, exercises, currentIndex, results, combo, bestCombo, router, course, missed])
 
   // Asked before anything else: the session request must already know the level
   if (!declaredLevel && !levelAsked) return <LevelPicker onDone={() => setLevelAsked(true)} />
@@ -192,6 +195,8 @@ export default function StudyPage() {
   }
 
   const current = exercises[currentIndex]
+  // Each exercise carries its own direction: in a mixed session they differ
+  const currentDirection: Direction = current.direction ?? defaultDirection(course)
 
   return (
     <div className="mx-auto min-h-dvh max-w-[430px] pb-28">
@@ -234,12 +239,12 @@ export default function StudyPage() {
           }
         >
           {current.exerciseType === 'FLASHCARD' && (
-            <FlashCard word={current.word} direction={direction} onAnswer={handleAnswer} />
+            <FlashCard word={current.word} direction={currentDirection} onAnswer={handleAnswer} />
           )}
           {current.exerciseType === 'QCM' && (
             <MultipleChoice
               word={current.word}
-              direction={direction}
+              direction={currentDirection}
               distractors={current.distractors}
               onAnswer={handleAnswer}
             />
@@ -247,7 +252,7 @@ export default function StudyPage() {
           {current.exerciseType === 'TYPING' && (
             <TypingExercise
               word={current.word}
-              direction={direction}
+              direction={currentDirection}
               alsoAccepted={current.alsoAccepted}
               onAnswer={handleAnswer}
             />
@@ -284,8 +289,8 @@ const MODE_ICONS: Record<StudyMode, LucideIcon> = {
 function ModePicker({ course, onPick, direction, onDirectionChange }: {
   course: Course
   onPick: (mode: StudyMode) => void
-  direction: Direction
-  onDirectionChange: (d: Direction) => void
+  direction: DirectionChoice
+  onDirectionChange: (d: DirectionChoice) => void
 }) {
   const t = getStrings(course.native)
   // Cloze, conjugation, reading and grammar are authored for the pair's `term`
@@ -307,10 +312,15 @@ function ModePicker({ course, onPick, direction, onDirectionChange }: {
       : []),
   ]
 
-  const directionOptions = courseDirections(course).map(d => ({
-    value: d,
-    label: `${flagOf(promptLang(d))} → ${flagOf(answerLang(d))}`,
-  }))
+  const [first, second] = courseDirections(course)
+  const directionOptions = [
+    ...[first, second].map(d => ({
+      value: d as DirectionChoice,
+      label: `${flagOf(promptLang(d))} → ${flagOf(answerLang(d))}`,
+    })),
+    // Reviews both schedules at once, each card in the direction it is due in
+    { value: 'MIXED' as DirectionChoice, label: `${flagOf(promptLang(first))} ⇄ ${flagOf(answerLang(first))}` },
+  ]
 
   return (
     <AppShell title={t.chooseExercise}>
@@ -321,7 +331,7 @@ function ModePicker({ course, onPick, direction, onDirectionChange }: {
           <Segmented
             className="mt-2"
             value={direction}
-            onChange={v => onDirectionChange(v as Direction)}
+            onChange={v => onDirectionChange(v as DirectionChoice)}
             options={directionOptions}
           />
         </div>

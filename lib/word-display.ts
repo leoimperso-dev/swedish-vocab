@@ -25,6 +25,25 @@ export function learnedText(word: DisplayWord, course: Course): string {
   return isTermSide(word, course.learned) ? word.term : word.translation
 }
 
+// What the speaker button reads out: the learned side, followed by its degrees
+// when it is an adjective. A comparative is a spelling change ("groot" → "groter"
+// → "grootst"), so hearing only the base teaches half the word. Forms belong to
+// the pair's `term` side, so they are only spoken when that is what is learned.
+export function learnedSpeech(
+  word: DisplayWord & { forms?: unknown },
+  course: Course,
+): { text: string; locale: string }[] {
+  const locale = learnedLocale(course)
+  const queue = [{ text: learnedText(word, course), locale }]
+  if (isTermSide(word, course.learned) && word.forms && typeof word.forms === 'object') {
+    const forms = word.forms as Record<string, string>
+    for (const key of ['comparative', 'superlative']) {
+      if (forms[key]) queue.push({ text: forms[key], locale })
+    }
+  }
+  return queue
+}
+
 export function learnedLocale(course: Course): string {
   return localeOf(course.learned)
 }

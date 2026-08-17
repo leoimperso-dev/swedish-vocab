@@ -3,7 +3,7 @@ import { auth } from '@/auth'
 import { db } from '@/lib/db'
 import { getCourseWithLevel } from '@/lib/current-course'
 import { buildExercises } from '@/lib/study/build'
-import { courseDirections, defaultDirection, learnsTermLanguage, type Direction } from '@/lib/courses'
+import { asDirectionChoice, learnsTermLanguage } from '@/lib/courses'
 import type { ExerciseType } from '@/types'
 
 const SESSION_SIZE = 15
@@ -19,9 +19,7 @@ export async function GET(req: NextRequest) {
   // Conjugation and cloze drill the pair's `term` language: only its learners get them
   const termExercises = learnsTermLanguage(course)
 
-  const requested = req.nextUrl.searchParams.get('direction')
-  const direction: Direction = courseDirections(course).find(d => d === requested)
-    ?? defaultDirection(course)
+  const direction = asDirectionChoice(course, req.nextUrl.searchParams.get('direction'))
   const modeParam = req.nextUrl.searchParams.get('mode') as ExerciseType | null
   const termOnlyMode = modeParam === 'CONJUGATION' || modeParam === 'CLOZE'
   const forcedMode = modeParam && FORCED_MODES.includes(modeParam) && (!termOnlyMode || termExercises)

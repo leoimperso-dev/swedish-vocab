@@ -171,6 +171,23 @@ export function speak(text: string, locale: string, rate = getRate()): void {
   window.speechSynthesis.speak(utterance)
 }
 
+// Reads a few short items back to back, in one language. For a headword and its
+// inflected forms — long playlists belong to `useSpeechQueue`, which guards
+// Chrome's watchdog; a handful of words never runs long enough to trip it.
+export function speakSequence(items: { text: string; locale: string }[], rate = getRate()): void {
+  if (typeof window === 'undefined' || items.length === 0) return
+  window.speechSynthesis.cancel()
+  for (const item of items) {
+    const utterance = new SpeechSynthesisUtterance(speakable(item.text))
+    utterance.lang = item.locale
+    const voice = getVoiceFor(item.locale)
+    if (voice) utterance.voice = voice
+    utterance.rate = rate
+    utterance.pitch = 1
+    window.speechSynthesis.speak(utterance)
+  }
+}
+
 export function isSupported(): boolean {
   return typeof window !== 'undefined' && 'speechSynthesis' in window
 }

@@ -37,7 +37,8 @@ Dark-only, mobile-first (max-w-[430px]), ported from the svensk-spark Lovable de
   learner chose one in the profile (voice and rate live per device in localStorage, not on
   the account). English is listed natural-voices-only (`NATURAL_ONLY_LANGS`) — desktops ship
   a dozen legacy SAPI voices for it that bury the good ones; the profile has a checkbox to
-  see every installed voice anyway.
+  see every installed voice anyway. `speakSequence` + `learnedSpeech()` read a headword
+  followed by its comparative and superlative — hearing only the base teaches half an adjective.
 - `lib/streak.ts` — Daily streak logic (timezone-aware) + streak freezes (max 2, absorb missed days, +1 earned per 7-day milestone)
 - `lib/achievements.ts` — Achievement definitions and unlock checks
 - `lib/courses.ts` — Language registry: pairs, courses, directions, locales, verb forms
@@ -74,6 +75,12 @@ progression per direction (unique on `[userId, wordId, direction]`). `courseDire
 yields the two the user can pick on the mode-picker screen, native-first by default. TTS always
 speaks the learned side (`learnedText`). Word counts in stats/achievements use `distinct: ['wordId']`
 so directions don't double-count.
+
+The picker also offers `MIXED` (`DirectionChoice`): the session reviews **both schedules at once**
+and each card is asked — and credited — in the direction it is actually due in (a word due both
+ways is kept once). A never-seen word gets a random one. Nothing is flipped after drawing, which
+would advance a schedule that was not due; the client posts `ExerciseWord.direction`, not the
+picker's value.
 
 ## Content tied to the `term` side
 Verb forms, Tatoeba sentences, stories and grammar lessons are authored for the pair's `term`
@@ -245,6 +252,13 @@ A non-gradable adjective (`dead`, `getrouwd`, `inre`, ordinals, nationalities) k
 an invented one is worse than none. Spanish is deliberately absent: only its four suppletive
 adjectives are stored, the rest builds with `más`. `scripts/audit-forms.ts` reports coverage.
 
+Dutch nouns carry their `de`/`het` article — it is part of the word. The French dump states
+the gender for barely half of them, so the generator falls back to the `nl-noun` head template
+of the **English** dump (`kaikki-nl-en.jsonl`), which covers almost the rest;
+`scripts/fix-dutch-articles.ts <kaikki-nl-en.jsonl> [--apply]` backfills already-seeded rows
+the same way (2 261 fixed), with suffix rules (`-ment`, `-heid`, `-ing`…, each measured above
+96% against the dump) for what the dump misses. Months and weekdays stay bare on both sides.
+
 Glosses are cross-checked against WikDict (CC BY-SA, built from Wiktionary/DBnary,
 `Desktop\pro\wikdict\<pair>.sqlite3`) with `scripts/cross-check-glosses.ts`. WikDict is a
 second opinion, never a source of truth — it says `bueno → allo`. A disagreement is a review
@@ -285,6 +299,7 @@ pnpm tsx scripts/mark-studyable.ts         # recompute Word.studyable (after eac
 pnpm tsx scripts/assign-cefr.ts            # recompute Word.cefr (after apply-frequency)
 pnpm tsx scripts/check-duel-rules.ts       # QA: duel scoring and match resolution
 pnpm tsx scripts/simulate-duel.ts          # QA: full duel against the DB (self-cleaning)
+pnpm tsx scripts/check-mixed-session.ts <email>  # QA: a MIXED session keeps each card's direction
 ```
 After touching stories or vocabulary, run the coverage check — only proper
 nouns and numbers may stay unresolved (the reader shows « Nom propre » for

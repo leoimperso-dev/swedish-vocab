@@ -3,9 +3,9 @@
 import { useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Check, Minus, X } from 'lucide-react'
-import { speak, unlock } from '@/lib/tts'
+import { speakSequence, unlock } from '@/lib/tts'
 import { evaluateAlternatives } from '@/lib/fuzzy'
-import { directionPrompt, directionAnswer, learnedText, learnedLocale } from '@/lib/word-display'
+import { directionPrompt, directionAnswer, learnedSpeech } from '@/lib/word-display'
 import { answerLang, type Direction } from '@/lib/courses'
 import { getStrings } from '@/lib/i18n'
 import { useCourse } from '@/components/CourseProvider'
@@ -52,7 +52,7 @@ export default function TypingExercise({ word, direction, alsoAccepted, onAnswer
   const handleSubmit = () => {
     if (!input.trim() || result) return
     unlock()
-    speak(learnedText(word, course), learnedLocale(course))
+    speakSequence(learnedSpeech(word, course))
 
     const evaluation = evaluateAlternatives(input, [expected, ...(alsoAccepted ?? [])])
     setResult(evaluation)

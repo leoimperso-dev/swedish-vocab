@@ -65,6 +65,11 @@ export function asLangOrDefault(value: string | null | undefined): Lang {
 // progression regardless of which side the user reads the interface in.
 export type Direction = 'SV_FR' | 'FR_SV' | 'EN_FR' | 'FR_EN'
 
+// What the learner asked a session to drill. 'MIXED' is not a direction: it
+// draws each card in the direction it is actually scheduled in, so one session
+// can ask "hus → ?" and "maison → ?" about different words.
+export type DirectionChoice = Direction | 'MIXED'
+
 export function directionFor(from: Lang, to: Lang): Direction {
   return `${from.toUpperCase()}_${to.toUpperCase()}` as Direction
 }
@@ -110,6 +115,12 @@ export function courseDirections(course: Course): [Direction, Direction] {
 
 export function defaultDirection(course: Course): Direction {
   return courseDirections(course)[0]
+}
+
+/** Narrows a request parameter to one of the course's directions, or 'MIXED'. */
+export function asDirectionChoice(course: Course, value: string | null | undefined): DirectionChoice {
+  if (value === 'MIXED') return 'MIXED'
+  return courseDirections(course).find(d => d === value) ?? defaultDirection(course)
 }
 
 // True when the user studies the pair's `term` side. Enriched content —

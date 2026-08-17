@@ -3,10 +3,10 @@
 import { useState } from 'react'
 import { motion, useMotionValue, useTransform, type PanInfo } from 'framer-motion'
 import { Check, X, Volume2, Lightbulb } from 'lucide-react'
-import { speak, unlock } from '@/lib/tts'
+import { speakSequence, unlock } from '@/lib/tts'
 import {
   formatForms, parseDetails, directionPrompt, directionAnswer,
-  learnedText, learnedLocale, promptIsTerm, showsEnrichedAnswer,
+  learnedSpeech, promptIsTerm, showsEnrichedAnswer,
 } from '@/lib/word-display'
 import type { Direction } from '@/lib/courses'
 import { getStrings } from '@/lib/i18n'
@@ -41,9 +41,16 @@ export default function FlashCard({ word, direction, onAnswer }: Props) {
     onAnswer(result, 'FLASHCARD')
   }
 
+  // The card is dragged once flipped, so replaying must not start a swipe
+  const replay = (e: React.MouseEvent) => {
+    e.stopPropagation()
+    unlock()
+    speakSequence(learnedSpeech(word, course))
+  }
+
   const handleFlip = () => {
     unlock()
-    speak(learnedText(word, course), learnedLocale(course))
+    speakSequence(learnedSpeech(word, course))
     setFlipped(true)
   }
 
@@ -92,7 +99,7 @@ export default function FlashCard({ word, direction, onAnswer }: Props) {
             <p className="text-sm text-muted-foreground">{t.tapToReveal}</p>
           </div>
         ) : (
-          <FlashCardBack word={word} direction={direction} />
+          <FlashCardBack word={word} direction={direction} onReplay={replay} />
         )}
       </motion.div>
 
@@ -136,7 +143,11 @@ export default function FlashCard({ word, direction, onAnswer }: Props) {
   )
 }
 
-function FlashCardBack({ word, direction }: { word: Word; direction: Direction }) {
+function FlashCardBack({ word, direction, onReplay }: {
+  word: Word
+  direction: Direction
+  onReplay: (e: React.MouseEvent) => void
+}) {
   const course = useCourse()
   const t = getStrings(course.native)
   const forms = formatForms(word.forms)
@@ -154,7 +165,17 @@ function FlashCardBack({ word, direction }: { word: Word; direction: Direction }
         {directionPrompt(word, direction)}
         {formsOnPrompt && forms && <span> ({forms})</span>}
       </p>
-      <p className="font-display text-2xl font-semibold text-primary">{mainAnswer}</p>
+      <div className="flex items-center justify-center gap-2">
+        <p className="font-display text-2xl font-semibold text-primary">{mainAnswer}</p>
+        <button
+          onClick={onReplay}
+          aria-label={t.listen}
+          title={t.listen}
+          className="pressable grid size-9 shrink-0 place-items-center rounded-xl border border-border bg-surface text-muted-foreground"
+        >
+          <Volume2 size={16} />
+        </button>
+      </div>
       {!formsOnPrompt && forms && (
         <p className="text-xs text-muted-foreground">({forms})</p>
       )}

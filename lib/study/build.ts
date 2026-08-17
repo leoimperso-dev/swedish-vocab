@@ -8,7 +8,7 @@ import { answerableExamples } from '@/lib/cloze'
 import { glossSenses, glossesOverlap } from '@/lib/gloss'
 import {
   courseDirections, learnsTermLanguage, pairOf, promptLang, verbFormsFor,
-  type Course, type Direction,
+  type Course, type Direction, type DirectionChoice,
 } from '@/lib/courses'
 import { assignDuelTypes } from '@/lib/duel/mix'
 import type { ExerciseType, ExerciseWord } from '@/types'
@@ -61,6 +61,12 @@ function selectExerciseType(
   return pool[Math.floor(Math.random() * pool.length)]
 }
 
+/** Filter keeping the first row of each word — one card per word per session. */
+function uniqueWords(): (uw: { wordId: string }) => boolean {
+  const seen = new Set<string>()
+  return uw => (seen.has(uw.wordId) ? false : (seen.add(uw.wordId), true))
+}
+
 export function shuffleInPlace<T>(items: T[]): T[] {
   for (let i = items.length - 1; i > 0; i--) {
     const j = Math.floor(Math.random() * (i + 1))
@@ -73,7 +79,11 @@ export interface BuildOptions {
   userId: string
   course: Course
   level: CefrLevel | null
-  direction: Direction
+  /**
+   * One direction for the whole session, or 'MIXED' to draw each card in the
+   * direction it is scheduled in — see the mixed handling in buildExercises.
+   */
+  direction: DirectionChoice
   size: number
   newWords: number
   /** Single exercise type for the whole list (solo mode picker). */
@@ -106,6 +116,17 @@ export async function buildExercises(opts: BuildOptions): Promise<ExerciseWord[]
   // Conjugation and cloze drill the pair's `term` language: only its learners get them
   const termExercises = learnsTermLanguage(course)
 
+  // A mixed session is not "one direction chosen at random per question": SM-2
+  // keeps a separate schedule per direction, so it reviews both schedules at
+  // once and each card is asked — and credited — in the direction it is
+  // actually due in. Flipping a card after drawing it would advance a schedule
+  // that was not the one due.
+  const bothWays = courseDirections(course)
+  const mixed = direction === 'MIXED'
+  const directionFilter = mixed ? { in: [...bothWays] } : direction
+  const fallbackDirection: Direction = mixed ? bothWays[0] : direction
+  const randomDirection = () => bothWays[Math.floor(Math.random() * bothWays.length)]
+
   // Conjugation needs verbs with complete forms; cloze needs example sentences (checked in JS below)
   const conjugationOnly = forcedMode === 'CONJUGATION'
   const clozeOnly = forcedMode === 'CLOZE'
@@ -123,7 +144,7 @@ export async function buildExercises(opts: BuildOptions): Promise<ExerciseWord[]
   // See reviewPriority — under-level words still compete, but only while the
   // learner is actually getting them wrong.
   const duePool = await db.userWord.findMany({
-    where: { userId, direction, nextReview: { lte: new Date() }, word: wordFilter },
+    where: { userId, direction: directionFilter, nextReview: { lte: new Date() }, word: wordFilter },
     include: { word: true },
     orderBy: { nextReview: 'asc' },
     take: DUE_POOL_SIZE,
@@ -134,6 +155,9 @@ export async function buildExercises(opts: BuildOptions): Promise<ExerciseWord[]
     // Stable within a tier: the oldest due word still comes first
     .sort((a, b) => a.priority - b.priority || a.index - b.index)
     .map(entry => entry.uw)
+    // A word due in both directions would otherwise be asked twice in one
+    // session, the first question giving away the second
+    .filter(uniqueWords())
     // Solo reserves seats for the new words it wants to teach; a duel gives
     // every seat it can to revision and only tops up with new words at the end.
     .slice(0, policy === 'DUEL' ? size : size - newWordsTargetBase)
@@ -150,7 +174,7 @@ export async function buildExercises(opts: BuildOptions): Promise<ExerciseWord[]
           await db.userWord.findMany({
             where: {
               userId,
-              direction,
+              direction: directionFilter,
               nextReview: { gt: new Date() },
               wordId: { notIn: dueUserWords.map(uw => uw.wordId) },
               word: wordFilter,
@@ -162,12 +186,13 @@ export async function buildExercises(opts: BuildOptions): Promise<ExerciseWord[]
           })
         )
           .filter(uw => isEligible(uw.word))
+          .filter(uniqueWords())
           .slice(0, paddingSeats)
       : []
 
   // 3. New words (never studied in this direction)
   const studiedWordIds = await db.userWord.findMany({
-    where: { userId, direction },
+    where: { userId, direction: directionFilter },
     select: { wordId: true },
   })
   const studiedIds = studiedWordIds.map(uw => uw.wordId)
@@ -216,22 +241,22 @@ export async function buildExercises(opts: BuildOptions): Promise<ExerciseWord[]
         )
       : null
 
-  // Cloze and conjugation are written in one direction only, so they keep the
-  // round's — flipping applies to the exercises that actually have two sides.
-  const bothWays = courseDirections(course)
   const exercises = entries.map((entry, i) => {
     const exerciseType =
       forcedMode ??
       duelTypes?.[i] ??
       selectExerciseType(entry.userWord, entry.word, course, termExercises)
+    // A scheduled card is asked in its own direction; a word never seen has no
+    // schedule yet, so a mixed session picks one for it.
+    const own = (entry.userWord?.direction as Direction | undefined)
+      ?? (mixed ? randomDirection() : fallbackDirection)
+    // Blitz overrides that at random, but only on the exercises that have two
+    // sides — cloze and conjugation are authored one way round.
     const flippable = exerciseType === 'QCM' || exerciseType === 'TYPING'
     return {
       ...entry,
       exerciseType,
-      direction:
-        opts.flipDirections && flippable
-          ? bothWays[Math.floor(Math.random() * bothWays.length)]
-          : direction,
+      direction: opts.flipDirections && flippable ? randomDirection() : own,
     }
   })
 

@@ -2,8 +2,8 @@
 
 import { useEffect, useState } from 'react'
 import { motion } from 'framer-motion'
-import { speak, unlock } from '@/lib/tts'
-import { directionPrompt, directionAnswer, learnedText, learnedLocale } from '@/lib/word-display'
+import { speakSequence, unlock } from '@/lib/tts'
+import { directionPrompt, directionAnswer, learnedSpeech } from '@/lib/word-display'
 import { answerLang, type Direction } from '@/lib/courses'
 import { getStrings } from '@/lib/i18n'
 import { useCourse } from '@/components/CourseProvider'
@@ -53,7 +53,7 @@ export default function MultipleChoice({ word, direction, distractors, onAnswer 
     if (selected) return
     setSelected(option)
     unlock()
-    speak(learnedText(word, course), learnedLocale(course))
+    speakSequence(learnedSpeech(word, course))
 
     // Right answers flow on; a wrong one waits so the correct option can be read
     if (option === correctOption) setTimeout(() => onAnswer('correct', 'QCM'), 800)
