@@ -119,6 +119,13 @@ the card was scheduled as. Left on a `learned → native` card, the learner type
 French schedule advanced. The card simply stays due. Guarded by `scripts/check-speech-language.ts`
 (step 3) and `scripts/check-mixed-session.ts`.
 
+## Expressions
+The curated lists carry an `EXPRESSIONS` category (set phrases and idioms). The study picker has
+a mode of its own for them (`?scope=expressions` → `BuildOptions.category`): an idiom is learned
+as a block, and mixed among ordinary headwords it never comes up often enough to stick.
+**`sv-fr` has no such category yet** — the mode is empty for Swedish learners until the list gets
+one. Counts today: nl 101, es 100, en 49, sv 0.
+
 ## Content tied to the `term` side
 Verb forms, Tatoeba sentences, stories and grammar lessons are authored for the pair's `term`
 language and written in its `translation` language. `learnsTermLanguage(course)` gates conjugation,

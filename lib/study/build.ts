@@ -174,7 +174,16 @@ export interface BuildOptions {
    * one-way reflex, which is a real skill gap and a good tie-breaker.
    */
   flipDirections?: boolean
+  /**
+   * Restrict the session to one category of the curated lists. Used by the
+   * expressions mode: an idiom is learned as a block ("het maakt niet uit"),
+   * and drilling those among ordinary headwords buries them.
+   */
+  category?: string
 }
+
+/** The curated category holding set phrases and idioms. */
+export const EXPRESSIONS_CATEGORY = 'EXPRESSIONS'
 
 /**
  * Due words first (SM-2 scheduled, ranked by level), topped up with never-seen
@@ -206,7 +215,11 @@ export async function buildExercises(opts: BuildOptions): Promise<ExerciseWord[]
   const isEligible = (word: Word) =>
     conjugationOnly ? hasFullVerbForms(word.forms, course) : clozeOnly ? clozeEligible(word) : true
   // studyable excludes entries that make no exercise — see scripts/mark-studyable.ts
-  const wordFilter = { pair, studyable: true, ...(conjugationOnly ? { wordType: 'VERB' as const } : {}) }
+  const wordFilter = {
+    pair, studyable: true,
+    ...(conjugationOnly ? { wordType: 'VERB' as const } : {}),
+    ...(opts.category ? { category: opts.category } : {}),
+  }
 
   // 1. Due words (SM-2 scheduled for today, in the session's direction).
   //

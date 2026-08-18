@@ -4,7 +4,7 @@ import { Component, useEffect, useState, useCallback, type ReactNode } from 'rea
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import {
-  Shuffle, Layers, ListChecks, PenLine, TextCursorInput, Repeat2,
+  Shuffle, Layers, ListChecks, PenLine, TextCursorInput, Repeat2, Quote,
   BookOpen, Brain, ChevronRight, Sparkles, Loader2, PartyPopper, Ear, MessagesSquare,
   type LucideIcon,
 } from 'lucide-react'
@@ -29,7 +29,9 @@ import {
 } from '@/lib/courses'
 import type { ExerciseWord, AnswerResult, ExerciseType } from '@/types'
 
-type StudyMode = 'MIX' | ExerciseType
+// EXPRESSIONS is not an exercise type but a slice of the vocabulary: the same
+// mixed session, drawn from the curated set phrases only
+type StudyMode = 'MIX' | 'EXPRESSIONS' | ExerciseType
 
 // Fisher-Yates on a copy — a replay in the order the words were missed lets the
 // learner recite the sequence instead of recalling the words
@@ -69,7 +71,8 @@ export default function StudyPage() {
     if (!mode) return
     setLoading(true)
     const params = new URLSearchParams({ direction })
-    if (mode !== 'MIX') params.set('mode', mode)
+    if (mode === 'EXPRESSIONS') params.set('scope', 'expressions')
+    else if (mode !== 'MIX') params.set('mode', mode)
     fetch(`/api/study/session?${params}`)
       .then(r => r.json())
       .then(data => {
@@ -278,6 +281,7 @@ export default function StudyPage() {
 
 const MODE_ICONS: Record<StudyMode, LucideIcon> = {
   MIX: Shuffle,
+  EXPRESSIONS: Quote,
   FLASHCARD: Layers,
   QCM: ListChecks,
   TYPING: PenLine,
@@ -300,6 +304,7 @@ function ModePicker({ course, onPick, direction, onDirectionChange }: {
 
   const modes: Array<{ mode: StudyMode; label: string; desc: string }> = [
     { mode: 'MIX', label: t.modeMix, desc: t.modeMixDesc },
+    { mode: 'EXPRESSIONS', label: t.modeExpressions, desc: t.modeExpressionsDesc },
     { mode: 'FLASHCARD', label: t.modeFlashcard, desc: t.modeFlashcardDesc },
     { mode: 'QCM', label: t.modeQcm, desc: t.modeQcmDesc },
     { mode: 'TYPING', label: t.modeTyping, desc: t.modeTypingDesc },

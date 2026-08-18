@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@/auth'
 import { db } from '@/lib/db'
 import { getCourseWithLevel } from '@/lib/current-course'
-import { buildExercises } from '@/lib/study/build'
+import { buildExercises, EXPRESSIONS_CATEGORY } from '@/lib/study/build'
 import { asDirectionChoice, learnsTermLanguage } from '@/lib/courses'
 import type { ExerciseType } from '@/types'
 
@@ -26,6 +26,10 @@ export async function GET(req: NextRequest) {
     ? modeParam
     : null
 
+  // Expressions are learned as blocks, so they get a session of their own
+  // instead of being buried among ordinary headwords
+  const expressionsOnly = req.nextUrl.searchParams.get('scope') === 'expressions'
+
   const exercises = await buildExercises({
     userId,
     course,
@@ -34,6 +38,7 @@ export async function GET(req: NextRequest) {
     size: SESSION_SIZE,
     newWords: NEW_WORDS_PER_SESSION,
     forcedMode,
+    category: expressionsOnly ? EXPRESSIONS_CATEGORY : undefined,
   })
 
   const studySession = await db.studySession.create({ data: { userId } })
