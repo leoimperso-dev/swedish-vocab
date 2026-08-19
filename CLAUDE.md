@@ -447,7 +447,10 @@ A whole bilingual document is mined by `scripts/harvest-examples.ts <term.txt> <
 [pair] [--dry]`: it attaches each sentence to the **rare** words in it (corpus rank ≥ 4000, fewer
 than 3 translated examples), rarest first. Unranked words are deliberately not treated as rare —
 most are unranked because the corpus never saw that spelling ("inte", "som"), and regulations
-hung off them teach nobody anything.
+hung off them teach nobody anything. Homographs go through the same `resolveKeyOwnership` as
+`build-examples.ts`, over **every** word of the pair and not only the rare ones: filtering first
+would let a rare homograph win a key by default because its frequent rival was already gone
+("visa" the song inheriting a sentence about *visa*, to show).
 
 Content scripts take the pair as their last argument (default `sv-fr`):
 `build-examples.ts <tatoeba-dir> [pair]`, `apply-frequency.ts <xx_50k.txt> [pair]`,

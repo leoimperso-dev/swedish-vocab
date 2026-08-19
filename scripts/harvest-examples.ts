@@ -23,6 +23,7 @@ import fs from 'fs'
 import { db } from '../lib/db'
 import { asPairId, pairOf, type Lang } from '../lib/courses'
 import { headwordKey, isSuffixShorthand } from '../lib/morphology'
+import { resolveKeyOwnership } from './key-ownership'
 
 interface Example {
   term: string
@@ -86,18 +87,21 @@ async function main() {
 
   const words = await db.word.findMany({
     where: { pair },
-    select: { id: true, term: true, translation: true, forms: true, frequencyRank: true, examples: true },
+    select: { id: true, term: true, translation: true, wordType: true, forms: true, frequencyRank: true, examples: true },
   })
 
-  // Surface key -> the rare words that claim it. Ambiguity is left in: a
-  // sentence attached to the wrong homograph is visible in the vocabulary list
-  // and removable, unlike a rank, which silently reshapes what is taught.
-  const byKey = new Map<string, typeof words>()
+  // Homographs: a surface key belongs to exactly one word.
+  //
+  // "visa" is both the verb (montrer) and "en visa" (une chanson). Matching on
+  // the surface alone gave a golf regulation to the song, which is the kind of
+  // example that teaches the wrong word. The same ownership rules as
+  // build-examples decide it, over *every* word of the pair and not only the
+  // rare ones — otherwise a rare homograph wins a key by default, precisely
+  // because its frequent rival was filtered out first. A key whose owner is
+  // common simply yields nothing here, which is the right answer: better no
+  // example than one about another word.
+  const keysById = new Map<string, string[]>()
   for (const word of words) {
-    if (word.frequencyRank === null || word.frequencyRank < RARE_RANK) continue
-    const translated = ((word.examples ?? []) as unknown as Example[]).filter(e => e.translation)
-    if (translated.length >= MAX_EXAMPLES) continue
-
     const keys = new Set<string>()
     const base = headwordKey(word.term, lang)
     if (base && !base.includes(' ')) keys.add(base)
@@ -108,7 +112,33 @@ async function main() {
         if (clean.length >= 3 && !clean.includes(' ') && !isSuffixShorthand(clean, lang)) keys.add(clean)
       }
     }
-    for (const key of keys) byKey.set(key, [...(byKey.get(key) ?? []), word])
+    keysById.set(word.id, [...keys])
+  }
+  const minRankByKey = new Map<string, number>()
+  for (const word of words) {
+    if (word.frequencyRank == null) continue
+    for (const key of keysById.get(word.id)!) {
+      const current = minRankByKey.get(key)
+      if (current === undefined || word.frequencyRank < current) minRankByKey.set(key, word.frequencyRank)
+    }
+  }
+  const owned = resolveKeyOwnership(
+    words.map(word => ({
+      id: word.id,
+      wordType: word.wordType,
+      headKey: headwordKey(word.term, lang),
+      keys: keysById.get(word.id)!,
+      lemmaRank: word.frequencyRank ?? Number.MAX_SAFE_INTEGER,
+    })),
+    key => minRankByKey.get(key),
+  )
+
+  const byKey = new Map<string, typeof words>()
+  for (const word of words) {
+    if (word.frequencyRank === null || word.frequencyRank < RARE_RANK) continue
+    const translated = ((word.examples ?? []) as unknown as Example[]).filter(e => e.translation)
+    if (translated.length >= MAX_EXAMPLES) continue
+    for (const key of owned.get(word.id) ?? []) byKey.set(key, [...(byKey.get(key) ?? []), word])
   }
   console.log(`${byKey.size} clé(s) de mots rares en manque d'exemples, sur ${words.length} mots`)
 
@@ -120,6 +150,9 @@ async function main() {
     const hits: Array<{ word: (typeof words)[number]; blank: string }> = []
     const seen = new Set<string>()
     for (const raw of tokens) {
+      // An abbreviation is not a word: stripping the dots turned "t.ex." into
+      // "tex", which matched an unrelated headword
+      if (/\w\.\w/.test(raw)) continue
       const token = normalize(raw)
       if (token.length < 3) continue
       for (const candidate of [token, headwordKey(token, lang)]) {
