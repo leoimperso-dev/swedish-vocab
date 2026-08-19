@@ -295,6 +295,16 @@ permission must stay inside a real tap (the button), which Apple enforces.
 tappable → `/api/dictionary?q=` backed by `lib/dictionary.ts` (one in-memory map per pair, over
 headwords + stored forms, falling back to `lemmaCandidates()` from `lib/morphology.ts`).
 
+## Bilingual stories
+`Story.body` holds the `term`-language text; `bodyTranslated` holds the same paragraphs in the
+`translation` language, and is **null on the generated stories** — those are written for learners
+and the word popover carries them. Real-world prose is different: a paragraph can be understood
+word by word and still mean nothing, so a source that comes with its own translation keeps it.
+The reader hides it behind a per-paragraph « Voir la traduction », because reading it first is
+reading French. Import with `scripts/add-story.ts <term.txt> <translation.txt> <slug> "<titre>"
+"<titre traduit>" [pair] [level]` — it refuses a mismatched paragraph count, since the alignment
+is the whole point.
+
 ## Example sentences & cloze
 `Word.examples` (`[{term, translation?, blank}]`) holds real Tatoeba sentences (CC-BY) matched by
 headword+forms via `scripts/build-examples.ts` (English pivot only when neither side is English).

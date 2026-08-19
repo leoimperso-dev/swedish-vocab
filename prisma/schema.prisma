@@ -164,6 +164,10 @@ model Story {
   titleTranslated String
   level           String // "beginner" | "intermediate" | "expert" | "dialogue"
   body            String // `term`-language text, paragraphs separated by \n\n
+  // Same text in the pair's `translation` language, paragraph for paragraph.
+  // Only set on bilingual sources (real-world prose); a written-for-learners
+  // story leaves it null and is read with the word popover alone.
+  bodyTranslated  String?
   wordCount       Int
   createdAt       DateTime @default(now())
 

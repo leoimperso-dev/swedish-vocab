@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useMemo, useRef } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
 import { getStrings } from '@/lib/i18n'
 import { useCourse } from '@/components/CourseProvider'
@@ -42,6 +42,22 @@ export default function StoryReader({ story }: { story: Story }) {
     return { paragraphs: paragraphsWithIds, sentences: flat }
   }, [story.body])
 
+  // Bilingual sources carry their own translation, paragraph for paragraph —
+  // see scripts/add-story.ts. Hidden by default: reading it first is reading
+  // French, not Swedish.
+  const translated = useMemo(
+    () => (story.bodyTranslated ? story.bodyTranslated.split(/\n\n+/) : []),
+    [story.bodyTranslated],
+  )
+  const [shown, setShown] = useState<Set<number>>(new Set())
+  const reveal = (paragraph: number) =>
+    setShown(prev => {
+      const next = new Set(prev)
+      if (next.has(paragraph)) next.delete(paragraph)
+      else next.add(paragraph)
+      return next
+    })
+
   // The voice reads on past the fold; the page has to follow it
   const activeRef = useRef<HTMLSpanElement>(null)
   useEffect(() => {
@@ -74,20 +90,35 @@ export default function StoryReader({ story }: { story: Story }) {
       <Card className="p-5">
         <div className="space-y-5 text-[17px] leading-[2] tracking-tight">
           {paragraphs.map((paragraph, pIdx) => (
-            <p key={pIdx}>
-              {paragraph.map(sentence => (
-                <span
-                  key={sentence.id}
-                  ref={index === sentence.id ? activeRef : undefined}
-                  className={cn(
-                    'rounded transition-colors',
-                    index === sentence.id && 'bg-warning-soft',
-                  )}
+            <div key={pIdx}>
+              <p>
+                {paragraph.map(sentence => (
+                  <span
+                    key={sentence.id}
+                    ref={index === sentence.id ? activeRef : undefined}
+                    className={cn(
+                      'rounded transition-colors',
+                      index === sentence.id && 'bg-warning-soft',
+                    )}
+                  >
+                    <TappableText text={sentence.text} locale={locale} t={t} />{' '}
+                  </span>
+                ))}
+              </p>
+              {translated[pIdx] && (
+                <button
+                  onClick={() => reveal(pIdx)}
+                  aria-expanded={shown.has(pIdx)}
+                  className="pressable mt-1 text-left text-xs text-muted-foreground"
                 >
-                  <TappableText text={sentence.text} locale={locale} t={t} />{' '}
-                </span>
-              ))}
-            </p>
+                  {shown.has(pIdx) ? (
+                    <span className="italic">{translated[pIdx]}</span>
+                  ) : (
+                    <span className="underline decoration-dotted">{t.showTranslation}</span>
+                  )}
+                </button>
+              )}
+            </div>
           ))}
         </div>
       </Card>

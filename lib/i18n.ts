@@ -150,6 +150,7 @@ const fr = {
   noVoiceForLanguage: (language: string) =>
     `Aucune voix ${language} installée sur cet appareil`,
   tapAnyWord: 'Appuie sur un mot pour voir sa traduction',
+  showTranslation: 'Voir la traduction',
   wordNotFound: 'Mot inconnu du dictionnaire',
   properNoun: 'Nom propre',
   back: '← Retour',
@@ -517,6 +518,7 @@ const sv: typeof fr = {
   speakList: 'Läs upp listan',
   noVoiceForLanguage: language => `Ingen ${language} röst installerad på den här enheten`,
   tapAnyWord: 'Tryck på ett ord för att se översättningen',
+  showTranslation: 'Visa översättningen',
   wordNotFound: 'Ordet finns inte i ordboken',
   properNoun: 'Egennamn',
   back: '← Tillbaka',
@@ -879,6 +881,7 @@ const en: typeof fr = {
   speakList: 'Read the list',
   noVoiceForLanguage: language => `No ${language} voice installed on this device`,
   tapAnyWord: 'Tap any word to see its translation',
+  showTranslation: 'Show the translation',
   wordNotFound: 'Word not in the dictionary',
   properNoun: 'Proper noun',
   back: '← Back',
