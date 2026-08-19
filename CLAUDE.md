@@ -443,6 +443,11 @@ no French counterpart (41% of the Swedish ones). `scripts/translate-examples.ts 
 is never touched, however literal it looks, because those are human. A sentence met in the wild
 goes in with `scripts/add-example.ts <term> "<phrase>" "<traduction>" [pair]`, which marks it
 `manual: true` — `build-examples.ts` rewrites a word's whole array, and keeps those.
+A whole bilingual document is mined by `scripts/harvest-examples.ts <term.txt> <translation.txt>
+[pair] [--dry]`: it attaches each sentence to the **rare** words in it (corpus rank ≥ 4000, fewer
+than 3 translated examples), rarest first. Unranked words are deliberately not treated as rare —
+most are unranked because the corpus never saw that spelling ("inte", "som"), and regulations
+hung off them teach nobody anything.
 
 Content scripts take the pair as their last argument (default `sv-fr`):
 `build-examples.ts <tatoeba-dir> [pair]`, `apply-frequency.ts <xx_50k.txt> [pair]`,
