@@ -17,7 +17,10 @@ const MAX_LEN = 140
 // Tatoeba uses ISO 639-3 codes in its file names
 const TATOEBA_CODE: Record<Lang, string> = { sv: 'swe', fr: 'fra', en: 'eng', nl: 'nld', es: 'spa' }
 
-interface Example { term: string; translation?: string; blank: string }
+// `manual` marks a sentence added by hand (scripts/add-example.ts). This script
+// rewrites the whole array for a word, so those have to be carried over or a
+// rebuild would silently delete them.
+interface Example { term: string; translation?: string; blank: string; manual?: boolean }
 
 function readTsv(file: string): string[][] {
   return fs.readFileSync(file, 'utf-8').split('\n').filter(Boolean).map(l => l.split('\t'))
@@ -103,7 +106,7 @@ async function main() {
 
   const words = await db.word.findMany({
     where: { pair },
-    select: { id: true, term: true, forms: true, wordType: true, frequencyRank: true },
+    select: { id: true, term: true, forms: true, wordType: true, frequencyRank: true, examples: true },
   })
   console.log(`Matching ${words.length} words...`)
 
@@ -153,9 +156,12 @@ async function main() {
         }
       }
     }
+    // Hand-picked sentences survive a rebuild, and stay first
+    const kept = ((word.examples ?? []) as unknown as Example[]).filter(e => e.manual)
+
     if (candidates.size === 0) {
       // Clear examples this word may have inherited from a key it no longer owns
-      updates.push({ id: word.id, examples: null })
+      updates.push({ id: word.id, examples: kept.length > 0 ? kept : null })
       continue
     }
 
@@ -169,8 +175,8 @@ async function main() {
     })
     scored.sort((a, b) => a.score - b.score)
 
-    const seen = new Set<string>()
-    const examples: Example[] = []
+    const seen = new Set<string>(kept.map(e => e.term))
+    const examples: Example[] = [...kept]
     for (const { sid, blank } of scored) {
       const text = termSentences.get(sid)!
       if (seen.has(text)) continue

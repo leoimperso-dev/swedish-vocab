@@ -427,6 +427,13 @@ This machine requires `NODE_OPTIONS=--use-system-ca` for Prisma binary downloads
   tolerating 1 slip up to 4 characters, 2 up to 8, 3 beyond
 - For verbs: each form (present/prétérit/supin) evaluated separately via `evaluateVerbForms`
 
+Example sentences come from Tatoeba, which pairs sentences by hand — a large share arrives with
+no French counterpart (41% of the Swedish ones). `scripts/translate-examples.ts <pair>` fills
+**only** the empty ones with DeepL (`DEEPL_API_KEY`, `--dry` to preview); an existing translation
+is never touched, however literal it looks, because those are human. A sentence met in the wild
+goes in with `scripts/add-example.ts <term> "<phrase>" "<traduction>" [pair]`, which marks it
+`manual: true` — `build-examples.ts` rewrites a word's whole array, and keeps those.
+
 Content scripts take the pair as their last argument (default `sv-fr`):
 `build-examples.ts <tatoeba-dir> [pair]`, `apply-frequency.ts <xx_50k.txt> [pair]`,
 `import-stories.ts <dir> [pair]`, `import-grammar.ts <dir> [pair]`.
