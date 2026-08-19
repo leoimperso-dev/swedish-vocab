@@ -14,6 +14,8 @@ interface DictResult {
   term?: string
   translation?: string
   forms?: string | null
+  /** Other words this spelling could be — see DictEntry.also */
+  also?: Array<{ term: string; translation: string }>
 }
 
 const EDGE_MARGIN = 8
@@ -120,6 +122,17 @@ function WordPopover({ entry, token, locale, t }: {
               ({entry.forms})
             </span>
           )}
+          {/* One spelling, several words: "banan" is a banana and the definite
+              form of "bana", a course. Only the sentence can settle it, so the
+              reader gets the alternatives rather than one confident wrong answer. */}
+          {entry.also?.map(other => (
+            <span
+              key={other.term}
+              className="mt-1.5 block border-t border-border/60 pt-1.5 text-xs leading-snug text-muted-foreground/80"
+            >
+              <span className="font-semibold text-foreground/70">{other.term}</span> — {other.translation}
+            </span>
+          ))}
           <button
             onClick={e => {
               e.stopPropagation()

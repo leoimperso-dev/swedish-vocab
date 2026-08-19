@@ -69,8 +69,14 @@ function swedishCandidates(token: string): string[] {
     if (suffix === 't' || suffix === 'tt') out.push(stem + 'n', stem + 'd')
     // Neuter participle → common gender: "instucket" → "instucken"
     if (suffix === 'et') out.push(stem + 'en')
-    // Redouble final consonant: "sant" → "san" → "sann", "tunt" → "tun" → "tunn"
-    if (stem.length >= 2) out.push(stem + stem[stem.length - 1], stem + stem[stem.length - 1] + 'n')
+    // Redouble final consonant: "sant" → "san" → "sann", "tunt" → "tun" → "tunn",
+    // and with the infinitive ending for the s-passive: "bestäms" → "bestäm" →
+    // "bestämma". Swedish builds that passive on the present stem, so stripping
+    // the -s leaves a stem one consonant short of its own infinitive.
+    if (stem.length >= 2) {
+      const doubled = stem + stem[stem.length - 1]
+      out.push(doubled, doubled + 'n', doubled + 'a')
+    }
     // Undouble final consonant: "rummet" → "rumm" → "rum", "mannen" → "mann" → "man"
     if (stem.length >= 3 && stem[stem.length - 1] === stem[stem.length - 2]) {
       const single = stem.slice(0, -1)

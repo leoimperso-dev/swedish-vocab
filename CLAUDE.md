@@ -305,6 +305,17 @@ reading French. Import with `scripts/add-story.ts <term.txt> <translation.txt> <
 "<titre traduit>" [pair] [level]` — it refuses a mismatched paragraph count, since the alignment
 is the whole point.
 
+## Homographs in the word popover
+One spelling can be several words, and Swedish definite forms collide with real headwords:
+"banan" is a banana *and* the definite of "bana", a course. The dictionary cache keeps every
+claimant per surface key, shows the most frequent one and lists up to two others as
+`DictEntry.also` — the sentence is the only thing that could settle it, and the reader has that.
+Duplicate rows of the *same* word are a different problem: the seed's unique key is
+`(pair, term, wordType, source)`, so one word imported twice became two entries with half the
+meaning each. `scripts/dedupe-words.ts <pair> [--dry]` merges them — union of the glosses kept
+verbatim (never through `glossSenses`, which is for comparing, not displaying), richest forms,
+all examples, and every learner's progress repointed.
+
 ## Example sentences & cloze
 `Word.examples` (`[{term, translation?, blank}]`) holds real Tatoeba sentences (CC-BY) matched by
 headword+forms via `scripts/build-examples.ts` (English pivot only when neither side is English).

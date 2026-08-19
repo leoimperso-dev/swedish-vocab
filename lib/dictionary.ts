@@ -11,9 +11,26 @@ export interface DictEntry {
   term: string // display headword ("en kvinna")
   translation: string // best translation(s)
   forms: string | null
+  /**
+   * Other words the same surface form could be.
+   *
+   * Swedish definite forms collide with real headwords: "banan" is both a
+   * banana and *the course* (definite of "bana"). The exact match wins, which
+   * answered "une banane" in a text about a golf course. Nothing in the token
+   * can settle it — only the sentence can — so the reader is shown the
+   * alternative instead of being told one answer with false confidence.
+   */
+  also?: Array<{ term: string; translation: string }>
 }
 
-const caches = new Map<PairId, Map<string, DictEntry>>()
+interface Dict {
+  /** Surface key -> the entry shown first (most frequent claimant). */
+  primary: Map<string, DictEntry>
+  /** Surface key -> every claimant, so a homograph can be offered as well. */
+  all: Map<string, DictEntry[]>
+}
+
+const caches = new Map<PairId, Dict>()
 
 // How many senses a popover shows before it stops being a translation and
 // starts being a dictionary article
@@ -42,7 +59,7 @@ function bestSenses(translations: string[], fallback: string): string {
   return kept.length > 0 ? kept.join(', ') : fallback
 }
 
-async function buildCache(pair: PairId): Promise<Map<string, DictEntry>> {
+async function buildCache(pair: PairId): Promise<Dict> {
   const lang = pairOf(pair).term
   const words = await db.word.findMany({
     where: { pair },
@@ -51,7 +68,8 @@ async function buildCache(pair: PairId): Promise<Map<string, DictEntry>> {
     orderBy: [{ frequencyRank: { sort: 'asc', nulls: 'last' } }, { createdAt: 'asc' }],
   })
 
-  const map = new Map<string, DictEntry>()
+  const primary = new Map<string, DictEntry>()
+  const all = new Map<string, DictEntry[]>()
   const formOrder = [
     'present', 'preterit', 'supine',
     'past', 'pastParticiple',
@@ -87,10 +105,12 @@ async function buildCache(pair: PairId): Promise<Map<string, DictEntry>> {
       }
     }
     for (const key of keys) {
-      if (key && !map.has(key)) map.set(key, entry)
+      if (!key) continue
+      if (!primary.has(key)) primary.set(key, entry)
+      all.set(key, [...(all.get(key) ?? []), entry])
     }
   }
-  return map
+  return { primary, all }
 }
 
 function resolve(cache: Map<string, DictEntry>, token: string, lang: Lang): DictEntry | null {
@@ -131,19 +151,45 @@ function resolveCompound(cache: Map<string, DictEntry>, token: string, lang: Lan
   return null
 }
 
-export async function lookupWord(raw: string, pair: PairId): Promise<DictEntry | null> {
-  let cache = caches.get(pair)
-  if (!cache) {
-    cache = await buildCache(pair)
-    caches.set(pair, cache)
+/** Entries reachable from a token by the morphology, minus the one already shown. */
+function otherReadings(
+  dict: Dict,
+  token: string,
+  lang: Lang,
+  chosen: DictEntry,
+): Array<{ term: string; translation: string }> {
+  const seen = new Set([chosen.id])
+  const out: Array<{ term: string; translation: string }> = []
+  // The token itself first — several words can share one spelling — then what
+  // the morphology reaches from it
+  for (const candidate of [token, ...lemmaCandidates(token, lang)]) {
+    for (const hit of dict.all.get(candidate) ?? []) {
+      if (seen.has(hit.id)) continue
+      seen.add(hit.id)
+      out.push({ term: hit.term, translation: hit.translation })
+      if (out.length === 2) return out
+    }
   }
+  return out
+}
+
+export async function lookupWord(raw: string, pair: PairId): Promise<DictEntry | null> {
+  let dict = caches.get(pair)
+  if (!dict) {
+    dict = await buildCache(pair)
+    caches.set(pair, dict)
+  }
+  const cache = dict.primary
 
   const token = raw.toLowerCase().replace(/[.,!?¿¡;:"«»()[\]…'’„“”–—]/g, '').trim()
   if (!token) return null
 
   const lang = pairOf(pair).term
   const hit = resolve(cache, token, lang) ?? resolveCompound(cache, token, lang)
-  if (hit) return hit
+  if (hit) {
+    const also = otherReadings(dict, token, lang, hit)
+    return also.length > 0 ? { ...hit, also } : hit
+  }
 
   // Hyphenated compounds ("thirty-one", "band-sidan"): surface the first known part
   if (token.includes('-')) {
