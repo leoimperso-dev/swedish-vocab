@@ -11,7 +11,14 @@
 // richest forms, every example, and every learner's progress. A sense that
 // exists only in the loser would otherwise disappear.
 //
-// Usage: pnpm tsx scripts/dedupe-words.ts <pair> [--dry]
+// A word split across parts of speech is a second, milder case: the Wiktionary
+// extraction listed "okay" five times (adjective, adverb, function, noun, verb),
+// each with its own schedule. --cross-type merges those, but only when the
+// glosses actually overlap — "blind" the adjective and "blind" the noun (un
+// store) are two words that happen to share a spelling, and merging them would
+// invent a meaning.
+//
+// Usage: pnpm tsx scripts/dedupe-words.ts <pair> [--cross-type] [--dry]
 import 'dotenv/config'
 import { db } from '../lib/db'
 import { asPairId } from '../lib/courses'
@@ -44,11 +51,35 @@ function fragmentKey(fragment: string): string {
     .replace(/[^a-z0-9]/g, '')
 }
 
+/**
+ * Splits on the separators between senses only — a comma inside brackets
+ * belongs to one sense. Splitting blindly turned "(particule : sans doute,
+ * probablement, assez)" into three fragments, the first of which kept an
+ * unclosed bracket.
+ */
+function splitSenses(gloss: string): string[] {
+  const parts: string[] = []
+  let depth = 0
+  let current = ''
+  for (const char of gloss) {
+    if (char === '(' || char === '[') depth++
+    else if (char === ')' || char === ']') depth = Math.max(0, depth - 1)
+    if (depth === 0 && (char === ',' || char === ';' || char === '/')) {
+      parts.push(current)
+      current = ''
+      continue
+    }
+    current += char
+  }
+  parts.push(current)
+  return parts
+}
+
 function mergeGlosses(glosses: string[]): string {
   const seen = new Set<string>()
   const out: string[] = []
   for (const gloss of glosses) {
-    for (const raw of cleanGloss(gloss).split(/\s*[,;/]\s*|\s+\/\s+/)) {
+    for (const raw of splitSenses(cleanGloss(gloss))) {
       const fragment = raw.trim()
       const key = fragmentKey(fragment)
       if (!fragment || !key || seen.has(key)) continue
@@ -73,14 +104,28 @@ async function main() {
     orderBy: { createdAt: 'asc' },
   })
 
+  const crossType = process.argv.includes('--cross-type')
   const groups = new Map<string, typeof words>()
   for (const word of words) {
-    // Word type is part of the identity: "en vad" (le mollet) and "vad" the
-    // interrogative are different words that happen to share a spelling.
-    const key = `${word.term.trim().toLowerCase()}|${word.wordType}`
+    // Word type is part of the identity by default: "en vad" (le mollet) and
+    // "vad" the interrogative are different words sharing a spelling.
+    const key = crossType
+      ? word.term.trim().toLowerCase()
+      : `${word.term.trim().toLowerCase()}|${word.wordType}`
     groups.set(key, [...(groups.get(key) ?? []), word])
   }
-  const duplicated = [...groups.values()].filter(g => g.length > 1)
+  let duplicated = [...groups.values()].filter(g => g.length > 1)
+  if (crossType) {
+    // Only rows that already agree on some part of the meaning. Without this,
+    // every homograph in the dictionary would be collapsed into one entry.
+    duplicated = duplicated
+      .map(group => {
+        const keys = group.map(w => new Set(splitSenses(cleanGloss(w.translation)).map(fragmentKey)))
+        const head = keys[0]
+        return group.filter((_, i) => i === 0 || [...keys[i]].some(k => head.has(k)))
+      })
+      .filter(group => group.length > 1)
+  }
   console.log(`${pair} : ${duplicated.length} mot(s) en double, ${duplicated.reduce((n, g) => n + g.length - 1, 0)} ligne(s) en trop`)
 
   let merged = 0
