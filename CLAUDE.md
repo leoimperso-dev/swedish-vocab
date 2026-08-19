@@ -452,6 +452,12 @@ hung off them teach nobody anything. Homographs go through the same `resolveKeyO
 would let a rare homograph win a key by default because its frequent rival was already gone
 ("visa" the song inheriting a sentence about *visa*, to show).
 
+A word met while reading and absent from the dictionary is not a gap but a wrong answer — the
+word popover falls back to half a compound, or to a homograph. Add it with
+`scripts/add-word.ts <term> <translation> [pair] [wordType] [category]`, or `--file words.json`
+for a batch. New entries land unranked, so `cefrForRank(null)` makes them C2 and they stay out of
+a beginner's new-word draw until `apply-frequency` runs again.
+
 Content scripts take the pair as their last argument (default `sv-fr`):
 `build-examples.ts <tatoeba-dir> [pair]`, `apply-frequency.ts <xx_50k.txt> [pair]`,
 `import-stories.ts <dir> [pair]`, `import-grammar.ts <dir> [pair]`.
