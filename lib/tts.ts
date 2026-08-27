@@ -66,7 +66,11 @@ export function setPreferredVoiceUri(locale: string, voiceUri: string | null): v
 // Speaking rate, shared by every utterance of the app
 const RATE_KEY = 'tts-rate'
 export const DEFAULT_RATE = 0.9
-export const RATE_BOUNDS = { min: 0.6, max: 1.3, step: 0.05 } as const
+// Down to 0.3: a dictation of a long Swedish compound is unfollowable at
+// conversational speed for a beginner. Engines differ below ~0.5 — Apple's
+// voices stretch cleanly, some Android ones distort — so the low end is offered,
+// not imposed: the default stays at DEFAULT_RATE.
+export const RATE_BOUNDS = { min: 0.3, max: 1.3, step: 0.05 } as const
 
 export function getRate(): number {
   if (typeof window === 'undefined') return DEFAULT_RATE
