@@ -24,5 +24,9 @@ export default function middleware(req: NextRequest) {
 }
 
 export const config = {
-  matcher: ['/((?!_next/static|_next/image|favicon.ico|manifest.json|.*\\.png$).*)'],
+  // sw.js must stay public: the browser fetches it to register the worker, and
+  // a redirect to /login there fails registration outright — no offline cache
+  // and no push notifications. It carries no user data, only code already
+  // served to everyone.
+  matcher: ['/((?!_next/static|_next/image|favicon.ico|manifest.json|sw.js|.*\\.png$).*)'],
 }
