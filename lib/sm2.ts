@@ -10,7 +10,12 @@ export interface SM2State {
   nextReview: Date
 }
 
-export function sm2Update(state: SM2State, quality: Quality): SM2State {
+/**
+ * @param now when the answer was given. An answer produced offline is replayed
+ *   later, sometimes hours later; scheduling it from the moment the *server*
+ *   heard about it would push every interval by the length of the disconnection.
+ */
+export function sm2Update(state: SM2State, quality: Quality, now = new Date()): SM2State {
   let { easeFactor, interval, repetitions } = state
 
   if (quality < 3) {
@@ -26,7 +31,7 @@ export function sm2Update(state: SM2State, quality: Quality): SM2State {
     easeFactor = Math.max(1.3, easeFactor + (0.1 - (5 - quality) * 0.08))
   }
 
-  const nextReview = new Date()
+  const nextReview = new Date(now)
   nextReview.setDate(nextReview.getDate() + interval)
 
   return { easeFactor, interval, repetitions, nextReview }

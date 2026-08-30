@@ -295,8 +295,13 @@ model StudySession {
   wordsApprox  Int       @default(0)
   xpGained     Int       @default(0)
   bestCombo    Int       @default(0)
+  // Set only on a session played offline and replayed later: the phone resends
+  // until the server confirms, and this is what makes the retry a no-op.
+  offlineBatch String?
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, offlineBatch], map: "StudySession_userId_offlineBatch_key")
 }
 
 model Achievement {

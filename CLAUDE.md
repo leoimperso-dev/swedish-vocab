@@ -209,6 +209,27 @@ not authored for the pair's `term` side.
 - No transcript is stored. The entry card is hidden unless `GROQ_API_KEY` is set.
 - `pnpm tsx scripts/try-chat.ts [lang] ["phrase"]` sends one real turn, to check the key end to end.
 
+## Offline
+The app is a PWA with a service worker (`public/sw.js`). Static assets are cache-first; **pages
+are network-first with a cached copy behind them**, but only `/study`, `/words` and `/dashboard` —
+the rest needs the server anyway. A redirect to `/login` is never cached, or the next cold start
+would lock the learner out.
+
+`lib/offline/` holds the device's own copy, in IndexedDB (`localStorage` is ~5 MB, a pair's
+vocabulary is already close):
+- **pool** — 120 exercises drawn ahead by `/api/study/offline`. An exercise arrives
+  self-contained (word, type, direction, distractors, accepted answers), so nothing is computed
+  offline. A forced mode cannot be honoured from the pool; the learner gets the mix.
+- **queue** — answers given offline, each with `answeredAt`. `recordAnswer` and `sm2Update` take
+  that timestamp: scheduling from the moment the *server* heard about it would push every
+  interval by the length of the disconnection.
+- **words** — the vocabulary list, so lookup and search work with no network.
+
+`/api/study/sync` replays a queue. The phone keeps its answers until the request returns 200, so
+the same batch can arrive twice: `StudySession.offlineBatch` is unique per user and the second
+attempt is skipped rather than paying XP twice. Client clocks are not trusted — an `answeredAt`
+in the future is clamped to now. Guarded by `scripts/check-offline-sync.ts`.
+
 ## Duels
 Asynchronous matches between two learners of the same **pair**, under `/duels` (the nav's
 trophy slot; `CompeteTabs` switches between duels and the leaderboard, so the bar keeps six
@@ -406,6 +427,7 @@ pnpm tsx scripts/check-speech-language.ts  # QA: every course only ever speaks t
 pnpm tsx scripts/simulate-duel.ts          # QA: full duel against the DB (self-cleaning)
 pnpm tsx scripts/check-mixed-session.ts <email>  # QA: a MIXED session keeps each card's direction
 pnpm tsx scripts/check-mastered.ts         # QA: "I know these perfectly" (throwaway account)
+pnpm tsx scripts/check-offline-sync.ts     # QA: replaying an offline session (throwaway account)
 pnpm tsx scripts/check-password-auth.ts    # QA: hashing + reset tokens (throwaway account)
 pnpm tsx --env-file=.env.local scripts/try-email.ts <address>  # sends one real email through Brevo
 ```

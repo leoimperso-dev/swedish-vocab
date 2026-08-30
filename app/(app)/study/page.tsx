@@ -28,9 +28,13 @@ import {
   type Course, type Direction, type DirectionChoice,
 } from '@/lib/courses'
 import type { ExerciseWord, AnswerResult, ExerciseType } from '@/types'
+import { drawFromPool, fillPool, flushQueue, poolSize, queueAnswer } from '@/lib/offline/study'
 
 // EXPRESSIONS is not an exercise type but a slice of the vocabulary: the same
 // mixed session, drawn from the curated set phrases only
+// Same length as a server-built session (see app/api/study/session/route.ts)
+const OFFLINE_SESSION_SIZE = 15
+
 type StudyMode = 'MIX' | 'EXPRESSIONS' | ExerciseType
 
 // Fisher-Yates on a copy — a replay in the order the words were missed lets the
@@ -66,6 +70,31 @@ export default function StudyPage() {
   const [loading, setLoading] = useState(false)
   const [finishing, setFinishing] = useState(false)
   const [confirmQuit, setConfirmQuit] = useState(false)
+  // Set when the session came from the downloaded pool: its answers are queued
+  // on the phone under this id and replayed as one session on reconnection
+  const [offlineBatch, setOfflineBatch] = useState<string | null>(null)
+  const [offlineDone, setOfflineDone] = useState(false)
+  const [synced, setSynced] = useState(0)
+
+  // Send what was answered offline, then top the pool back up. Both are
+  // best-effort: a failure here must never block a session.
+  useEffect(() => {
+    const catchUp = async () => {
+      if (!navigator.onLine) return
+      const sent = await flushQueue().catch(() => 0)
+      if (sent > 0) { setSynced(sent); router.refresh() }
+      if ((await poolSize(course.pair).catch(() => 1)) > 0) return
+      const res = await fetch(`/api/study/offline?direction=${direction}`)
+      if (!res.ok) return
+      const data = await res.json()
+      if (Array.isArray(data.exercises) && data.exercises.length > 0) {
+        await fillPool(course.pair, defaultDirection(course), data.exercises)
+      }
+    }
+    catchUp().catch(() => {})
+    window.addEventListener('online', () => { catchUp().catch(() => {}) })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [course.pair])
 
   useEffect(() => {
     if (!mode) return
@@ -73,17 +102,26 @@ export default function StudyPage() {
     const params = new URLSearchParams({ direction })
     if (mode === 'EXPRESSIONS') params.set('scope', 'expressions')
     else if (mode !== 'MIX') params.set('mode', mode)
-    fetch(`/api/study/session?${params}`)
-      .then(r => r.json())
-      .then(data => {
+    const start = async () => {
+      try {
+        const res = await fetch(`/api/study/session?${params}`)
+        if (!res.ok) throw new Error('offline')
+        const data = await res.json()
         setSessionId(data.sessionId ?? null)
         setExercises(Array.isArray(data.exercises) ? data.exercises : [])
-        setLoading(false)
-      })
-      .catch(() => {
-        setMode(null)
-        setLoading(false)
-      })
+        setOfflineBatch(null)
+      } catch {
+        // No network: play what was downloaded. The pool holds a mixed session,
+        // so a forced mode cannot be honoured — the learner gets the mix.
+        const drawn = await drawFromPool(course.pair, OFFLINE_SESSION_SIZE).catch(() => [])
+        if (drawn.length === 0) { setMode(null); setLoading(false); return }
+        setExercises(drawn)
+        setSessionId(null)
+        setOfflineBatch(`${course.pair}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`)
+      }
+      setLoading(false)
+    }
+    start()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mode])
 
@@ -100,25 +138,37 @@ export default function StudyPage() {
   }, [sessionActive])
 
   const handleAnswer = useCallback(async (result: AnswerResult, exerciseType: string) => {
-    if (!sessionId || !exercises[currentIndex]) return
+    if ((!sessionId && !offlineBatch) || !exercises[currentIndex]) return
 
     const word = exercises[currentIndex].word
     // A mixed session asks each card in the direction it is scheduled in, so
     // the answer is credited to that one, not to the picker's value
     const answered = exercises[currentIndex].direction ?? defaultDirection(course)
-    // Progress is saved answer by answer — a failed save must not block the session
-    try {
-      await fetch('/api/study/answer', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ wordId: word.id, result, exerciseType, direction: answered, timeSpent: 0, sessionId }),
-      })
-    } catch {}
+    const runningCombo = result === 'correct' ? combo + 1 : 0
+    if (offlineBatch) {
+      // Kept on the phone with the moment it was answered: SM-2 schedules from
+      // there, not from whenever the connection comes back
+      await queueAnswer({
+        wordId: word.id, result, direction: answered, exerciseType,
+        answeredAt: new Date().toISOString(),
+        batch: offlineBatch,
+        bestCombo: Math.max(runningCombo, bestCombo),
+      }).catch(() => {})
+    } else {
+      // Progress is saved answer by answer — a failed save must not block the session
+      try {
+        await fetch('/api/study/answer', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ wordId: word.id, result, exerciseType, direction: answered, timeSpent: 0, sessionId }),
+        })
+      } catch {}
+    }
 
     const newResults = [...results, result]
     setResults(newResults)
 
-    const newCombo = result === 'correct' ? combo + 1 : 0
+    const newCombo = runningCombo
     setCombo(newCombo)
     if (newCombo > bestCombo) setBestCombo(newCombo)
 
@@ -133,6 +183,8 @@ export default function StudyPage() {
         setReviewingMissed(true)
         return
       }
+      // Offline: nothing to close server-side, the queue carries the session
+      if (offlineBatch) { setOfflineDone(true); return }
       setFinishing(true)
       const finalize = () =>
         fetch('/api/study/answer', {
@@ -151,7 +203,7 @@ export default function StudyPage() {
     } else {
       setCurrentIndex(i => i + 1)
     }
-  }, [sessionId, exercises, currentIndex, results, combo, bestCombo, router, course, missed])
+  }, [sessionId, offlineBatch, exercises, currentIndex, results, combo, bestCombo, router, course, missed])
 
   // Asked before anything else: the session request must already know the level
   if (!declaredLevel && !levelAsked) return <LevelPicker onDone={() => setLevelAsked(true)} />
@@ -163,9 +215,29 @@ export default function StudyPage() {
         onPick={setMode}
         direction={direction}
         onDirectionChange={setDirection}
+        synced={synced}
       />
     )
   }
+  if (offlineDone) {
+    return (
+      <AppShell title={t.chooseExercise}>
+        <div className="space-y-4">
+          <Card className="space-y-2 py-6 text-center">
+            <p className="font-display text-4xl font-semibold tabular-nums">
+              {results.filter(r => r === 'correct').length}/{results.length}
+            </p>
+            {/* No XP shown: it is awarded when the server replays the session */}
+            <p className="text-sm text-muted-foreground">{t.offlineSessionDone}</p>
+          </Card>
+          <Button size="lg" className="w-full" onClick={() => router.push('/dashboard')}>
+            {t.finishSession}
+          </Button>
+        </div>
+      </AppShell>
+    )
+  }
+
   if (loading) return <LoadingScreen />
   if (exercises.length === 0) return <NoWordsDueScreen />
 
@@ -232,6 +304,11 @@ export default function StudyPage() {
         </div>
       )}
 
+      {/* Silence about the pool would read as a broken session */}
+      {offlineBatch && (
+        <p className="px-4 pt-3 text-center text-[11px] text-warning">{t.offlineBanner}</p>
+      )}
+
       <main key={currentIndex} className="animate-rise px-4 pt-5">
         <ExerciseBoundary
           fallback={
@@ -290,11 +367,13 @@ const MODE_ICONS: Record<StudyMode, LucideIcon> = {
   LISTENING: Ear,
 }
 
-function ModePicker({ course, onPick, direction, onDirectionChange }: {
+function ModePicker({ course, onPick, direction, onDirectionChange, synced }: {
   course: Course
   onPick: (mode: StudyMode) => void
   direction: DirectionChoice
   onDirectionChange: (d: DirectionChoice) => void
+  /** Answers just sent from the offline queue — worth confirming, silently lost otherwise */
+  synced: number
 }) {
   const t = getStrings(course.native)
   // Cloze, conjugation, reading and grammar are authored for the pair's `term`
@@ -330,6 +409,9 @@ function ModePicker({ course, onPick, direction, onDirectionChange }: {
   return (
     <AppShell title={t.chooseExercise}>
       <div className="space-y-4">
+        {synced > 0 && (
+          <p className="text-center text-xs text-success">{t.offlineSynced(synced)}</p>
+        )}
         {/* Direction toggle — each direction has its own SM-2 progression */}
         <div>
           <SectionLabel>{t.chooseDirection}</SectionLabel>

@@ -21,6 +21,7 @@ import { CEFR_LEVELS } from '@/lib/cefr'
 import { Button } from '@/components/ui/button'
 import { EmptyState, ListSkeleton } from '@/components/ui/feedback'
 import TappableText from '@/components/TappableText'
+import { cacheWords, getCachedWords } from '@/lib/offline/words'
 
 const TOP_LIST_SIZE = 3000
 // Rows rendered per batch — more stream in as the sentinel scrolls into view
@@ -145,32 +146,29 @@ export default function WordsPage() {
   }
 
   useEffect(() => {
-    // Cache key carries the pair — switching course must not flash the other vocabulary
-    const cacheKey = `words-cache-v3-${course.pair}`
     setLoading(true)
-    // Stale-while-revalidate: show the cached list instantly, refresh in the background
-    try {
-      const cached = sessionStorage.getItem(cacheKey)
-      if (cached) {
-        const parsed = JSON.parse(cached)
-        if (Array.isArray(parsed.words)) {
-          setWords(parsed.words)
-          setLoading(false)
-        }
+    // Stale-while-revalidate, backed by IndexedDB rather than sessionStorage:
+    // the list is several megabytes and survives the app being closed, which is
+    // what makes the vocabulary readable with no network at all.
+    const load = async () => {
+      const cached = await getCachedWords<ApiWord>(course.pair).catch(() => null)
+      if (cached && cached.length > 0) {
+        setWords(cached)
+        setLoading(false)
       }
-    } catch {}
-
-    fetch('/api/words')
-      .then(r => r.json())
-      .then(data => {
+      try {
+        const res = await fetch('/api/words')
+        if (!res.ok) throw new Error('offline')
+        const data = await res.json()
         if (!Array.isArray(data.words)) return
         setWords(data.words)
-        setLoading(false)
-        try {
-          sessionStorage.setItem(cacheKey, JSON.stringify({ words: data.words }))
-        } catch {}
-      })
-      .catch(() => setLoading(false))
+        await cacheWords(course.pair, data.words).catch(() => {})
+      } catch {
+        // Offline: the cached copy is all there is, and it is enough
+      }
+      setLoading(false)
+    }
+    load()
   }, [course.pair])
 
   const visibleWords = useMemo(() => {
@@ -298,7 +296,9 @@ export default function WordsPage() {
       setWords(ws => ws.map(w => (ids.has(w.id) ? { ...w, known: true, level: MAX_KNOWLEDGE_LEVEL } : w)))
       // The cached copy still holds the old dots — drop it rather than let the
       // next visit flash them before the refresh lands
-      try { sessionStorage.removeItem(`words-cache-v3-${course.pair}`) } catch {}
+      await cacheWords<ApiWord>(course.pair, ws =>
+        ws.map(w => (ids.has(w.id) ? { ...w, known: true, level: MAX_KNOWLEDGE_LEVEL } : w)),
+      ).catch(() => {})
       setSelected(new Set())
       setSelecting(false)
       router.refresh()
