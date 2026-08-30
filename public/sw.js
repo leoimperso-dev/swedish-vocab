@@ -2,14 +2,35 @@
 // APIs stay network-only (auth + freshness); pages are network-first with a
 // cached copy behind them, which is what lets the app open with no network.
 const STATIC_CACHE = 'static-v1'
-const PAGE_CACHE = 'pages-v2'
+const PAGE_CACHE = 'pages-v3'
 
 // Pages worth keeping for offline use. The rest of the app needs the server
 // anyway — a duel is an exchange with an opponent, statistics are computed in
 // the database — so caching them would only show stale numbers.
 const OFFLINE_PAGES = ['/study', '/words', '/dashboard']
 
-self.addEventListener('install', () => self.skipWaiting())
+self.addEventListener('install', event => {
+  // Fetch the offline pages now rather than hope the learner visits each one
+  // online first. Registration happens on an authenticated page, so these come
+  // back as real pages and not as a redirect to /login.
+  event.waitUntil(
+    (async () => {
+      try {
+        const cache = await caches.open(PAGE_CACHE)
+        await Promise.all(
+          OFFLINE_PAGES.map(async path => {
+            const response = await fetch(path, { credentials: 'same-origin' })
+            if (response.ok && !response.redirected) await cache.put(location.origin + path, response)
+          }),
+        )
+      } catch {
+        // A failed pre-cache must not block the worker: the fetch handler still
+        // fills the cache page by page as they are visited.
+      }
+      await self.skipWaiting()
+    })()
+  )
+})
 
 self.addEventListener('activate', event => {
   const keep = [STATIC_CACHE, PAGE_CACHE]
@@ -47,10 +68,12 @@ self.addEventListener('fetch', event => {
   const isOfflinePage = OFFLINE_PAGES.some(
     path => url.pathname === path || url.pathname.startsWith(path + '/'),
   )
-  if (!isOfflinePage) return
   const isNavigation = request.mode === 'navigate'
   const isRouterFetch = url.searchParams.has('_rsc')
-  if (!isNavigation && !isRouterFetch) return
+  // A navigation anywhere is handled, so that opening the app offline lands on
+  // the cached start page instead of the browser's error. Router fetches are
+  // only cached for the pages meant to work offline.
+  if (!isNavigation && !(isRouterFetch && isOfflinePage)) return
 
   event.respondWith(
     (async () => {
@@ -60,7 +83,7 @@ self.addEventListener('fetch', event => {
         // A redirect is not a page: caching the one to /login would lock the
         // learner out on the next cold start, and a redirected response cannot
         // be replayed for a navigation anyway.
-        if (response.ok && !response.redirected) {
+        if (response.ok && !response.redirected && isOfflinePage) {
           cache.put(request.url, response.clone())
         }
         return response
@@ -72,6 +95,11 @@ self.addEventListener('fetch', event => {
         if (isNavigation) {
           const byPath = await cache.match(url.origin + url.pathname, { ignoreVary: true })
           if (byPath) return byPath
+          // The home-screen shortcut may point at "/", which only redirects, and
+          // a link may lead somewhere never cached. Falling back to the start
+          // page beats a dead end — the learner lands in the app either way.
+          const home = await cache.match(location.origin + '/dashboard', { ignoreVary: true })
+          if (home) return home
           // Never throw out of respondWith: the browser turns that into a bare
           // "Failed to fetch" with no page at all. An honest message is better.
           return offlinePage()
