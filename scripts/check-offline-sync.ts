@@ -59,21 +59,21 @@ async function main() {
 
     // The unique index is what makes a resent batch a no-op
     const batch = `batch-${Date.now()}`
-    await db.$executeRaw`UPDATE "StudySession" SET "offlineBatch" = ${batch} WHERE id = ${session.id}`
-    const twin = await db.studySession.create({ data: { userId: user.id } })
+    await db.studySession.update({ where: { id: session.id }, data: { offlineBatch: batch } })
     let rejected = false
     try {
-      await db.$executeRaw`UPDATE "StudySession" SET "offlineBatch" = ${batch} WHERE id = ${twin.id}`
+      await db.studySession.create({ data: { userId: user.id, offlineBatch: batch } })
     } catch {
       rejected = true
     }
     check('un même lot ne peut pas être enregistré deux fois', rejected)
 
     // ...and the route looks the batch up before writing anything
-    const found = await db.$queryRaw<Array<{ id: string }>>`
-      SELECT id FROM "StudySession" WHERE "userId" = ${user.id} AND "offlineBatch" = ${batch} LIMIT 1
-    `
-    check('le lot déjà synchronisé est retrouvable', found.length === 1)
+    const found = await db.studySession.findFirst({
+      where: { userId: user.id, offlineBatch: batch },
+      select: { id: true },
+    })
+    check('le lot déjà synchronisé est retrouvable', found !== null)
   } finally {
     await db.userWord.deleteMany({ where: { userId: user.id } })
     await db.studySession.deleteMany({ where: { userId: user.id } })

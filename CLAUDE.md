@@ -227,7 +227,8 @@ vocabulary is already close):
 
 `/api/study/sync` replays a queue. The phone keeps its answers until the request returns 200, so
 the same batch can arrive twice: `StudySession.offlineBatch` is unique per user and the second
-attempt is skipped rather than paying XP twice. Client clocks are not trusted — an `answeredAt`
+attempt is skipped rather than paying XP twice. (Note for Windows: `prisma generate` fails with
+EPERM while `pnpm dev` runs — the dev server holds the query engine DLL.) Client clocks are not trusted — an `answeredAt`
 in the future is clamped to now. Guarded by `scripts/check-offline-sync.ts`.
 
 ## Duels

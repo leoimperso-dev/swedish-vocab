@@ -59,17 +59,15 @@ export async function POST(req: NextRequest) {
     if (answers.length === 0) continue
 
     // Already synced: the phone retried
-    const existing = await db.$queryRaw<Array<{ id: string }>>`
-      SELECT id FROM "StudySession" WHERE "userId" = ${userId} AND "offlineBatch" = ${batch.batch} LIMIT 1
-    `
-    if (existing.length > 0) { skipped++; continue }
+    const existing = await db.studySession.findFirst({
+      where: { userId, offlineBatch: batch.batch },
+      select: { id: true },
+    })
+    if (existing) { skipped++; continue }
 
-    const studySession = await db.studySession.create({ data: { userId } })
-    // The generated client does not know `offlineBatch` until `prisma generate`
-    // runs again — set it in SQL, which the migration already created.
-    await db.$executeRaw`
-      UPDATE "StudySession" SET "offlineBatch" = ${batch.batch} WHERE id = ${studySession.id}
-    `
+    const studySession = await db.studySession.create({
+      data: { userId, offlineBatch: batch.batch },
+    })
 
     const results: AnswerResult[] = []
     for (const answer of answers) {
