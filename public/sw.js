@@ -2,7 +2,7 @@
 // APIs stay network-only (auth + freshness); pages are network-first with a
 // cached copy behind them, which is what lets the app open with no network.
 const STATIC_CACHE = 'static-v1'
-const PAGE_CACHE = 'pages-v1'
+const PAGE_CACHE = 'pages-v2'
 
 // Pages worth keeping for offline use. The rest of the app needs the server
 // anyway — a duel is an exchange with an opponent, statistics are computed in
@@ -40,31 +40,67 @@ self.addEventListener('fetch', event => {
     return
   }
 
-  // Page navigations: serve the network, keep a copy, and fall back to that copy
-  // when there is none. The page is stale by definition — the header may show
-  // yesterday's XP — but the study screen reads its exercises from IndexedDB,
-  // so what matters is that the app opens at all.
-  const isPage = request.mode === 'navigate' &&
-    OFFLINE_PAGES.some(path => url.pathname === path || url.pathname.startsWith(path + '/'))
-  if (!isPage) return
+  // Pages: network first, cached copy behind. Two request shapes reach the same
+  // page — the cold-start navigation, and the RSC payload the client router
+  // fetches when a link is tapped inside the app. Both are cached under the
+  // request URL, so a link works offline as well as a launch does.
+  const isOfflinePage = OFFLINE_PAGES.some(
+    path => url.pathname === path || url.pathname.startsWith(path + '/'),
+  )
+  if (!isOfflinePage) return
+  const isNavigation = request.mode === 'navigate'
+  const isRouterFetch = url.searchParams.has('_rsc')
+  if (!isNavigation && !isRouterFetch) return
 
   event.respondWith(
     (async () => {
       const cache = await caches.open(PAGE_CACHE)
       try {
         const response = await fetch(request)
-        // Only a real page is worth keeping: a redirect to /login cached here
-        // would lock the learner out of the app the next time they open it
-        if (response.ok && response.type === 'basic') cache.put(request, response.clone())
+        // A redirect is not a page: caching the one to /login would lock the
+        // learner out on the next cold start, and a redirected response cannot
+        // be replayed for a navigation anyway.
+        if (response.ok && !response.redirected) {
+          cache.put(request.url, response.clone())
+        }
         return response
-      } catch (error) {
-        const cached = await cache.match(request) || await cache.match(url.pathname)
-        if (cached) return cached
-        throw error
+      } catch {
+        // ignoreVary: Next varies its responses on RSC headers that differ from
+        // one launch to the next, so an exact match would never hit.
+        const exact = await cache.match(request.url, { ignoreVary: true })
+        if (exact) return exact
+        if (isNavigation) {
+          const byPath = await cache.match(url.origin + url.pathname, { ignoreVary: true })
+          if (byPath) return byPath
+          // Never throw out of respondWith: the browser turns that into a bare
+          // "Failed to fetch" with no page at all. An honest message is better.
+          return offlinePage()
+        }
+        // An RSC payload is cached under a hash that changes between builds, so
+        // a miss is expected. Failing it makes the client router fall back to a
+        // full navigation, which the branch above serves from the cache — the
+        // page HTML must never be returned here, the router cannot parse it.
+        return Response.error()
       }
     })()
   )
 })
+
+// Shown only when the page was never opened online, so nothing was cached.
+function offlinePage() {
+  return new Response(
+    `<!doctype html><html lang="fr"><meta charset="utf-8">
+     <meta name="viewport" content="width=device-width,initial-scale=1">
+     <title>Hors ligne</title>
+     <body style="margin:0;display:grid;place-items:center;min-height:100vh;background:#0f172a;color:#e2e8f0;font-family:system-ui,sans-serif;text-align:center;padding:24px">
+       <div>
+         <p style="font-size:18px;font-weight:600;margin:0 0 8px">Pas de connexion</p>
+         <p style="font-size:14px;opacity:.75;margin:0">Ouvre l'application une fois connecté pour pouvoir l'utiliser hors ligne.</p>
+       </div>
+     </body></html>`,
+    { headers: { 'Content-Type': 'text/html; charset=utf-8' } },
+  )
+}
 
 // Duel notifications. The payload is written by lib/push.ts; a missing or
 // malformed one still shows something rather than nothing.
