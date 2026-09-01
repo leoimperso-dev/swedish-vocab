@@ -43,7 +43,17 @@ export function VoiceSettings() {
     bump()
     setRateState(getRate())
     window.speechSynthesis?.addEventListener('voiceschanged', bump)
-    return () => window.speechSynthesis?.removeEventListener('voiceschanged', bump)
+    // Android does not always fire `voiceschanged`: the engine is bound lazily
+    // and the list simply appears a moment later. Without this poll the picker
+    // stays empty for good, and the learner concludes their downloaded voices
+    // are not seen at all.
+    const poll = setInterval(bump, 400)
+    const stop = setTimeout(() => clearInterval(poll), 4000)
+    return () => {
+      window.speechSynthesis?.removeEventListener('voiceschanged', bump)
+      clearInterval(poll)
+      clearTimeout(stop)
+    }
   }, [])
 
   useEffect(() => {
@@ -148,6 +158,28 @@ export function VoiceSettings() {
           </div>
         )
       })}
+
+      {/* An empty list is almost never "no voice installed": on Android the
+          engine is only bound after something has been spoken, and speaking
+          needs a tap to count as a user gesture. */}
+      {everyVoice.length === 0 && (
+        <div className="space-y-2">
+          <p className="text-xs text-warning">{t.voiceNoneFound}</p>
+          <button
+            type="button"
+            onClick={() => {
+              unlock()
+              speak(SAMPLE[course.learned], localeOf(course.learned))
+              // The list usually appears within a second of the first utterance
+              setTimeout(() => setReady(n => n + 1), 600)
+              setTimeout(() => setReady(n => n + 1), 1800)
+            }}
+            className="pressable rounded-xl border border-border bg-surface px-3 py-2 text-xs font-semibold text-primary"
+          >
+            {t.voiceWakeEngine}
+          </button>
+        </div>
+      )}
 
       {everyVoice.length > 0 && (
         <label className="flex cursor-pointer items-center gap-2 text-xs text-muted-foreground">
