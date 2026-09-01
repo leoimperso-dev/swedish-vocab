@@ -192,6 +192,23 @@ export function VoiceSettings() {
           {t.voiceShowAll(everyVoice.length)}
         </label>
       )}
+      {/* The raw list, exactly as the browser reports it. Which voices a device
+          exposes to a web page is decided by the OS — iOS keeps its Siri voices
+          to itself — so when the picker looks wrong this is what settles
+          whether the app is filtering something out or the voice was never
+          offered in the first place. */}
+      {showAll && everyVoice.length > 0 && (
+        <div className="rounded-xl border border-border bg-surface p-3">
+          <p className="text-[11px] font-semibold text-muted-foreground">{t.voiceDetected(everyVoice.length)}</p>
+          <ul className="mt-1 space-y-0.5">
+            {everyVoice.map(voice => (
+              <li key={voice.voiceURI} className="text-[11px] leading-snug text-muted-foreground/80">
+                {voice.name} — {voice.lang.replace('_', '-')}{voice.localService ? '' : ` · ${t.voiceOnline}`}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
       <p className="text-xs text-muted-foreground">{t.voiceExplainer}</p>
     </div>
   )
