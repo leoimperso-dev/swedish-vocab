@@ -34,6 +34,8 @@ import { drawFromPool, fillPool, flushQueue, poolSize, queueAnswer } from '@/lib
 // mixed session, drawn from the curated set phrases only
 // Same length as a server-built session (see app/api/study/session/route.ts)
 const OFFLINE_SESSION_SIZE = 15
+// Two sessions left is the point where a refill is worth a request
+const POOL_REFILL_BELOW = OFFLINE_SESSION_SIZE * 2
 
 type StudyMode = 'MIX' | 'EXPRESSIONS' | ExerciseType
 
@@ -83,7 +85,9 @@ export default function StudyPage() {
       if (!navigator.onLine) return
       const sent = await flushQueue().catch(() => 0)
       if (sent > 0) { setSynced(sent); router.refresh() }
-      if ((await poolSize(course.pair).catch(() => 1)) > 0) return
+      // Refilled before it runs dry, not once empty: the reconnection that
+      // would have topped it up may not come before the next flight.
+      if ((await poolSize(course.pair).catch(() => POOL_REFILL_BELOW)) >= POOL_REFILL_BELOW) return
       const res = await fetch(`/api/study/offline?direction=${direction}`)
       if (!res.ok) return
       const data = await res.json()

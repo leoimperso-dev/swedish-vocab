@@ -4,10 +4,11 @@ import { getCourseWithLevel } from '@/lib/current-course'
 import { buildExercises } from '@/lib/study/build'
 import { asDirectionChoice } from '@/lib/courses'
 
-// Eight sessions' worth. Enough for a week of commutes, small enough to
-// download on a phone connection in one go (~1 MB with distractors).
-const OFFLINE_SIZE = 120
-const NEW_WORDS = 40
+// Twenty sessions' worth. A long flight or a week without signal is the case
+// this exists for, and the payload is still under a megabyte: an exercise is a
+// word, its type, three distractors and a few accepted spellings.
+const OFFLINE_SIZE = 300
+const NEW_WORDS = 100
 
 /**
  * The exercises the phone keeps for when there is no network.

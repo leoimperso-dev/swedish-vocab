@@ -2,12 +2,17 @@
 // APIs stay network-only (auth + freshness); pages are network-first with a
 // cached copy behind them, which is what lets the app open with no network.
 const STATIC_CACHE = 'static-v1'
-const PAGE_CACHE = 'pages-v3'
+const PAGE_CACHE = 'pages-v4'
 
 // Pages worth keeping for offline use. The rest of the app needs the server
 // anyway — a duel is an exchange with an opponent, statistics are computed in
 // the database — so caching them would only show stale numbers.
-const OFFLINE_PAGES = ['/study', '/words', '/dashboard']
+//
+// '/reading' covers the story index and every story under it: a story is a
+// fixed text, so the copy cached on the way through stays correct. Only the
+// stories actually opened online are kept — pre-fetching every one of them
+// would download the whole library on a phone connection.
+const OFFLINE_PAGES = ['/study', '/words', '/dashboard', '/reading']
 
 self.addEventListener('install', event => {
   // Fetch the offline pages now rather than hope the learner visits each one
