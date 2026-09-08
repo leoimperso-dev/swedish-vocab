@@ -16,6 +16,7 @@ import { Flag } from '@/components/ui/flags'
 import { xpByLanguage } from '@/lib/profile-stats'
 import { LevelSettings } from '@/components/LevelSettings'
 import { VoiceSettings } from '@/components/VoiceSettings'
+import { MyReports, MyReportsTitle } from '@/components/MyReports'
 import { PushToggle } from '@/components/duel/PushToggle'
 import { pushEnabled } from '@/lib/push'
 import { asLangOrDefault, resolveCourse } from '@/lib/courses'
@@ -195,6 +196,14 @@ export default async function ProfilePage() {
           <CardTitle>{t.voiceSetting}</CardTitle>
           <div className="mt-3">
             <VoiceSettings />
+          </div>
+        </Card>
+
+        {/* What the learner reported, and whether it was dealt with */}
+        <Card>
+          <CardTitle><MyReportsTitle /></CardTitle>
+          <div className="mt-3">
+            <MyReports />
           </div>
         </Card>
 

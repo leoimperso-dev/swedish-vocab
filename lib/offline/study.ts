@@ -2,7 +2,7 @@
 // waiting to reach the server.
 import { STORES, clear, count, getAll, offlineStorageAvailable, putAll, remove } from '@/lib/offline/db'
 import type { Direction } from '@/lib/courses'
-import type { AnswerResult, ExerciseWord } from '@/types'
+import type { AnswerResult, ExerciseType, ExerciseWord } from '@/types'
 
 export interface PooledExercise {
   id?: number
@@ -41,13 +41,35 @@ export async function fillPool(pair: string, direction: Direction, exercises: Ex
   )
 }
 
-/** Takes `size` exercises out of the pool — they are consumed, not borrowed. */
-export async function drawFromPool(pair: string, size: number): Promise<ExerciseWord[]> {
+/**
+ * Takes `size` exercises out of the pool — they are consumed, not borrowed.
+ *
+ * A forced type is honoured as far as the pool allows. FLASHCARD always works:
+ * any word can be shown as one, since a flashcard needs nothing beyond the word
+ * itself — it is the mode to reach for with no network. The others are served
+ * from the pooled exercises of that type, topped up with whatever is left
+ * rather than refusing to start a session.
+ */
+export async function drawFromPool(
+  pair: string,
+  size: number,
+  forcedType?: ExerciseType | null,
+): Promise<ExerciseWord[]> {
   if (!offlineStorageAvailable()) return []
   const rows = (await getAll<PooledExercise>(STORES.pool)).filter(row => row.pair === pair)
-  const taken = rows.slice(0, size)
-  await remove(STORES.pool, taken.map(row => row.id!).filter(id => id !== undefined))
-  return taken.map(row => row.exercise)
+
+  let chosen: PooledExercise[]
+  if (forcedType && forcedType !== 'FLASHCARD') {
+    const matching = rows.filter(row => row.exercise.exerciseType === forcedType)
+    chosen = [...matching, ...rows.filter(row => !matching.includes(row))].slice(0, size)
+  } else {
+    chosen = rows.slice(0, size)
+  }
+
+  await remove(STORES.pool, chosen.map(row => row.id!).filter(id => id !== undefined))
+  return chosen.map(row =>
+    forcedType === 'FLASHCARD' ? { ...row.exercise, exerciseType: 'FLASHCARD' as const } : row.exercise,
+  )
 }
 
 export async function queueAnswer(answer: Omit<QueuedAnswer, 'id'>): Promise<void> {

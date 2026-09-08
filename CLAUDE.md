@@ -220,6 +220,9 @@ vocabulary is already close):
 - **pool** — 120 exercises drawn ahead by `/api/study/offline`. An exercise arrives
   self-contained (word, type, direction, distractors, accepted answers), so nothing is computed
   offline. A forced mode cannot be honoured from the pool; the learner gets the mix.
+- A forced mode is honoured as far as the pool allows. **FLASHCARD always works**: any word can
+  be one, so it is the mode to reach for with no network. The others are served from the pooled
+  exercises of that type, topped up rather than refusing to start.
 - **queue** — answers given offline, each with `answeredAt`. `recordAnswer` and `sm2Update` take
   that timestamp: scheduling from the moment the *server* heard about it would push every
   interval by the length of the disconnection.
@@ -411,7 +414,9 @@ only inserts what's new (which also means two senses of one word must share a si
 type, via `SessionProgress`) and the story word popover. `<ReportButton wordId context
 shownTerm shownTranslation />` posts to `/api/report`; the shown text is copied into the row so
 the report stays readable after the entry is fixed. Triage with
-`pnpm tsx scripts/list-reports.ts` (`--all`, `--resolve <id>`). This is the only detector for a
+`pnpm tsx scripts/list-reports.ts` (`--all`, `--resolve <id>`), and each learner sees their own
+under Profile → *Mes signalements* with a pending/fixed badge — a report that never comes back is
+a report nobody writes twice. This is the only detector for a
 gloss that is wrong but well formed — no audit script can see those.
 
 ## Commands

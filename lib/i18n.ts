@@ -281,6 +281,10 @@ const fr = {
   reportPlaceholder: "Qu'est-ce qui ne va pas ? La traduction, la phrase d'exemple, une forme du verbe...",
   reportSend: 'Envoyer',
   reportThanks: 'Merci, c’est noté',
+  reportsMine: 'Mes signalements',
+  reportsNone: 'Aucun signalement envoyé.',
+  reportPending: 'à traiter',
+  reportResolved: 'corrigé',
   freezeInfo: (count: number, max: number, every: number) =>
     `Streak freezes : ${count} / ${max} — un freeze protège ta série si tu rates un jour ; tu en regagnes un tous les ${every} jours de suite.`,
   badges: 'Badges',
@@ -650,6 +654,10 @@ const sv: typeof fr = {
   reportPlaceholder: 'Vad är fel? Översättningen, exempelmeningen, en verbform...',
   reportSend: 'Skicka',
   reportThanks: 'Tack, noterat',
+  reportsMine: 'Mina rapporter',
+  reportsNone: 'Inga rapporter skickade.',
+  reportPending: 'väntar',
+  reportResolved: 'åtgärdad',
   freezeInfo: (count, max, every) =>
     `Streak freezes: ${count} / ${max} — en freeze skyddar din svit om du missar en dag; du får tillbaka en var ${every}:e dag i rad.`,
   badges: 'Utmärkelser',
@@ -1019,6 +1027,10 @@ const en: typeof fr = {
   reportPlaceholder: 'What is wrong? The translation, the example sentence, a verb form...',
   reportSend: 'Send',
   reportThanks: 'Thanks, noted',
+  reportsMine: 'My reports',
+  reportsNone: 'No report sent.',
+  reportPending: 'pending',
+  reportResolved: 'fixed',
   freezeInfo: (count, max, every) =>
     `Streak freezes: ${count} / ${max} — a freeze protects your streak if you miss a day; you earn one back every ${every} days in a row.`,
   badges: 'Badges',

@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Flag, Check } from 'lucide-react'
 import { useLang } from '@/components/CourseProvider'
 import { getStrings } from '@/lib/i18n'
@@ -25,6 +25,26 @@ export function ReportButton({ wordId, context, shownTerm, shownTranslation, siz
   const [open, setOpen] = useState(false)
   const [message, setMessage] = useState('')
   const [state, setState] = useState<'idle' | 'sending' | 'sent'>('idle')
+  // The panel is positioned against the *visible* viewport, not the layout one.
+  // With `fixed inset-0` the sheet stays anchored to the bottom of the page,
+  // which the on-screen keyboard then covers — and iOS scrolls the whole page
+  // to reveal the focused field, carrying the panel off the top of the screen.
+  // Reports arrived typed blind, which is exactly how they read.
+  const [viewport, setViewport] = useState<{ top: number; height: number } | null>(null)
+
+  useEffect(() => {
+    if (!open) return
+    const vv = window.visualViewport
+    if (!vv) return
+    const follow = () => setViewport({ top: vv.offsetTop, height: vv.height })
+    follow()
+    vv.addEventListener('resize', follow)
+    vv.addEventListener('scroll', follow)
+    return () => {
+      vv.removeEventListener('resize', follow)
+      vv.removeEventListener('scroll', follow)
+    }
+  }, [open])
 
   const send = async () => {
     if (!message.trim() || state === 'sending') return
@@ -64,7 +84,8 @@ export function ReportButton({ wordId, context, shownTerm, shownTranslation, siz
 
       {open && (
         <div
-          className="fixed inset-0 z-50 flex items-end justify-center bg-black/60 p-3 backdrop-blur-sm sm:items-center"
+          style={viewport ? { top: viewport.top, height: viewport.height } : undefined}
+          className="fixed inset-x-0 bottom-0 top-0 z-50 flex items-end justify-center overflow-y-auto bg-black/60 p-3 backdrop-blur-sm sm:items-center"
           onClick={e => {
             e.stopPropagation()
             if (state !== 'sending') setOpen(false)

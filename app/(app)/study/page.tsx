@@ -115,9 +115,11 @@ export default function StudyPage() {
         setExercises(Array.isArray(data.exercises) ? data.exercises : [])
         setOfflineBatch(null)
       } catch {
-        // No network: play what was downloaded. The pool holds a mixed session,
-        // so a forced mode cannot be honoured — the learner gets the mix.
-        const drawn = await drawFromPool(course.pair, OFFLINE_SESSION_SIZE).catch(() => [])
+        // No network: play what was downloaded. Flashcards always work offline —
+        // any word can be one — so that mode is honoured exactly; the others
+        // are served from the pool as far as it allows.
+        const forced = mode === 'MIX' || mode === 'EXPRESSIONS' ? null : mode
+        const drawn = await drawFromPool(course.pair, OFFLINE_SESSION_SIZE, forced).catch(() => [])
         if (drawn.length === 0) { setMode(null); setLoading(false); return }
         setExercises(drawn)
         setSessionId(null)
