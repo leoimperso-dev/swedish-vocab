@@ -3,10 +3,14 @@
 // iOS requires a user gesture before first use — call unlock() on first tap
 
 import { keepAwake } from '@/lib/wake-lock'
+import { playSequence, stopAudio, unlockAudio } from '@/lib/tts/player'
 
 let unlocked = false
 
 export function unlock() {
+  // Both engines need the same gesture: the synthesizer to be allowed to speak
+  // at all, the audio element to be allowed to play later, off-gesture
+  unlockAudio()
   if (unlocked) return
   const utterance = new SpeechSynthesisUtterance('')
   window.speechSynthesis.speak(utterance)
@@ -166,16 +170,47 @@ export function voicesFor(locale: string): SpeechSynthesisVoice[] {
 }
 
 export function speak(text: string, locale: string, rate = getRate()): void {
-  if (typeof window === 'undefined') return
-  keepAwake()
+  speakSequence([{ text, locale }], { rate })
+}
+
+/** The device synthesizer, once the server audio has been ruled out. */
+function speakWithDevice(
+  items: { text: string; locale: string }[],
+  rate: number,
+  onDone?: () => void,
+): void {
+  let settled = false
+  const finish = () => {
+    if (settled) return
+    settled = true
+    clearTimeout(guard)
+    onDone?.()
+  }
+  const guard = setTimeout(finish, SPEECH_TIMEOUT_MS)
   window.speechSynthesis.cancel()
-  const utterance = new SpeechSynthesisUtterance(speakable(text))
-  utterance.lang = locale
-  const voice = getVoiceFor(locale)
-  if (voice) utterance.voice = voice
-  utterance.rate = rate
-  utterance.pitch = 1
-  window.speechSynthesis.speak(utterance)
+
+  items.forEach((item, i) => {
+    const utterance = new SpeechSynthesisUtterance(speakable(item.text))
+    utterance.lang = item.locale
+    const voice = getVoiceFor(item.locale)
+    if (voice) utterance.voice = voice
+    utterance.rate = rate
+    utterance.pitch = 1
+    if (i === items.length - 1) {
+      utterance.onend = finish
+      // A missing voice fires onerror instead — the card still has to move on
+      utterance.onerror = finish
+    }
+    window.speechSynthesis.speak(utterance)
+  })
+}
+
+/** Cuts off whichever engine is currently talking. */
+export function cancelSpeech(): void {
+  if (typeof window === 'undefined') return
+  sequenceRun++
+  stopAudio()
+  if (isSupported()) window.speechSynthesis.cancel()
 }
 
 // Nothing waits on the voice for longer than this: a device that never fires
@@ -195,38 +230,32 @@ export function speakSequence(
   items: { text: string; locale: string }[],
   { rate = getRate(), onDone }: { rate?: number; onDone?: () => void } = {},
 ): void {
-  const finish = () => {
-    if (!onDone || settled) return
-    settled = true
-    clearTimeout(guard)
-    onDone()
-  }
-  let settled = false
-  let guard: ReturnType<typeof setTimeout> | undefined
-
-  if (typeof window === 'undefined' || !isSupported() || items.length === 0) {
+  if (typeof window === 'undefined' || items.length === 0) {
     onDone?.()
     return
   }
-  guard = setTimeout(finish, SPEECH_TIMEOUT_MS)
   keepAwake()
-  window.speechSynthesis.cancel()
+  stopAudio()
+  if (isSupported()) window.speechSynthesis.cancel()
 
-  items.forEach((item, i) => {
-    const utterance = new SpeechSynthesisUtterance(speakable(item.text))
-    utterance.lang = item.locale
-    const voice = getVoiceFor(item.locale)
-    if (voice) utterance.voice = voice
-    utterance.rate = rate
-    utterance.pitch = 1
-    if (i === items.length - 1) {
-      utterance.onend = finish
-      // A missing voice fires onerror instead — the card still has to move on
-      utterance.onerror = finish
-    }
-    window.speechSynthesis.speak(utterance)
+  // A new call supersedes the one in flight — without this, the awaited
+  // fetches of an abandoned card would still play over the next one
+  const run = ++sequenceRun
+  const signal = { get cancelled() { return run !== sequenceRun } }
+
+  // Both engines must be handed the same normalized text: the content address
+  // of the audio is a hash of it
+  const spoken = items.map(i => ({ ...i, text: speakable(i.text) }))
+
+  void playSequence(spoken, { rate, signal }).then(played => {
+    if (run !== sequenceRun) return
+    if (played) onDone?.()
+    else if (isSupported()) speakWithDevice(items, rate, onDone)
+    else onDone?.()
   })
 }
+
+let sequenceRun = 0
 
 export function isSupported(): boolean {
   return typeof window !== 'undefined' && 'speechSynthesis' in window

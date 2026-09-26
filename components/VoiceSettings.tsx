@@ -6,6 +6,10 @@ import {
   DEFAULT_RATE, RATE_BOUNDS, allVoices, filtersNaturalOnly, getPreferredVoiceUri, getRate,
   setPreferredVoiceUri, setRate, speak, unlock, voicesFor,
 } from '@/lib/tts'
+import {
+  getServerVoice, serverAudioEnabled, serverAudioPossible, setServerAudioEnabled, setServerVoice,
+} from '@/lib/tts/player'
+import { voicesForLang } from '@/lib/tts/catalog'
 import { LANGS, localeOf, type Lang } from '@/lib/courses'
 import { useCourse } from '@/components/CourseProvider'
 import { getStrings } from '@/lib/i18n'
@@ -37,6 +41,15 @@ export function VoiceSettings() {
   const [choices, setChoices] = useState<Record<string, string>>({})
   const [rate, setRateState] = useState(DEFAULT_RATE)
   const [showAll, setShowAll] = useState(false)
+  const [serverOn, setServerOn] = useState(false)
+  const [serverChoices, setServerChoices] = useState<Record<string, string>>({})
+
+  useEffect(() => {
+    setServerOn(serverAudioEnabled())
+    setServerChoices(
+      Object.fromEntries(LANGS.map(l => [l, getServerVoice(localeOf(l)) ?? ''])),
+    )
+  }, [])
 
   useEffect(() => {
     const bump = () => setReady(n => n + 1)
@@ -97,6 +110,73 @@ export function VoiceSettings() {
             <Volume2 size={17} />
           </button>
         </div>
+      </div>
+
+      {/* Server-rendered audio first: it is the only voice the learner can
+          actually choose on iOS, where the device list is whatever Safari
+          decides to expose. */}
+      {serverAudioPossible() && (
+        <div className="space-y-3 rounded-xl border border-border bg-surface p-3">
+          <div>
+            <p className="text-xs font-semibold text-foreground">{t.serverVoiceTitle}</p>
+            <p className="mt-0.5 text-[11px] text-muted-foreground">{t.serverVoiceHint}</p>
+          </div>
+          <label className="flex cursor-pointer items-center gap-2 text-xs">
+            <input
+              type="checkbox"
+              checked={serverOn}
+              onChange={e => {
+                setServerOn(e.target.checked)
+                setServerAudioEnabled(e.target.checked)
+              }}
+              className="size-4 cursor-pointer accent-primary"
+            />
+            {t.serverVoiceOn}
+          </label>
+
+          {serverOn && langs.map(lang => {
+            const locale = localeOf(lang)
+            const options = voicesForLang(locale)
+            if (options.length === 0) return null
+            return (
+              <div key={lang}>
+                <p className="mb-1.5 text-xs font-semibold text-muted-foreground">
+                  {t.languageName[lang]}
+                </p>
+                <div className="flex items-center gap-2">
+                  <select
+                    value={serverChoices[lang] ?? ''}
+                    onChange={e => {
+                      setServerVoice(locale, e.target.value || null)
+                      setServerChoices(prev => ({ ...prev, [lang]: e.target.value }))
+                    }}
+                    className="min-w-0 flex-1 cursor-pointer rounded-xl border border-border bg-surface px-3 py-2.5 text-sm text-foreground outline-none focus:border-primary"
+                  >
+                    {options.map(v => (
+                      <option key={v.id} value={v.id}>{v.label}</option>
+                    ))}
+                  </select>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      unlock()
+                      speak(SAMPLE[lang], locale)
+                    }}
+                    aria-label={t.voiceTest}
+                    className="pressable grid size-11 shrink-0 place-items-center rounded-xl border border-border bg-surface text-primary"
+                  >
+                    <Volume2 size={17} />
+                  </button>
+                </div>
+              </div>
+            )
+          })}
+        </div>
+      )}
+
+      <div>
+        <p className="text-xs font-semibold text-foreground">{t.deviceVoiceTitle}</p>
+        <p className="mt-0.5 text-[11px] text-muted-foreground">{t.deviceVoiceHint}</p>
       </div>
 
       {langs.map(lang => {

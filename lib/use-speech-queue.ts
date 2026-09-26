@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { getRate, getVoiceFor, isSupported, speakable, unlock, watchVoiceAvailability } from '@/lib/tts'
 import { allowSleep, keepAwake } from '@/lib/wake-lock'
+import { playOne, stopAudio } from '@/lib/tts/player'
 
 export interface SpeechItem {
   text: string
@@ -44,6 +45,7 @@ export function useSpeechQueue() {
     sessionRef.current++
     clearKeepAlive()
     allowSleep()
+    stopAudio()
     if (isSupported()) window.speechSynthesis.cancel()
     setIndex(null)
   }, [])
@@ -53,6 +55,7 @@ export function useSpeechQueue() {
     // A new run invalidates every pending callback of the previous one
     const session = ++sessionRef.current
     clearKeepAlive()
+    stopAudio()
     window.speechSynthesis.cancel()
     unlock()
 
@@ -60,9 +63,13 @@ export function useSpeechQueue() {
     // lost `onend`
     let current: { advance: () => void; startedAt: number; done: boolean } | null = null
     let sinceResume = 0
+    // The watchdog reads the synthesizer, which says nothing about an <audio>
+    // element — it must not call a server-voiced item stalled
+    let onAudio = false
 
     keepAliveRef.current = setInterval(() => {
       if (sessionRef.current !== session) return clearKeepAlive()
+      if (onAudio) return
       const synth = window.speechSynthesis
       if (synth.speaking || synth.pending) {
         sinceResume += WATCHDOG_MS
@@ -91,11 +98,6 @@ export function useSpeechQueue() {
       setIndex(i)
       keepAwake()
       const item = items[i]
-      const utterance = new SpeechSynthesisUtterance(speakable(item.text))
-      utterance.lang = item.locale
-      const voice = getVoiceFor(item.locale)
-      if (voice) utterance.voice = voice
-      utterance.rate = getRate()
       const entry = { startedAt: Date.now(), done: false, advance: () => {} }
       entry.advance = () => {
         if (entry.done || sessionRef.current !== session) return
@@ -104,10 +106,24 @@ export function useSpeechQueue() {
         else playFrom(i + 1)
       }
       current = entry
-      utterance.onend = entry.advance
-      // A missing voice for the language fires onerror — skip rather than stall
-      utterance.onerror = entry.advance
-      window.speechSynthesis.speak(utterance)
+
+      onAudio = true
+      void playOne(speakable(item.text), item.locale, getRate()).then(played => {
+        if (sessionRef.current !== session) return
+        onAudio = false
+        if (played) return entry.advance()
+        // No server audio for this one — the device voice finishes the list
+        entry.startedAt = Date.now()
+        const utterance = new SpeechSynthesisUtterance(speakable(item.text))
+        utterance.lang = item.locale
+        const voice = getVoiceFor(item.locale)
+        if (voice) utterance.voice = voice
+        utterance.rate = getRate()
+        utterance.onend = entry.advance
+        // A missing voice for the language fires onerror — skip rather than stall
+        utterance.onerror = entry.advance
+        window.speechSynthesis.speak(utterance)
+      })
     }
 
     playFrom(0)
