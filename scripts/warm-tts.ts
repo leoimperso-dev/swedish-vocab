@@ -9,6 +9,13 @@
 //   pnpm tsx scripts/warm-tts.ts --pair sv-fr --scope words           # dry run
 //   pnpm tsx scripts/warm-tts.ts --pair sv-fr --scope words --write
 //   pnpm tsx scripts/warm-tts.ts --pair sv-fr --scope words,stories,dialogues --write --limit 2000
+//   pnpm tsx scripts/warm-tts.ts --pair sv-fr --side translation --scope words --write
+//
+// `--side` picks which language is synthesized. The default `term` is the one
+// being learned and covers almost everything the app says; `translation` is
+// needed only because the vocabulary list reads a word and then its gloss.
+// The translation side is shared by every pair, so warming it once for one
+// pair already covers the French of the others.
 //
 // Scopes, cheapest first:
 //   words      headwords of the learned side          (~128k chars for sv-fr)
@@ -35,33 +42,54 @@ function arg(name: string): string | null {
 }
 const WRITE = process.argv.includes('--write')
 
+// Paragraph boundary, the unit a story is read in
+const SPLIT = /\n\n+/
+
+type Side = 'term' | 'translation'
+
 /** Every utterance of a pair that the app may need to say, deduplicated. */
-async function collect(pair: PairId, scopes: Scope[]): Promise<string[]> {
+async function collect(pair: PairId, scopes: Scope[], side: Side): Promise<string[]> {
   const texts: string[] = []
 
   if (scopes.includes('words') || scopes.includes('examples')) {
     const words = await db.word.findMany({
       where: { pair, studyable: true },
-      select: { term: true, examples: true },
+      select: { term: true, translation: true, examples: true },
     })
     for (const w of words) {
-      if (scopes.includes('words')) texts.push(w.term)
+      if (scopes.includes('words')) texts.push(side === 'term' ? w.term : w.translation)
       if (scopes.includes('examples')) {
-        const ex = w.examples as { term?: string }[] | null
-        if (Array.isArray(ex)) for (const e of ex) if (e?.term) texts.push(e.term)
+        const ex = w.examples as { term?: string; translation?: string }[] | null
+        if (Array.isArray(ex)) {
+          for (const e of ex) {
+            const text = side === 'term' ? e?.term : e?.translation
+            if (text) texts.push(text)
+          }
+        }
       }
     }
   }
   if (scopes.includes('stories')) {
-    const stories = await db.story.findMany({ where: { pair }, select: { body: true } })
+    const stories = await db.story.findMany({
+      where: { pair },
+      select: { body: true, bodyTranslated: true },
+    })
     // Split the way the reader reads it: one utterance per paragraph
-    for (const s of stories) texts.push(...s.body.split(/\n\n+/))
+    for (const s of stories) {
+      const body = side === 'term' ? s.body : s.bodyTranslated
+      if (body) texts.push(...body.split(SPLIT))
+    }
   }
   if (scopes.includes('dialogues')) {
     const dialogues = await db.dialogue.findMany({ where: { pair }, select: { turns: true } })
     for (const d of dialogues) {
-      const turns = d.turns as { text?: string }[]
-      if (Array.isArray(turns)) for (const t of turns) if (t?.text) texts.push(t.text)
+      const turns = d.turns as { text?: string; translation?: string }[]
+      if (Array.isArray(turns)) {
+        for (const t of turns) {
+          const text = side === 'term' ? t?.text : t?.translation
+          if (text) texts.push(text)
+        }
+      }
     }
   }
 
@@ -85,13 +113,15 @@ async function main() {
   const bad = scopes.filter(s => !ALL_SCOPES.includes(s))
   if (bad.length) throw new Error(`unknown scope: ${bad.join(', ')}`)
 
-  const locale = localeOf(pairOf(pair).term)
+  const side = (arg('side') ?? 'term') as Side
+  if (side !== 'term' && side !== 'translation') throw new Error(`unknown side: ${side}`)
+  const locale = localeOf(pairOf(pair)[side])
   const voice = arg('voice') ?? defaultServerVoice(locale)
   if (!voice) throw new Error(`no server voice for ${locale}`)
 
-  const texts = (await collect(pair, scopes)).slice(0, limit)
+  const texts = (await collect(pair, scopes, side)).slice(0, limit)
   const chars = texts.reduce((a, t) => a + t.length, 0)
-  console.log(`${pair} · ${scopes.join(',')} · voix ${voice}`)
+  console.log(`${pair} · ${side} · ${scopes.join(',')} · voix ${voice}`)
   console.log(`${texts.length.toLocaleString()} énoncés, ${chars.toLocaleString()} caractères`)
   console.log(`coût Azure au tarif standard : ~${(chars / 1e6 * 16).toFixed(2)} $`)
 
