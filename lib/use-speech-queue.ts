@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { getRate, getVoiceFor, isSupported, speakable, unlock, watchVoiceAvailability } from '@/lib/tts'
 import { allowSleep, keepAwake } from '@/lib/wake-lock'
-import { playOne, stopAudio } from '@/lib/tts/player'
+import { playOne, prefetch, stopAudio } from '@/lib/tts/player'
 
 export interface SpeechItem {
   text: string
@@ -106,6 +106,12 @@ export function useSpeechQueue() {
         else playFrom(i + 1)
       }
       current = entry
+
+      // Resolve the next item's audio while this one plays. Without it every
+      // gap in the list carries a round trip, and a two-language playlist
+      // sounds like it is buffering between every word.
+      const next = items[i + 1]
+      if (next) prefetch(speakable(next.text), next.locale)
 
       onAudio = true
       void playOne(speakable(item.text), item.locale, getRate()).then(played => {
