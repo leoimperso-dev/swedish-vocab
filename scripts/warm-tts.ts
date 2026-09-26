@@ -138,15 +138,25 @@ async function main() {
       const text = queue.shift()
       if (!text) return
       const key = await audioKey(text, voice)
-      try {
-        if (await hasAudio(key, voice)) skipped++
-        else {
+      // A dropped connection must not leave a permanent hole in the corpus:
+      // the run is long, and a single flaky minute would otherwise cost every
+      // utterance attempted during it
+      let error: Error | null = null
+      for (let attempt = 0; attempt < 3; attempt++) {
+        if (attempt > 0) await new Promise(r => setTimeout(r, 1000 * attempt))
+        try {
+          if (await hasAudio(key, voice)) { skipped++; error = null; break }
           await putAudio(key, voice, await synthesize(text, voice))
           made++
+          error = null
+          break
+        } catch (e) {
+          error = e as Error
         }
-      } catch (e) {
+      }
+      if (error) {
         failed++
-        if (failed <= 5) console.error(`  ✗ ${text.slice(0, 40)} — ${(e as Error).message}`)
+        if (failed <= 5) console.error(`  ✗ ${text.slice(0, 40)} — ${error.message}`)
       }
       if (++done % 200 === 0) console.log(`  ${done}/${texts.length}`)
     }
