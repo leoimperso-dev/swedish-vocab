@@ -93,6 +93,30 @@ export function setRate(rate: number): void {
   } catch {}
 }
 
+// Silence inside a read-aloud list, in ms. Two separate values because they do
+// different work: the short one separates a word from its own translation, the
+// long one marks where one entry ends and the next begins. Collapsing them into
+// one setting makes the list either run together or crawl.
+export type Gap = 'pair' | 'entry'
+const GAP_KEYS: Record<Gap, string> = { pair: 'tts-gap-pair', entry: 'tts-gap-entry' }
+export const GAP_DEFAULTS: Record<Gap, number> = { pair: 90, entry: 260 }
+export const GAP_BOUNDS = { min: 0, max: 1500, step: 10 } as const
+
+export function getGap(gap: Gap): number {
+  if (typeof window === 'undefined') return GAP_DEFAULTS[gap]
+  const stored = Number(window.localStorage.getItem(GAP_KEYS[gap]))
+  if (!Number.isFinite(stored) || stored < GAP_BOUNDS.min || stored > GAP_BOUNDS.max) {
+    return GAP_DEFAULTS[gap]
+  }
+  return stored
+}
+
+export function setGap(gap: Gap, ms: number): void {
+  try {
+    window.localStorage.setItem(GAP_KEYS[gap], String(ms))
+  } catch {}
+}
+
 /** Every installed voice, whatever its language — the escape hatch of the picker. */
 export function allVoices(): SpeechSynthesisVoice[] {
   if (!isSupported()) return []

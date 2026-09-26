@@ -6,6 +6,7 @@ import { motion, useMotionValue, useTransform } from 'framer-motion'
 import { Check, ChevronDown, Eye, EyeOff, ListChecks, MessageSquare, Search, Square, Star, Volume2, X } from 'lucide-react'
 import { formatForms, parseDetails } from '@/lib/word-display'
 import { MAX_KNOWLEDGE_LEVEL } from '@/lib/sm2'
+import { getGap } from '@/lib/tts'
 import { getStrings } from '@/lib/i18n'
 import { learnsTermLanguage, localeOf, type Course } from '@/lib/courses'
 import { useCourse } from '@/components/CourseProvider'
@@ -26,12 +27,6 @@ import { cacheWords, getCachedWords } from '@/lib/offline/words'
 const TOP_LIST_SIZE = 3000
 // Rows rendered per batch — more stream in as the sentinel scrolls into view
 const PAGE_STEP = 60
-
-// Silence after a word and after a whole entry, in ms. Just enough to hear
-// the two languages as two utterances and the next entry as a new one —
-// longer reads as the app hesitating rather than as phrasing.
-const WORD_GAP = 90
-const ENTRY_GAP = 260
 
 // Accent-insensitive haystack/needle normalisation for search
 function fold(s: string): string {
@@ -271,7 +266,9 @@ export default function WordsPage() {
       const term = { text: w.term.replace(/\(.*?\)/g, '').trim(), locale: learnsTerm ? learnedLocale : nativeLocale }
       const translation = { text: w.translation, locale: learnsTerm ? nativeLocale : learnedLocale }
       const [first, second] = learnsTerm ? [term, translation] : [translation, term]
-      return [{ ...first, pauseAfter: WORD_GAP }, { ...second, pauseAfter: ENTRY_GAP }]
+      // Read from the settings at call time, so a change applies to the next
+      // playback without a reload
+      return [{ ...first, pauseAfter: getGap('pair') }, { ...second, pauseAfter: getGap('entry') }]
     }))
   }, [course, speak])
 

@@ -3,8 +3,9 @@
 import { useEffect, useState } from 'react'
 import { Volume2 } from 'lucide-react'
 import {
-  DEFAULT_RATE, RATE_BOUNDS, allVoices, filtersNaturalOnly, getPreferredVoiceUri, getRate,
-  setPreferredVoiceUri, setRate, speak, unlock, voicesFor,
+  DEFAULT_RATE, GAP_BOUNDS, GAP_DEFAULTS, RATE_BOUNDS, allVoices, filtersNaturalOnly,
+  getGap, getPreferredVoiceUri, getRate, setGap, setPreferredVoiceUri, setRate, speak, unlock,
+  voicesFor, type Gap,
 } from '@/lib/tts'
 import {
   getServerVoice, serverAudioEnabled, serverAudioPossible, setServerAudioEnabled, setServerVoice,
@@ -41,10 +42,12 @@ export function VoiceSettings() {
   const [choices, setChoices] = useState<Record<string, string>>({})
   const [rate, setRateState] = useState(DEFAULT_RATE)
   const [showAll, setShowAll] = useState(false)
+  const [gaps, setGapsState] = useState(GAP_DEFAULTS)
   const [serverOn, setServerOn] = useState(false)
   const [serverChoices, setServerChoices] = useState<Record<string, string>>({})
 
   useEffect(() => {
+    setGapsState({ pair: getGap('pair'), entry: getGap('entry') })
     setServerOn(serverAudioEnabled())
     setServerChoices(
       Object.fromEntries(LANGS.map(l => [l, getServerVoice(localeOf(l)) ?? ''])),
@@ -109,6 +112,40 @@ export function VoiceSettings() {
           >
             <Volume2 size={17} />
           </button>
+        </div>
+      </div>
+
+      {/* Silences between utterances of a read-aloud list. Separate from the
+          rate: slowing the voice does not give the learner time to answer in
+          their head, and lengthening the gap does not make the word clearer. */}
+      <div>
+        <p className="text-xs font-semibold text-muted-foreground">{t.gapsTitle}</p>
+        <div className="mt-1.5 space-y-2">
+          {(['pair', 'entry'] as Gap[]).map(gap => (
+            <div key={gap}>
+              <div className="flex items-baseline justify-between">
+                <span className="text-[11px] text-muted-foreground">
+                  {gap === 'pair' ? t.gapPair : t.gapEntry}
+                </span>
+                <span className="text-[11px] tabular-nums text-muted-foreground">
+                  {(gaps[gap] / 1000).toFixed(2)} s
+                </span>
+              </div>
+              <input
+                type="range"
+                min={GAP_BOUNDS.min}
+                max={GAP_BOUNDS.max}
+                step={GAP_BOUNDS.step}
+                value={gaps[gap]}
+                onChange={e => {
+                  const next = Number(e.target.value)
+                  setGapsState(prev => ({ ...prev, [gap]: next }))
+                  setGap(gap, next)
+                }}
+                className="h-2 w-full cursor-pointer accent-primary"
+              />
+            </div>
+          ))}
         </div>
       </div>
 
