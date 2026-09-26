@@ -13,6 +13,7 @@ import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 import type { Word } from '@prisma/client'
 import type { AnswerResult } from '@/types'
+import { HeroWord } from '@/components/study/HeroWord'
 
 interface Props {
   word: Word
@@ -74,7 +75,7 @@ export default function MultipleChoice({ word, direction, distractors, onAnswer,
   return (
     <div className="space-y-4">
       <Card className="py-8 text-center">
-        <p className="text-hero-word">{directionPrompt(word, direction)}</p>
+        <HeroWord text={directionPrompt(word, direction)} />
         <p className="mt-2 text-xs text-muted-foreground">{t.whichTranslation}</p>
       </Card>
 

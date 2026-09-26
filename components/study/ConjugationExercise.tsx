@@ -11,6 +11,7 @@ import { Card, TextField } from '@/components/ui/primitives'
 import { Button } from '@/components/ui/button'
 import type { Word } from '@prisma/client'
 import type { AnswerResult } from '@/types'
+import { HeroWord } from '@/components/study/HeroWord'
 
 interface Props {
   word: Word
@@ -68,7 +69,7 @@ export default function ConjugationExercise({ word, onAnswer, onSubmitted }: Pro
     <div className="space-y-4">
       <Card className="py-6 text-center">
         <p className="text-xs text-muted-foreground">{t.infinitive}</p>
-        <p className="text-hero-word">{word.term}</p>
+        <HeroWord text={word.term} />
         <p className="mt-2 text-sm text-primary">{word.translation}</p>
       </Card>
 

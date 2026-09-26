@@ -13,6 +13,13 @@ export interface SpeechItem {
 
 // Chrome silently pauses long syntheses after ~15s; a periodic resume keeps it going
 const KEEPALIVE_MS = 8000
+// How often the watchdog checks whether the engine is still talking
+const WATCHDOG_MS = 1000
+// Silence longer than this, with an utterance still unfinished, means its
+// `onend` was lost — mobile engines drop it often enough that a long list
+// never reaches its end without this. Long enough not to mistake the gap
+// before an utterance actually starts for a stall.
+const STALL_GRACE_MS = 2000
 
 /**
  * Plays a list of utterances in order, each with its own language.
@@ -49,14 +56,34 @@ export function useSpeechQueue() {
     window.speechSynthesis.cancel()
     unlock()
 
+    // The utterance being spoken, so the watchdog can finish it in place of a
+    // lost `onend`
+    let current: { advance: () => void; startedAt: number; done: boolean } | null = null
+    let sinceResume = 0
+
     keepAliveRef.current = setInterval(() => {
       if (sessionRef.current !== session) return clearKeepAlive()
-      if (window.speechSynthesis.speaking) window.speechSynthesis.resume()
-    }, KEEPALIVE_MS)
+      const synth = window.speechSynthesis
+      if (synth.speaking || synth.pending) {
+        sinceResume += WATCHDOG_MS
+        if (sinceResume >= KEEPALIVE_MS) {
+          synth.resume()
+          sinceResume = 0
+        }
+        return
+      }
+      sinceResume = 0
+      // Silent. A deliberate pause between items has already advanced, so an
+      // unfinished utterance here means the engine stopped without saying so.
+      if (current && !current.done && Date.now() - current.startedAt > STALL_GRACE_MS) {
+        current.advance()
+      }
+    }, WATCHDOG_MS)
 
     const playFrom = (i: number) => {
       if (sessionRef.current !== session) return
       if (i >= items.length) {
+        current = null
         clearKeepAlive()
         setIndex(null)
         return
@@ -69,14 +96,17 @@ export function useSpeechQueue() {
       const voice = getVoiceFor(item.locale)
       if (voice) utterance.voice = voice
       utterance.rate = getRate()
-      const next = () => {
-        if (sessionRef.current !== session) return
+      const entry = { startedAt: Date.now(), done: false, advance: () => {} }
+      entry.advance = () => {
+        if (entry.done || sessionRef.current !== session) return
+        entry.done = true
         if (item.pauseAfter) setTimeout(() => playFrom(i + 1), item.pauseAfter)
         else playFrom(i + 1)
       }
-      utterance.onend = next
+      current = entry
+      utterance.onend = entry.advance
       // A missing voice for the language fires onerror — skip rather than stall
-      utterance.onerror = next
+      utterance.onerror = entry.advance
       window.speechSynthesis.speak(utterance)
     }
 

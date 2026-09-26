@@ -16,6 +16,7 @@ import { Button } from '@/components/ui/button'
 import { ReplayButton } from '@/components/study/ReplayButton'
 import type { Word } from '@prisma/client'
 import type { AnswerResult } from '@/types'
+import { HeroWord } from '@/components/study/HeroWord'
 
 const SWIPE_THRESHOLD = 100
 
@@ -85,9 +86,9 @@ export default function FlashCard({ word, direction, onAnswer }: Props) {
         )}
 
         {!flipped ? (
-          <div className="space-y-4">
-            <div className="flex items-center justify-center gap-2">
-              <p className="text-hero-word">{directionPrompt(word, direction)}</p>
+          <div className="w-full space-y-4">
+            <div className="flex w-full items-center justify-center gap-2">
+              <HeroWord text={directionPrompt(word, direction)} className="min-w-0 flex-1" />
               <Volume2 size={20} className="shrink-0 text-muted-foreground" />
             </div>
             <p className="text-sm text-muted-foreground">{t.tapToReveal}</p>
@@ -150,13 +151,13 @@ function FlashCardBack({ word, direction }: { word: Word; direction: Direction }
     : directionAnswer(word, direction)
 
   return (
-    <div className="animate-rise space-y-3">
+    <div className="animate-rise w-full space-y-3">
       <p className="text-sm text-muted-foreground">
         {directionPrompt(word, direction)}
         {formsOnPrompt && forms && <span> ({forms})</span>}
       </p>
       <div className="flex items-center justify-center gap-2">
-        <p className="font-display text-2xl font-semibold text-primary">{mainAnswer}</p>
+        <p className="min-w-0 break-words font-display text-2xl font-semibold text-primary">{mainAnswer}</p>
         <ReplayButton word={word} />
       </div>
       {!formsOnPrompt && forms && (

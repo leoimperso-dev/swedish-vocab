@@ -169,7 +169,25 @@
   font-weight: 600;
   letter-spacing: -0.03em;
   line-height: 1.05;
-  font-size: clamp(2.5rem, 12vw, 3.5rem);
+  max-width: 100%;
+  /* A Swedish compound ("nedslagsmarkering") is far wider than a short word at
+     the same size, and a clipped headword is unreadable. The second term caps
+     the size at what lets `--word-length` glyphs share one line: 0.55em is the
+     average advance of the display face. Falls back to the viewport when no
+     ancestor is a container, which is what the login title wants. */
+  font-size: min(
+    clamp(2.5rem, 12vw, 3.5rem),
+    calc(96cqw / (var(--word-length, 8) * 0.55))
+  );
+  /* Last resort for an outlier the cap alone cannot save */
+  overflow-wrap: break-word;
+}
+
+/* Wrapper that gives text-hero-word a width to measure itself against. */
+@utility hero-word-fit {
+  container-type: inline-size;
+  min-width: 0;
+  max-width: 100%;
 }
 
 @utility card-surface {
