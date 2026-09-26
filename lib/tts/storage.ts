@@ -65,9 +65,14 @@ export async function putAudio(key: string, voiceId: string, mp3: ArrayBuffer): 
       last = (e as Error).message
       continue
     }
-    // 409 = already there, which is a success for a content-addressed write
-    if (res.ok || res.status === 409) return publicAudioUrl(key, voiceId)!
-    last = `storage ${res.status}: ${(await res.text()).slice(0, 200)}`
+    // Already there is a success for a content-addressed write: the bytes at
+    // that path are a hash of exactly this audio. Storage reports the clash as
+    // HTTP 400 with a 409 buried in the body, so the body has to be read.
+    const body = res.ok ? '' : await res.text()
+    if (res.ok || res.status === 409 || body.includes('KeyAlreadyExists')) {
+      return publicAudioUrl(key, voiceId)!
+    }
+    last = `storage ${res.status}: ${body.slice(0, 200)}`
     // Anything but congestion is a real error — a bad key, a missing bucket
     if (res.status !== 429 && res.status < 500) break
   }
@@ -78,6 +83,8 @@ export async function putAudio(key: string, voiceId: string, mp3: ArrayBuffer): 
 export async function hasAudio(key: string, voiceId: string): Promise<boolean> {
   const url = publicAudioUrl(key, voiceId)
   if (!url) return false
-  const res = await fetch(url, { method: 'HEAD' })
+  // no-store because the CDN caches its own 404s: a warm run that trusted one
+  // would re-synthesize a file that already exists, paying for it twice
+  const res = await fetch(url, { method: 'HEAD', cache: 'no-store' })
   return res.ok
 }
