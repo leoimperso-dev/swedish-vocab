@@ -42,6 +42,19 @@ Dark-only, mobile-first (max-w-[430px]), ported from the svensk-spark Lovable de
   a dozen legacy SAPI voices for it that bury the good ones; the profile has a checkbox to
   see every installed voice anyway. `speakSequence` + `learnedSpeech()` read a headword
   followed by its comparative and superlative — hearing only the base teaches half an adjective.
+- `lib/tts/` — **server-rendered speech**, tried before the device voice and falling back to
+  it silently. iOS never exposes its Siri or downloaded premium voices to a web page, so on
+  an iPhone the device voice is unfixable; an MP3 rendered once on the server sounds the same
+  everywhere. `catalog.ts` holds the voice list and `audioKey()`, a SHA-256 of
+  `voice + speakable(text)` — **both the browser and `scripts/warm-tts.ts` must hash the exact
+  same normalized string, or every lookup misses and the corpus is re-synthesized**. Files are
+  content-addressed in a public Supabase bucket, so a warm utterance is one cached CDN GET and
+  never touches the server; only a miss goes through `/api/tts`, which synthesizes, uploads and
+  redirects. `scripts/warm-tts.ts --pair --scope [--write]` pre-renders a scope and prints the
+  character count and cost before spending anything. The service worker caches the audio origin
+  cache-first (`AUDIO_CACHE`), which is what makes the good voice work offline. Entirely
+  optional: with no `AZURE_SPEECH_KEY` / `NEXT_PUBLIC_SUPABASE_URL` the app just speaks with
+  the device voice as before.
 - `lib/streak.ts` — Daily streak logic (timezone-aware) + streak freezes (max 2, absorb missed days, +1 earned per 7-day milestone)
 - `lib/achievements.ts` — Achievement definitions and unlock checks
 - `lib/courses.ts` — Language registry: pairs, courses, directions, locales, verb forms
