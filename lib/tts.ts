@@ -2,6 +2,8 @@
 // being learned (see localeOf in lib/courses.ts).
 // iOS requires a user gesture before first use — call unlock() on first tap
 
+import { keepAwake } from '@/lib/wake-lock'
+
 let unlocked = false
 
 export function unlock() {
@@ -165,6 +167,7 @@ export function voicesFor(locale: string): SpeechSynthesisVoice[] {
 
 export function speak(text: string, locale: string, rate = getRate()): void {
   if (typeof window === 'undefined') return
+  keepAwake()
   window.speechSynthesis.cancel()
   const utterance = new SpeechSynthesisUtterance(speakable(text))
   utterance.lang = locale
@@ -206,6 +209,7 @@ export function speakSequence(
     return
   }
   guard = setTimeout(finish, SPEECH_TIMEOUT_MS)
+  keepAwake()
   window.speechSynthesis.cancel()
 
   items.forEach((item, i) => {

@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { getRate, getVoiceFor, isSupported, speakable, unlock, watchVoiceAvailability } from '@/lib/tts'
+import { allowSleep, keepAwake } from '@/lib/wake-lock'
 
 export interface SpeechItem {
   text: string
@@ -35,6 +36,7 @@ export function useSpeechQueue() {
   const stop = useCallback(() => {
     sessionRef.current++
     clearKeepAlive()
+    allowSleep()
     if (isSupported()) window.speechSynthesis.cancel()
     setIndex(null)
   }, [])
@@ -60,6 +62,7 @@ export function useSpeechQueue() {
         return
       }
       setIndex(i)
+      keepAwake()
       const item = items[i]
       const utterance = new SpeechSynthesisUtterance(speakable(item.text))
       utterance.lang = item.locale
