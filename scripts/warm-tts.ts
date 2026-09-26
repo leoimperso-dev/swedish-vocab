@@ -33,8 +33,10 @@ import { asPairId, localeOf, pairOf, type PairId } from '../lib/courses'
 type Scope = 'words' | 'stories' | 'dialogues' | 'examples'
 const ALL_SCOPES: Scope[] = ['words', 'stories', 'dialogues', 'examples']
 
-// Azure allows far more, but a burst of failures is cheaper to notice slowly
-const CONCURRENCY = 4
+// Bounded by Supabase Storage rather than by Azure: the bucket starts
+// answering 429 above this, and a refused upload wastes characters that were
+// already synthesized
+const CONCURRENCY = 3
 
 function arg(name: string): string | null {
   const i = process.argv.indexOf(`--${name}`)

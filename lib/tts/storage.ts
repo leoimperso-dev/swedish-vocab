@@ -30,6 +30,11 @@ export function storageConfigured(): boolean {
   return !!storageOrigin() && !!serviceKey()
 }
 
+// Storage answers 429 "too_many_connections" well before the synthesizer runs
+// out of quota, so a bulk warm loses uploads whose characters have already
+// been paid for. Retried rather than dropped, backing off each time.
+const UPLOAD_ATTEMPTS = 5
+
 /**
  * Writes one MP3, returning its public URL.
  *
@@ -42,20 +47,31 @@ export async function putAudio(key: string, voiceId: string, mp3: ArrayBuffer): 
   if (!origin || !secret) throw new Error('storage not configured')
 
   const path = audioPath(key, voiceId)
-  const res = await fetch(`${origin}/storage/v1/object/${AUDIO_BUCKET}/${path}`, {
-    method: 'POST',
-    headers: {
-      authorization: `Bearer ${secret}`,
-      'content-type': 'audio/mpeg',
-      'cache-control': 'public, max-age=31536000, immutable',
-    },
-    body: mp3,
-  })
-  // 409 = already there, which is a success for a content-addressed write
-  if (!res.ok && res.status !== 409) {
-    throw new Error(`storage ${res.status}: ${(await res.text()).slice(0, 200)}`)
+  let last = ''
+  for (let attempt = 0; attempt < UPLOAD_ATTEMPTS; attempt++) {
+    if (attempt > 0) await new Promise(r => setTimeout(r, 500 * 2 ** attempt))
+    let res: Response
+    try {
+      res = await fetch(`${origin}/storage/v1/object/${AUDIO_BUCKET}/${path}`, {
+        method: 'POST',
+        headers: {
+          authorization: `Bearer ${secret}`,
+          'content-type': 'audio/mpeg',
+          'cache-control': 'public, max-age=31536000, immutable',
+        },
+        body: mp3,
+      })
+    } catch (e) {
+      last = (e as Error).message
+      continue
+    }
+    // 409 = already there, which is a success for a content-addressed write
+    if (res.ok || res.status === 409) return publicAudioUrl(key, voiceId)!
+    last = `storage ${res.status}: ${(await res.text()).slice(0, 200)}`
+    // Anything but congestion is a real error — a bad key, a missing bucket
+    if (res.status !== 429 && res.status < 500) break
   }
-  return publicAudioUrl(key, voiceId)!
+  throw new Error(last)
 }
 
 /** Whether an utterance has already been synthesized. */
