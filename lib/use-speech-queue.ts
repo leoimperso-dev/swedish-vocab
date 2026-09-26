@@ -21,6 +21,8 @@ const WATCHDOG_MS = 1000
 // never reaches its end without this. Long enough not to mistake the gap
 // before an utterance actually starts for a stall.
 const STALL_GRACE_MS = 2000
+// How many upcoming utterances to resolve ahead of the one playing
+const LOOKAHEAD = 4
 
 /**
  * Plays a list of utterances in order, each with its own language.
@@ -107,14 +109,18 @@ export function useSpeechQueue() {
       }
       current = entry
 
-      // Resolve the next item's audio while this one plays. Without it every
-      // gap in the list carries a round trip, and a two-language playlist
-      // sounds like it is buffering between every word.
-      const next = items[i + 1]
-      if (next) prefetch(speakable(next.text), next.locale)
+      // Resolve the upcoming items while this one plays. Without it every gap
+      // in the list carries a round trip, and a two-language playlist sounds
+      // like it is buffering between every word. A window rather than the
+      // single next one, because a miss has to be synthesized before its turn.
+      for (const ahead of items.slice(i + 1, i + 1 + LOOKAHEAD)) {
+        prefetch(speakable(ahead.text), ahead.locale)
+      }
 
       onAudio = true
-      void playOne(speakable(item.text), item.locale, getRate()).then(played => {
+      // `wait: false` — a list must never stall. A word with no audio yet is
+      // spoken by the device now and rendered in the background for next time.
+      void playOne(speakable(item.text), item.locale, getRate(), { wait: false }).then(played => {
         if (sessionRef.current !== session) return
         onAudio = false
         if (played) return entry.advance()

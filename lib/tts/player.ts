@@ -100,6 +100,49 @@ function synthesizeUrl(text: string, voiceId: string): string {
 const resolved = new Map<string, string | null>()
 
 /**
+ * The URL of an utterance already stored, without ever synthesizing. Null on a
+ * miss — the caller decides whether that is worth waiting for.
+ */
+export async function cachedAudioUrl(text: string, locale: string): Promise<string | null> {
+  if (!serverAudioEnabled()) return null
+  const voiceId = getServerVoice(locale)
+  if (!voiceId) return null
+  const key = await audioKey(text, voiceId)
+  const cacheKey = `${voiceId}:${key}`
+  if (resolved.has(cacheKey)) return resolved.get(cacheKey)!
+  const url = cdnUrl(key, voiceId)
+  try {
+    const probe = await fetch(url)
+    if (!probe.ok) return null
+    resolved.set(cacheKey, url)
+    return url
+  } catch {
+    return null
+  }
+}
+
+// One synthesis in flight per utterance, and no repeat for one already asked
+// for: a list replayed twice must not queue the same work twice.
+const requested = new Set<string>()
+
+/**
+ * Asks the server to render this utterance, without waiting for it.
+ *
+ * What a long playlist needs: a missing word is spoken by the device this
+ * once, and by the good voice every time after. Waiting instead would freeze
+ * the list for seconds on a word the learner never asked to wait for.
+ */
+export function requestSynthesis(text: string, locale: string): void {
+  if (!serverAudioEnabled()) return
+  const voiceId = getServerVoice(locale)
+  if (!voiceId) return
+  const id = `${voiceId}:${text}`
+  if (requested.has(id)) return
+  requested.add(id)
+  void fetch(synthesizeUrl(text, voiceId)).catch(() => {})
+}
+
+/**
  * The URL to play, synthesizing on the fly if this utterance is new.
  * Null means the device voice has to take over.
  */
@@ -143,7 +186,9 @@ export async function audioUrlFor(text: string, locale: string): Promise<string 
 
 /** Fills the cache without playing, so the next card starts instantly. */
 export function prefetch(text: string, locale: string): void {
-  void audioUrlFor(text, locale).catch(() => {})
+  void cachedAudioUrl(text, locale).then(url => {
+    if (!url) requestSynthesis(text, locale)
+  }).catch(() => {})
 }
 
 export function stopAudio(): void {
@@ -157,9 +202,18 @@ export function stopAudio(): void {
  * there is no server audio for it. The caller keeps ownership of the ordering,
  * which is what a playlist with a highlighted line needs.
  */
-export async function playOne(text: string, locale: string, rate = 1): Promise<boolean> {
-  const url = await audioUrlFor(text, locale)
-  if (!url) return false
+export async function playOne(
+  text: string,
+  locale: string,
+  rate = 1,
+  { wait = true }: { wait?: boolean } = {},
+): Promise<boolean> {
+  const url = wait ? await audioUrlFor(text, locale) : await cachedAudioUrl(text, locale)
+  if (!url) {
+    // Render it for next time, but let the device speak it now
+    if (!wait) requestSynthesis(text, locale)
+    return false
+  }
   const el = audio()
   await new Promise<void>(resolve => {
     const done = () => {

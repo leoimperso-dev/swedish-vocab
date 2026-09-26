@@ -54,8 +54,11 @@ async function collect(pair: PairId, scopes: Scope[], side: Side): Promise<strin
   const texts: string[] = []
 
   if (scopes.includes('words') || scopes.includes('examples')) {
+    // Not restricted to `studyable`: an entry excluded from exercises is
+    // still shown in the dictionary and read aloud by the list player, and a
+    // gap there is exactly what makes a playlist stutter.
     const words = await db.word.findMany({
-      where: { pair, studyable: true },
+      where: { pair },
       select: { term: true, translation: true, examples: true },
     })
     for (const w of words) {
