@@ -2,7 +2,9 @@ import { NextResponse, type NextRequest } from 'next/server'
 
 // Reachable without a session: the (auth) screens and the endpoints they post to.
 const PUBLIC_PAGES = ['/login', '/signup', '/forgot-password', '/reset-password']
-const PUBLIC_APIS = ['/api/auth', '/api/register', '/api/password']
+// /api/cron carries its own bearer secret and is called by a scheduler that
+// has no session cookie; redirecting it to /login would silently disable it
+const PUBLIC_APIS = ['/api/auth', '/api/register', '/api/password', '/api/cron']
 
 // Lightweight redirect layer only — runs on Edge so it cannot query the DB.
 // Real auth enforcement happens via auth() in pages and API routes.
