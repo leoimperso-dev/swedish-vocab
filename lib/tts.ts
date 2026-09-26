@@ -104,7 +104,11 @@ export const GAP_BOUNDS = { min: 0, max: 1500, step: 10 } as const
 
 export function getGap(gap: Gap): number {
   if (typeof window === 'undefined') return GAP_DEFAULTS[gap]
-  const stored = Number(window.localStorage.getItem(GAP_KEYS[gap]))
+  // Read before converting: Number(null) is 0, and 0 is a legal gap, so an
+  // unset preference would silently read as "no silence at all"
+  const raw = window.localStorage.getItem(GAP_KEYS[gap])
+  if (raw === null) return GAP_DEFAULTS[gap]
+  const stored = Number(raw)
   if (!Number.isFinite(stored) || stored < GAP_BOUNDS.min || stored > GAP_BOUNDS.max) {
     return GAP_DEFAULTS[gap]
   }

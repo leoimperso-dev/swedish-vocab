@@ -44,6 +44,11 @@ model User {
   streakBest    Int       @default(0)
   freezeCount   Int       @default(2) // streak freezes available (max 2, +1 every 7-day milestone)
   dailyGoalXp   Int       @default(15)
+  // Daily nudge, sent by the hourly cron to everyone whose local hour matches
+  // and who has not studied yet that day. On by default: an opt-in reminder is
+  // one nobody ever turns on.
+  reminderEnabled Boolean @default(true)
+  reminderHour    Int     @default(21) // 0-23, in the user's own timezone
   lastStudiedAt DateTime?
   // Last time the app was opened, study or not — shown on a public profile
   lastSeenAt    DateTime?

@@ -26,6 +26,25 @@ function needsHomeScreenInstall(): boolean {
   return !standalone
 }
 
+/** Registers this device with the server. Assumes permission is granted. */
+async function subscribe(): Promise<boolean> {
+  try {
+    const reg = await navigator.serviceWorker.ready
+    const sub = await reg.pushManager.subscribe({
+      userVisibleOnly: true,
+      applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY!),
+    })
+    const res = await fetch('/api/push/subscribe', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(sub.toJSON()),
+    })
+    return res.ok
+  } catch {
+    return false
+  }
+}
+
 /**
  * Web Push opt-in, per device. Rendered only when VAPID keys are configured —
  * without them the server can never send, so offering the switch would lie.
@@ -43,7 +62,13 @@ export function PushToggle() {
       }
       if (Notification.permission === 'denied') return 'blocked'
       const reg = await navigator.serviceWorker.ready
-      return (await reg.pushManager.getSubscription()) ? 'on' : 'off'
+      if (await reg.pushManager.getSubscription()) return 'on'
+      // Permission already given on this device but no subscription: a new
+      // install, a cleared storage, or a second device of someone who said yes
+      // once. Re-subscribing silently is what they already asked for — the
+      // prompt is the consent, not the button.
+      if (Notification.permission === 'granted') return (await subscribe()) ? 'on' : 'off'
+      return 'off'
     }
     detect()
       .then(next => { if (!cancelled) setState(next) })
@@ -59,17 +84,7 @@ export function PushToggle() {
         setState(permission === 'denied' ? 'blocked' : 'off')
         return
       }
-      const reg = await navigator.serviceWorker.ready
-      const sub = await reg.pushManager.subscribe({
-        userVisibleOnly: true,
-        applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY!),
-      })
-      const res = await fetch('/api/push/subscribe', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(sub.toJSON()),
-      })
-      setState(res.ok ? 'on' : 'off')
+      setState((await subscribe()) ? 'on' : 'off')
     } catch {
       setState('off')
     } finally {

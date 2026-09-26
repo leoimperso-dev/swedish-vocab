@@ -18,6 +18,7 @@ import { LevelSettings } from '@/components/LevelSettings'
 import { VoiceSettings } from '@/components/VoiceSettings'
 import { MyReports, MyReportsTitle } from '@/components/MyReports'
 import { PushToggle } from '@/components/duel/PushToggle'
+import { ReminderSettings } from '@/components/ReminderSettings'
 import { pushEnabled } from '@/lib/push'
 import { asLangOrDefault, resolveCourse } from '@/lib/courses'
 import { Button } from '@/components/ui/button'
@@ -181,14 +182,23 @@ export default async function ProfilePage() {
           />
         </Card>
 
-        {/* Duel notifications, per device — hidden when no VAPID key is set */}
+        {/* Notifications — hidden when no VAPID key is set, since the server
+            could never send anything and the switches would lie */}
         {pushEnabled && (
-          <Card>
-            <CardTitle>{t.pushTitle}</CardTitle>
-            <div className="mt-3">
-              <PushToggle />
-            </div>
-          </Card>
+          <>
+            <Card>
+              <CardTitle>{t.pushTitle}</CardTitle>
+              <div className="mt-3">
+                <PushToggle />
+              </div>
+            </Card>
+            <Card>
+              <CardTitle>{t.reminderTitle}</CardTitle>
+              <div className="mt-3">
+                <ReminderSettings enabled={user.reminderEnabled} hour={user.reminderHour} />
+              </div>
+            </Card>
+          </>
         )}
 
         {/* Reading voice, per device */}

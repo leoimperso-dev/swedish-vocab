@@ -1,4 +1,12 @@
 {
   "buildCommand": "prisma generate && next build",
-  "regions": ["dub1"]
+  "regions": [
+    "dub1"
+  ],
+  "crons": [
+    {
+      "path": "/api/cron/reminder",
+      "schedule": "0 * * * *"
+    }
+  ]
 }
