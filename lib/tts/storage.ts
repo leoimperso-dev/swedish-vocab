@@ -88,3 +88,43 @@ export async function hasAudio(key: string, voiceId: string): Promise<boolean> {
   const res = await fetch(url, { method: 'HEAD', cache: 'no-store' })
   return res.ok
 }
+
+/**
+ * Every audio key already stored for a voice.
+ *
+ * Resuming an interrupted warm used to cost one HEAD per utterance — tens of
+ * thousands of round trips before the first new word was rendered, which made
+ * every restart slower than the work it was skipping. Listing each shard
+ * instead turns that into a few hundred calls.
+ */
+export async function storedKeys(voiceId: string): Promise<Set<string>> {
+  const origin = storageOrigin()
+  const secret = serviceKey()
+  if (!origin || !secret) throw new Error('storage not configured')
+
+  const found = new Set<string>()
+  // audioPath shards on the first two hex characters of the key
+  const shards = Array.from({ length: 256 }, (_, i) => i.toString(16).padStart(2, '0'))
+
+  const CONCURRENCY = 8
+  const queue = [...shards]
+  const worker = async () => {
+    for (;;) {
+      const shard = queue.shift()
+      if (!shard) return
+      for (let offset = 0; ; offset += 1000) {
+        const res = await fetch(`${origin}/storage/v1/object/list/${AUDIO_BUCKET}`, {
+          method: 'POST',
+          headers: { authorization: `Bearer ${secret}`, 'content-type': 'application/json' },
+          body: JSON.stringify({ prefix: `${voiceId}/${shard}/`, limit: 1000, offset }),
+        })
+        if (!res.ok) break
+        const page = (await res.json()) as { name: string }[]
+        for (const item of page) found.add(item.name.replace(/\.mp3$/, ''))
+        if (page.length < 1000) break
+      }
+    }
+  }
+  await Promise.all(Array.from({ length: CONCURRENCY }, worker))
+  return found
+}

@@ -25,7 +25,7 @@
 import 'dotenv/config'
 import { db } from '../lib/db'
 import { audioKey, defaultServerVoice } from '../lib/tts/catalog'
-import { hasAudio, putAudio, storageConfigured } from '../lib/tts/storage'
+import { putAudio, storageConfigured, storedKeys } from '../lib/tts/storage'
 import { MAX_CHARS, provider, synthesize } from '../lib/tts/synthesize'
 import { speakable } from '../lib/tts'
 import { asPairId, localeOf, pairOf, type PairId } from '../lib/courses'
@@ -134,6 +134,11 @@ async function main() {
   if (!provider()) throw new Error('aucun fournisseur TTS configuré')
   if (!storageConfigured()) throw new Error('stockage non configuré')
 
+  // Read what is already there once, rather than asking per utterance: a
+  // resumed run would otherwise spend longer checking than synthesizing
+  const already = await storedKeys(voice)
+  console.log(`déjà dans le bucket pour cette voix : ${already.size.toLocaleString()}`)
+
   let done = 0, made = 0, skipped = 0, failed = 0
   const queue = [...texts]
   const worker = async () => {
@@ -141,6 +146,11 @@ async function main() {
       const text = queue.shift()
       if (!text) return
       const key = await audioKey(text, voice)
+      if (already.has(key)) {
+        skipped++
+        if (++done % 500 === 0) console.log(`  ${done}/${texts.length}`)
+        continue
+      }
       // A dropped connection must not leave a permanent hole in the corpus:
       // the run is long, and a single flaky minute would otherwise cost every
       // utterance attempted during it
@@ -148,7 +158,6 @@ async function main() {
       for (let attempt = 0; attempt < 3; attempt++) {
         if (attempt > 0) await new Promise(r => setTimeout(r, 1000 * attempt))
         try {
-          if (await hasAudio(key, voice)) { skipped++; error = null; break }
           await putAudio(key, voice, await synthesize(text, voice))
           made++
           error = null
@@ -161,7 +170,7 @@ async function main() {
         failed++
         if (failed <= 5) console.error(`  ✗ ${text.slice(0, 40)} — ${error.message}`)
       }
-      if (++done % 200 === 0) console.log(`  ${done}/${texts.length}`)
+      if (++done % 200 === 0) console.log(`  ${done}/${texts.length} · ${made} créés`)
     }
   }
   await Promise.all(Array.from({ length: CONCURRENCY }, worker))
