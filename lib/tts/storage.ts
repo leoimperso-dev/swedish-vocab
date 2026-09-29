@@ -106,22 +106,41 @@ export async function storedKeys(voiceId: string): Promise<Set<string>> {
   // audioPath shards on the first two hex characters of the key
   const shards = Array.from({ length: 256 }, (_, i) => i.toString(16).padStart(2, '0'))
 
-  const CONCURRENCY = 8
+  // Low, and retried: the list endpoint throttles like the upload one, and a
+  // shard silently skipped here reads as "not stored yet", which sends the
+  // warm loop off to synthesize thousands of files that already exist. A
+  // wrong inventory is worse than a slow one.
+  const CONCURRENCY = 2
+  const ATTEMPTS = 7
+
+  const page = async (shard: string, offset: number): Promise<{ name: string }[]> => {
+    let last = ''
+    for (let attempt = 0; attempt < ATTEMPTS; attempt++) {
+      if (attempt > 0) await new Promise(r => setTimeout(r, 600 * 2 ** attempt))
+      try {
+        const res = await fetch(`${origin}/storage/v1/object/list/${AUDIO_BUCKET}`, {
+          method: 'POST',
+          headers: { authorization: `Bearer ${secret}`, 'content-type': 'application/json' },
+          body: JSON.stringify({ prefix: `${voiceId}/${shard}/`, limit: 1000, offset }),
+        })
+        if (res.ok) return (await res.json()) as { name: string }[]
+        last = `${res.status} ${(await res.text()).slice(0, 120)}`
+      } catch (e) {
+        last = (e as Error).message
+      }
+    }
+    throw new Error(`list ${voiceId}/${shard} @${offset}: ${last}`)
+  }
+
   const queue = [...shards]
   const worker = async () => {
     for (;;) {
       const shard = queue.shift()
       if (!shard) return
       for (let offset = 0; ; offset += 1000) {
-        const res = await fetch(`${origin}/storage/v1/object/list/${AUDIO_BUCKET}`, {
-          method: 'POST',
-          headers: { authorization: `Bearer ${secret}`, 'content-type': 'application/json' },
-          body: JSON.stringify({ prefix: `${voiceId}/${shard}/`, limit: 1000, offset }),
-        })
-        if (!res.ok) break
-        const page = (await res.json()) as { name: string }[]
-        for (const item of page) found.add(item.name.replace(/\.mp3$/, ''))
-        if (page.length < 1000) break
+        const items = await page(shard, offset)
+        for (const item of items) found.add(item.name.replace(/\.mp3$/, ''))
+        if (items.length < 1000) break
       }
     }
   }
