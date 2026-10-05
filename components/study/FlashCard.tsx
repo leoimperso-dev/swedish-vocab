@@ -1,9 +1,10 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { motion, useMotionValue, useTransform, type PanInfo } from 'framer-motion'
 import { Check, X, Volume2, Lightbulb } from 'lucide-react'
-import { speakSequence, unlock } from '@/lib/tts'
+import { speakSequence, speakable, unlock } from '@/lib/tts'
+import { prefetch } from '@/lib/tts/player'
 import {
   formatForms, parseDetails, directionPrompt, directionAnswer,
   learnedSpeech, promptIsTerm, showsEnrichedAnswer,
@@ -30,6 +31,15 @@ export default function FlashCard({ word, direction, onAnswer }: Props) {
   const [flipped, setFlipped] = useState(false)
   const [answered, setAnswered] = useState(false)
   const course = useCourse()
+
+  // Warm the CDN cache while the front is visible so audio starts instantly on flip
+  useEffect(() => {
+    for (const item of learnedSpeech(word, course)) {
+      prefetch(speakable(item.text), item.locale)
+    }
+  // The card is always mounted fresh (key={currentIndex}), so [] is correct
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
   const t = getStrings(course.native)
 
   const x = useMotionValue(0)
