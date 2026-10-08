@@ -2,12 +2,11 @@
 
 import { use, useEffect, useState } from 'react'
 import Link from 'next/link'
-import { useRouter } from 'next/navigation'
 import { ChevronLeft, Loader2, Minus, Swords } from 'lucide-react'
 import { AppShell } from '@/components/AppShell'
 import { Avatar } from '@/components/ui/avatar'
 import { Card, Chip, SectionLabel } from '@/components/ui/primitives'
-import { Button, buttonClasses } from '@/components/ui/button'
+import { buttonClasses } from '@/components/ui/button'
 import { getStrings } from '@/lib/i18n'
 import { useLang } from '@/components/CourseProvider'
 import { BLITZ_RANGE } from '@/lib/duel/rules'
@@ -17,10 +16,8 @@ import type { DuelDetail } from '@/app/api/duels/[id]/route'
 export default function DuelPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params)
   const t = getStrings(useLang())
-  const router = useRouter()
   const [duel, setDuel] = useState<DuelDetail | null>(null)
   const [missing, setMissing] = useState(false)
-  const [confirmQuit, setConfirmQuit] = useState(false)
 
   useEffect(() => {
     fetch(`/api/duels/${id}`)
@@ -50,12 +47,6 @@ export default function DuelPage({ params }: { params: Promise<{ id: string }> }
   const name = duel.opponent.name ?? '?'
   const over = duel.status !== 'ACTIVE'
   const verdict = duel.youWon === null ? t.duelDraw : duel.youWon ? t.duelWon : t.duelLost
-
-  const giveUp = async () => {
-    await fetch(`/api/duels/${id}`, { method: 'DELETE' })
-    router.push('/duels')
-    router.refresh()
-  }
 
   return (
     <AppShell
@@ -144,24 +135,6 @@ export default function DuelPage({ params }: { params: Promise<{ id: string }> }
           )}
         </section>
 
-        {!over &&
-          (confirmQuit ? (
-            <Card className="space-y-3">
-              <p className="text-sm text-muted-foreground">{t.duelGiveUpConfirm}</p>
-              <div className="flex gap-3">
-                <Button variant="destructive" className="flex-1" onClick={giveUp}>
-                  {t.duelGiveUp}
-                </Button>
-                <Button variant="secondary" className="flex-1" onClick={() => setConfirmQuit(false)}>
-                  {t.cancel}
-                </Button>
-              </div>
-            </Card>
-          ) : (
-            <Button variant="ghost" className="w-full" onClick={() => setConfirmQuit(true)}>
-              {t.duelGiveUp}
-            </Button>
-          ))}
       </div>
     </AppShell>
   )

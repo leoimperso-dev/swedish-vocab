@@ -29,6 +29,8 @@ interface Props {
    * not by pressing "next".
    */
   onSubmitted?: (result: AnswerResult) => void
+  /** When true, suppress auto-advance and the built-in "Next" button. */
+  manualNext?: boolean
 }
 
 const FEEDBACK_ICON: Record<AnswerResult, typeof Check> = {
@@ -43,7 +45,7 @@ const FEEDBACK_CLASS: Record<AnswerResult, string> = {
   incorrect: 'border-danger/40 bg-danger-soft text-danger',
 }
 
-export default function TypingExercise({ word, direction, alsoAccepted, onAnswer, onSubmitted }: Props) {
+export default function TypingExercise({ word, direction, alsoAccepted, onAnswer, onSubmitted, manualNext }: Props) {
   const [input, setInput] = useState('')
   const [result, setResult] = useState<AnswerResult | null>(null)
   const course = useCourse()
@@ -67,7 +69,7 @@ export default function TypingExercise({ word, direction, alsoAccepted, onAnswer
     // A correct answer flows on once the word has been said in full; a wrong one
     // waits for the learner to read it
     speakSequence(learnedSpeech(word, course), {
-      onDone: evaluation === 'correct'
+      onDone: !manualNext && evaluation === 'correct'
         ? () => setTimeout(() => onAnswer(evaluation, 'TYPING'), 400)
         : undefined,
     })
@@ -118,7 +120,7 @@ export default function TypingExercise({ word, direction, alsoAccepted, onAnswer
           <Button size="lg" className="w-full" disabled={!input.trim()} onClick={handleSubmit}>
             {t.submit}
           </Button>
-        ) : result !== 'correct' ? (
+        ) : result !== 'correct' && !manualNext ? (
           <div className="flex items-center gap-2">
             <Button size="lg" className="w-full" onClick={() => onAnswer(result, 'TYPING')}>
               {t.nextTurn}

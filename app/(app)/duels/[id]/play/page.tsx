@@ -11,7 +11,7 @@ import ClozeExercise from '@/components/study/ClozeExercise'
 import ListeningExercise from '@/components/study/ListeningExercise'
 import { AppShell } from '@/components/AppShell'
 import { Card, ProgressBar } from '@/components/ui/primitives'
-import { buttonClasses } from '@/components/ui/button'
+import { Button, buttonClasses } from '@/components/ui/button'
 import { getStrings } from '@/lib/i18n'
 import { useLang } from '@/components/CourseProvider'
 import { blitzSeconds, scoreAnswer, type DuelMode } from '@/lib/duel/rules'
@@ -103,6 +103,9 @@ export default function PlayRoundPage({ params }: { params: Promise<{ id: string
   // costs points — and the score is shown right away.
   const settled = useRef<{ points: number; msLeft: number } | null>(null)
   const [earned, setEarned] = useState<number | null>(null)
+  const [pendingResult, setPendingResult] = useState<AnswerResult | null>(null)
+  // Reset when moving to the next exercise
+  useEffect(() => { setPendingResult(null) }, [index])
 
   const handleSubmitted = useCallback(
     (result: AnswerResult, msLeft: number) => {
@@ -233,12 +236,20 @@ export default function PlayRoundPage({ params }: { params: Promise<{ id: string
             )}
           />
         ) : (
-          <Exercise
-            exercise={current}
-            fallbackDirection={data.direction}
-            onSubmitted={r => handleSubmitted(r, 0)}
-            onAnswer={r => handleAnswer(r, 0)}
-          />
+          <div className="space-y-4">
+            <Exercise
+              exercise={current}
+              fallbackDirection={data.direction}
+              onSubmitted={r => { handleSubmitted(r, 0); setPendingResult(r) }}
+              onAnswer={r => handleAnswer(r, 0)}
+              manualNext
+            />
+            {pendingResult !== null && (
+              <Button size="lg" className="w-full" onClick={() => handleAnswer(pendingResult, 0)}>
+                {t.nextTurn}
+              </Button>
+            )}
+          </div>
         )}
       </main>
     </div>
@@ -260,12 +271,14 @@ function Exercise({
   fallbackDirection,
   onAnswer,
   onSubmitted,
+  manualNext,
 }: {
   exercise: ExerciseWord
   fallbackDirection: Direction
   onAnswer: (result: AnswerResult) => void
   /** Fired when the answer is graded, before its correction is shown */
   onSubmitted: (result: AnswerResult) => void
+  manualNext?: boolean
 }) {
   const { word, exerciseType, distractors, alsoAccepted } = exercise
   // Blitz asks some questions the other way round — see lib/study/build.ts
@@ -275,17 +288,17 @@ function Exercise({
   // No flashcard here: a duel score cannot rest on self-assessment
   switch (exerciseType) {
     case 'QCM':
-      return <MultipleChoice word={word} direction={direction} distractors={distractors} onAnswer={answer} onSubmitted={onSubmitted} />
+      return <MultipleChoice word={word} direction={direction} distractors={distractors} onAnswer={answer} onSubmitted={onSubmitted} manualNext={manualNext} />
     case 'TYPING':
-      return <TypingExercise word={word} direction={direction} alsoAccepted={alsoAccepted} onAnswer={answer} onSubmitted={onSubmitted} />
+      return <TypingExercise word={word} direction={direction} alsoAccepted={alsoAccepted} onAnswer={answer} onSubmitted={onSubmitted} manualNext={manualNext} />
     case 'CONJUGATION':
-      return <ConjugationExercise word={word} onAnswer={answer} onSubmitted={onSubmitted} />
+      return <ConjugationExercise word={word} onAnswer={answer} onSubmitted={onSubmitted} manualNext={manualNext} />
     case 'CLOZE':
-      return <ClozeExercise word={word} alsoAccepted={alsoAccepted} onAnswer={answer} onSubmitted={onSubmitted} />
+      return <ClozeExercise word={word} alsoAccepted={alsoAccepted} onAnswer={answer} onSubmitted={onSubmitted} manualNext={manualNext} />
     case 'LISTENING':
-      return <ListeningExercise word={word} onAnswer={answer} onSubmitted={onSubmitted} />
+      return <ListeningExercise word={word} onAnswer={answer} onSubmitted={onSubmitted} manualNext={manualNext} />
     default:
-      return <MultipleChoice word={word} direction={direction} distractors={distractors} onAnswer={answer} onSubmitted={onSubmitted} />
+      return <MultipleChoice word={word} direction={direction} distractors={distractors} onAnswer={answer} onSubmitted={onSubmitted} manualNext={manualNext} />
   }
 }
 

@@ -32,6 +32,8 @@ interface Props {
    * not by pressing "next".
    */
   onSubmitted?: (result: AnswerResult) => void
+  /** When true, suppress auto-advance and the built-in "Next" button. */
+  manualNext?: boolean
 }
 
 function escapeRegex(s: string): string {
@@ -50,7 +52,7 @@ const FEEDBACK_CLASS: Record<AnswerResult, string> = {
   incorrect: 'border-danger/40 bg-danger-soft text-danger',
 }
 
-export default function ClozeExercise({ word, alsoAccepted, onAnswer, onSubmitted }: Props) {
+export default function ClozeExercise({ word, alsoAccepted, onAnswer, onSubmitted, manualNext }: Props) {
   const [input, setInput] = useState('')
   const [result, setResult] = useState<AnswerResult | null>(null)
   // The hint gives the answer away, so it stays behind a tap: searching first
@@ -103,7 +105,7 @@ export default function ClozeExercise({ word, alsoAccepted, onAnswer, onSubmitte
     setResult(evaluation)
     onSubmitted?.(evaluation)
 
-    if (evaluation === 'correct') setTimeout(() => onAnswer(evaluation, 'CLOZE'), 1500)
+    if (evaluation === 'correct' && !manualNext) setTimeout(() => onAnswer(evaluation, 'CLOZE'), 1500)
   }
 
   return (
@@ -189,7 +191,7 @@ export default function ClozeExercise({ word, alsoAccepted, onAnswer, onSubmitte
           <Button size="lg" className="w-full" disabled={!input.trim()} onClick={handleSubmit}>
             {t.submit}
           </Button>
-        ) : result !== 'correct' ? (
+        ) : result !== 'correct' && !manualNext ? (
           <Button size="lg" className="w-full" onClick={() => onAnswer(result, 'CLOZE')}>
             {t.nextTurn}
           </Button>

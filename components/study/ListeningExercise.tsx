@@ -30,6 +30,8 @@ interface Props {
    * not by pressing "next".
    */
   onSubmitted?: (result: AnswerResult) => void
+  /** When true, suppress auto-advance and the built-in "Next" button. */
+  manualNext?: boolean
 }
 
 const FEEDBACK_ICON: Record<AnswerResult, typeof Check> = {
@@ -46,7 +48,7 @@ const FEEDBACK_CLASS: Record<AnswerResult, string> = {
 
 // Dictation: the word (or one of its example sentences) is spoken, never shown,
 // and has to be typed back. The only exercise that trains the ear.
-export default function ListeningExercise({ word, onAnswer, onSubmitted }: Props) {
+export default function ListeningExercise({ word, onAnswer, onSubmitted, manualNext }: Props) {
   const course = useCourse()
   const t = getStrings(course.native)
   const [input, setInput] = useState('')
@@ -98,7 +100,7 @@ export default function ListeningExercise({ word, onAnswer, onSubmitted }: Props
     const evaluation = evaluateAnswer(input, prompt.text)
     setResult(evaluation)
     onSubmitted?.(evaluation)
-    if (evaluation === 'correct') setTimeout(() => onAnswer(evaluation, 'LISTENING'), 1600)
+    if (evaluation === 'correct' && !manualNext) setTimeout(() => onAnswer(evaluation, 'LISTENING'), 1600)
   }
 
   return (
@@ -154,7 +156,7 @@ export default function ListeningExercise({ word, onAnswer, onSubmitted }: Props
           <Button size="lg" className="w-full" disabled={!input.trim()} onClick={handleSubmit}>
             {t.submit}
           </Button>
-        ) : result !== 'correct' ? (
+        ) : result !== 'correct' && !manualNext ? (
           <Button size="lg" className="w-full" onClick={() => onAnswer(result, 'LISTENING')}>
             {t.nextTurn}
           </Button>

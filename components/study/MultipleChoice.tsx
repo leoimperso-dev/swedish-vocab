@@ -26,9 +26,12 @@ interface Props {
    * not by pressing "next".
    */
   onSubmitted?: (result: AnswerResult) => void
+  /** When true, suppress auto-advance and the built-in "Next" button — the
+   * caller shows its own navigation control. */
+  manualNext?: boolean
 }
 
-export default function MultipleChoice({ word, direction, distractors, onAnswer, onSubmitted }: Props) {
+export default function MultipleChoice({ word, direction, distractors, onAnswer, onSubmitted, manualNext }: Props) {
   const [options, setOptions] = useState<string[]>([])
   const [selected, setSelected] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
@@ -64,7 +67,7 @@ export default function MultipleChoice({ word, direction, distractors, onAnswer,
     unlock()
     // Right answers flow on, but only once the word has been said in full —
     // cutting the voice off mid-superlative teaches half the word
-    const done = option === correctOption
+    const done = !manualNext && option === correctOption
       ? () => setTimeout(() => onAnswer('correct', 'QCM'), 400)
       : undefined
     speakSequence(learnedSpeech(word, course), { onDone: done })
@@ -79,7 +82,7 @@ export default function MultipleChoice({ word, direction, distractors, onAnswer,
         <p className="mt-2 text-xs text-muted-foreground">{t.whichTranslation}</p>
       </Card>
 
-      {selected && selected !== correctOption && (
+      {selected && selected !== correctOption && !manualNext && (
         <div className="flex items-center gap-2">
           <Button size="lg" className="w-full" onClick={() => onAnswer('incorrect', 'QCM')}>
             {t.nextTurn}

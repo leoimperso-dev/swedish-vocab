@@ -22,13 +22,15 @@ interface Props {
    * not by pressing "next".
    */
   onSubmitted?: (result: AnswerResult) => void
+  /** When true, suppress auto-advance and the built-in "Next" button. */
+  manualNext?: boolean
 }
 
 // Drilled forms differ per language: Swedish present/preterit/supine,
 // English past/past participle — the registry decides, i18n supplies the labels.
 type FormKey = 'present' | 'preterit' | 'supine' | 'past' | 'pastParticiple'
 
-export default function ConjugationExercise({ word, onAnswer, onSubmitted }: Props) {
+export default function ConjugationExercise({ word, onAnswer, onSubmitted, manualNext }: Props) {
   const course = useCourse()
   const t = getStrings(course.native)
   const [inputs, setInputs] = useState<Record<string, string>>({})
@@ -61,8 +63,8 @@ export default function ConjugationExercise({ word, onAnswer, onSubmitted }: Pro
       : 'approximate'
 
     onSubmitted?.(overall)
-    if (overall === 'correct') setTimeout(() => onAnswer(overall, 'CONJUGATION'), 1500)
-    else setPending(overall)
+    if (overall === 'correct' && !manualNext) setTimeout(() => onAnswer(overall, 'CONJUGATION'), 1500)
+    else if (!manualNext) setPending(overall)
   }
 
   return (
