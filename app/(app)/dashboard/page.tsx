@@ -6,6 +6,7 @@ import { getStrings } from '@/lib/i18n'
 import { getCourse } from '@/lib/current-course'
 import { cn } from '@/lib/utils'
 import { AppShell } from '@/components/AppShell'
+import { PushBanner } from '@/components/PushBanner'
 import { Card, CardTitle, Chip, ProgressBar, SectionLabel } from '@/components/ui/primitives'
 import { buttonClasses } from '@/components/ui/button'
 import Link from 'next/link'
@@ -63,6 +64,8 @@ export default async function DashboardPage() {
       subtitle={t.dashboardSubtitle(t.languageName[course.learned])}
     >
       <div className="space-y-4">
+        <PushBanner />
+
         {/* Objectif du jour */}
         <Card className={goalReached ? 'border-success/30 bg-success-soft' : undefined}>
           <div className="flex items-start justify-between gap-3">
