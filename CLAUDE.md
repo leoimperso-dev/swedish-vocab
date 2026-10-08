@@ -329,9 +329,14 @@ icons for the home screen and would otherwise use a screenshot of the page. Requ
 permission must stay inside a real tap (the button), which Apple enforces.
 
 ## Reading
-`Story` table (48 graded stories, 4 levels) under `/reading`; `StoryReader` makes every word
+`Story` table (graded stories, 4 levels, ~30-50 per pair) under `/reading`; `StoryReader` makes every word
 tappable → `/api/dictionary?q=` backed by `lib/dictionary.ts` (one in-memory map per pair, over
 headwords + stored forms, falling back to `lemmaCandidates()` from `lib/morphology.ts`).
+
+Stories live only in the DB. A new batch is written as `stories-*.json` per pair (same plot
+localised in every pair's `term` language), checked with `scripts/check-story-json.ts <root>`
+— every non-proper-noun word must resolve in the dictionary or the popover is empty — then
+loaded with `scripts/import-stories.ts <dir> <pair>`.
 
 ## Bilingual stories
 `Story.body` holds the `term`-language text; `bodyTranslated` holds the same paragraphs in the
