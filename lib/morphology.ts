@@ -327,6 +327,25 @@ const ES_IRREGULARS: Record<string, string> = {
   ríe: 'reír', rió: 'reír', rieron: 'reír', riendo: 'reír',
   asintió: 'asentir', asintieron: 'asentir',
   descubierto: 'descubrir', descubierta: 'descubrir',
+  // One-letter stems the suffix rules refuse
+  da: 'dar', das: 'dar', dan: 'dar', damos: 'dar', dais: 'dar', dad: 'dar', den: 'dar', des: 'dar',
+  demos: 'dar', daba: 'dar', dabas: 'dar', daban: 'dar', dábamos: 'dar', dando: 'dar',
+  diste: 'dar', dimos: 'dar',
+  oí: 'oír', oíste: 'oír', oímos: 'oír', oyes: 'oír', oyen: 'oír', oía: 'oír', oías: 'oír',
+  oían: 'oír', oíamos: 'oír', oyendo: 'oír', oiga: 'oír', oigan: 'oír',
+  siendo: 'ser', vimos: 'ver', viste: 'ver', vayan: 'ir', vayas: 'ir', vayamos: 'ir',
+  compuesto: 'componer', compuesta: 'componer', yendo: 'ir', sos: 'ser',
+  // The clitic rule strips accents with the pronoun: "oírte" arrives as "oir"
+  oir: 'oír', reir: 'reír', sonreir: 'sonreír', freir: 'freír',
+}
+
+// Irregular preterite and subjunctive stems: "tuvimos" → "tener", "hagas" → "hacer"
+const ES_IRREGULAR_STEMS: Record<string, string> = {
+  tuv: 'tener', teng: 'tener', estuv: 'estar', anduv: 'andar', hic: 'hacer', hag: 'hacer',
+  pud: 'poder', pus: 'poner', pong: 'poner', sup: 'saber', sep: 'saber', quis: 'querer',
+  vin: 'venir', veng: 'venir', dij: 'decir', dig: 'decir', traj: 'traer', traig: 'traer',
+  salg: 'salir', hub: 'haber', hay: 'haber', cup: 'caber', quep: 'caber', vay: 'ir',
+  fu: 'ser', oig: 'oír', caig: 'caer', produj: 'producir', conduj: 'conducir', traduj: 'traducir',
 }
 
 // Verb endings, longest first (present, pretérito, imperfecto, futuro,
@@ -378,13 +397,53 @@ function spanishStemVariants(stem: string): string[] {
   return [...out]
 }
 
+// "mantuv-" → "mantener", "obtendr-" → "obtener", "contraj-" → "contraer":
+// prefixed verbs conjugate like their base
+function spanishIrregularStem(stem: string): string | null {
+  if (ES_IRREGULAR_STEMS[stem]) return ES_IRREGULAR_STEMS[stem]
+  for (const table of [ES_IRREGULAR_STEMS, ES_COND_STEMS]) {
+    for (const [irregular, infinitive] of Object.entries(table)) {
+      if (irregular.length >= 3 && stem.length - irregular.length >= 2 && stem.endsWith(irregular)) {
+        return stem.slice(0, -irregular.length) + infinitive
+      }
+    }
+  }
+  return ES_COND_STEMS[stem] ?? null
+}
+
+// Stem changes the first pass does not try: "conozc-" → "conoc-", "sig-" →
+// "segu-", "durm-" → "dorm-", "incluy-" → "inclu-", accented "prohíb-" → "prohib-"
+function spanishExtraStemVariants(stem: string): string[] {
+  const plain = deaccent(stem)
+  const bases = [stem, plain]
+  if (plain.endsWith('zc')) bases.push(plain.slice(0, -2) + 'c')
+  if (plain.endsWith('g')) bases.push(plain + 'u')
+  if (plain.endsWith('y')) bases.push(plain.slice(0, -1))
+  // Only dormir and morir turn o into u: "durmiendo", "murieron"
+  if (/^(durm|mur)/.test(plain)) bases.push(plain.replace('u', 'o'))
+  return [...new Set(bases.flatMap(spanishStemVariants))]
+}
+
+const ES_ACCENTED: Record<string, string> = { a: 'á', e: 'é', i: 'í', o: 'ó', u: 'ú' }
+
+// Plurals drop the accent of a word ending in -n/-s: "ladrones" → "ladrón",
+// "japoneses" → "japonés"
+function accentLastVowel(stem: string): string {
+  const match = stem.match(/([aeiou])([ns])$/)
+  return match ? stem.slice(0, -2) + ES_ACCENTED[match[1]] + match[2] : stem
+}
+
 function spanishCandidates(token: string, depth = 0): string[] {
   const out: string[] = []
   if (ES_IRREGULARS[token]) out.push(ES_IRREGULARS[token])
   const plain = deaccent(token)
   if (plain !== token && ES_IRREGULARS[plain]) out.push(ES_IRREGULARS[plain])
-  // Apocopes: "buen" → "bueno", "primer" → "primero", "algún" → "alguno"
-  out.push(token + 'o', token + 'a', plain + 'o', plain + 'a')
+  // A plural whose singular is a headword is that word: "helados" is ice
+  // creams before it is "helar", "riñas" quarrels before it is "reñir"
+  if (token.length > 4 && token.endsWith('s')) out.push(token.slice(0, -1))
+  // Apocopes: "buen" → "bueno", "primer" → "primero", "algún" → "alguno".
+  // None ends in -s: "milagros" is not "milagroso"
+  if (!token.endsWith('s')) out.push(token + 'o', token + 'a', plain + 'o', plain + 'a')
   for (const suffix of ES_STRIP_SUFFIXES) {
     if (!token.endsWith(suffix)) continue
     const stem = token.slice(0, -suffix.length)
@@ -409,6 +468,37 @@ function spanishCandidates(token: string, depth = 0): string[] {
       out.push(...spanishCandidates(base, depth + 1))
     }
   }
+  if (depth > 0) return out
+  // Second pass, only reached when nothing above resolves: the token without
+  // its accents ("están", "tenés", "ésta"), irregular stems and stem changes.
+  // A final accent is a verb ending ("topó" is not "topo"), never dropped whole.
+  if (plain !== token && plain.at(-1) === token.at(-1)) out.push(plain)
+  // Without accents only where the stress sits on the stem of a verb ("confía",
+  // "actúa") or a plural moved it ("jóvenes"): "célebre" is not "celebrar"
+  const forms = plain !== token && (/[íú]/.test(token) || token.endsWith('es')) ? [token, plain] : [token]
+  for (const form of forms) {
+    for (const suffix of ['án', 'én', 'és', 'ís', 'íais', 'yendo', 'iesen', 'ieses', 'iese', ...ES_STRIP_SUFFIXES]) {
+      if (!form.endsWith(suffix)) continue
+      const stem = form.slice(0, -suffix.length)
+      const irregular = spanishIrregularStem(stem)
+      if (irregular) out.push(irregular)
+      if (stem.length < 2) continue
+      // A plural the first pass missed is a noun before it is a verb: "órdenes"
+      if (suffix === 'es') out.push(stem, deaccent(stem), accentLastVowel(stem))
+      for (const variant of spanishExtraStemVariants(stem)) {
+        // "-ír" keeps its accent ("reían" → "reír"); voseo "-és" is an -er verb
+        // ("creés" → "creer", not "crear")
+        const endings = suffix === 'és' ? ['er', 'ar', 'ir', 'ír'] : ['ar', 'er', 'ir', 'ír']
+        out.push(...endings.map(ending => variant + ending), variant)
+      }
+      if (suffix === 'as') out.push(stem + 'os') // "varias" → "varios"
+    }
+  }
+  // Adverbs in -mente and superlatives in -ísimo resolve to the adjective
+  const adverb = token.match(/^(.{3,})mente$/)
+  if (adverb) out.push(adverb[1], adverb[1].replace(/a$/, 'o'))
+  const superlative = token.match(/^(.{2,})ísim[oa]s?$/)
+  if (superlative) out.push(superlative[1] + 'o', superlative[1] + 'e', superlative[1])
   return out
 }
 
