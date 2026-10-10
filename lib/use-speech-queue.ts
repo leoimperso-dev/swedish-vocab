@@ -23,6 +23,11 @@ const WATCHDOG_MS = 1000
 const STALL_GRACE_MS = 2000
 // How many upcoming utterances to resolve ahead of the one playing
 const LOOKAHEAD = 4
+// An <audio> element that fires neither `ended` nor `error` leaves its promise
+// pending for good, and the watchdog below stands down while audio plays — so
+// one lost event would end a long list in silence. No single word comes close
+// to this, so passing it means the element is never coming back.
+const AUDIO_TIMEOUT_MS = 20000
 
 /**
  * Plays a list of utterances in order, each with its own language.
@@ -68,10 +73,19 @@ export function useSpeechQueue() {
     // The watchdog reads the synthesizer, which says nothing about an <audio>
     // element — it must not call a server-voiced item stalled
     let onAudio = false
+    let audioSince = 0
 
     keepAliveRef.current = setInterval(() => {
       if (sessionRef.current !== session) return clearKeepAlive()
-      if (onAudio) return
+      if (onAudio) {
+        // Give up on an element that has gone quiet without ever reporting it,
+        // rather than let the rest of the list wait on it forever
+        if (current && !current.done && Date.now() - audioSince > AUDIO_TIMEOUT_MS) {
+          onAudio = false
+          current.advance()
+        }
+        return
+      }
       const synth = window.speechSynthesis
       if (synth.speaking || synth.pending) {
         sinceResume += WATCHDOG_MS
@@ -118,10 +132,13 @@ export function useSpeechQueue() {
       }
 
       onAudio = true
+      audioSince = Date.now()
       // `wait: false` — a list must never stall. A word with no audio yet is
       // spoken by the device now and rendered in the background for next time.
       void playOne(speakable(item.text), item.locale, getRate(), { wait: false }).then(played => {
-        if (sessionRef.current !== session) return
+        // `entry.done` guards the late arrival of an element the watchdog has
+        // already given up on: by now another item owns the audio flag
+        if (sessionRef.current !== session || entry.done) return
         onAudio = false
         if (played) return entry.advance()
         // No server audio for this one — the device voice finishes the list

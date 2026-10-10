@@ -234,8 +234,9 @@ export default function WordsPage() {
     })
   }
 
-  // Whatever the current view shows, in order — what the read-aloud button
-  // plays and what "select all" ticks
+  // The rendered slice of the current view, in order — what "select all" ticks.
+  // The list renders in pages of PAGE_STEP, so this stops at the scroll
+  // boundary; reading aloud deliberately does not (see fullList).
   const shownWords = useMemo(() => {
     if (query.trim()) return searchResults.slice(0, searchVisible)
     if (tab === 'favorites') return favoriteWords
@@ -244,6 +245,19 @@ export default function WordsPage() {
       .filter(([label]) => openCategories.has(label))
       .flatMap(([label, words]) => words.slice(0, catVisible[label] ?? PAGE_STEP))
   }, [query, searchResults, searchVisible, tab, favoriteWords, topWords, topVisible, groups, openCategories, catVisible])
+
+  // Everything the current view covers, pagination ignored — what the voice
+  // reads. Stopping at PAGE_STEP made a long list fall silent after sixty
+  // words for no reason the listener could see: scrolling is a property of
+  // the screen, not of the list being read.
+  const fullList = useMemo(() => {
+    if (query.trim()) return searchResults
+    if (tab === 'favorites') return favoriteWords
+    if (tab === 'top') return topWords
+    return groups
+      .filter(([label]) => openCategories.has(label))
+      .flatMap(([, words]) => words)
+  }, [query, searchResults, tab, favoriteWords, topWords, groups, openCategories])
 
   const { speak, stop, index: spokenIndex, playing } = useSpeechQueue()
   const missingVoice = useMissingVoice(localeOf(course.learned))
@@ -274,15 +288,15 @@ export default function WordsPage() {
 
   const toggleSpeak = () => {
     if (playing) stop()
-    else speakWords(shownWords)
+    else speakWords(fullList)
   }
 
-  // Read on from one word to the end of what the list currently shows — the
-  // same queue as the header button, entered in the middle
+  // Read on from one word to the end of the list — the same queue as the
+  // header button, entered in the middle
   const speakFrom = useCallback((wordId: string) => {
-    const start = shownWords.findIndex(w => w.id === wordId)
-    speakWords(start >= 0 ? shownWords.slice(start) : shownWords)
-  }, [shownWords, speakWords])
+    const start = fullList.findIndex(w => w.id === wordId)
+    speakWords(start >= 0 ? fullList.slice(start) : fullList)
+  }, [fullList, speakWords])
 
   const markSelectedMastered = async () => {
     const wordIds = [...selected]
@@ -374,7 +388,7 @@ export default function WordsPage() {
             onToggle={toggleSpeak}
             label={t.speakList}
             stopLabel={t.stopReading}
-            className={shownWords.length === 0 ? 'pointer-events-none opacity-40' : undefined}
+            className={fullList.length === 0 ? 'pointer-events-none opacity-40' : undefined}
           />
           <button
             onClick={() => { setSelecting(v => !v); setSelected(new Set()) }}
