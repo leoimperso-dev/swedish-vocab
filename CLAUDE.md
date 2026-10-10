@@ -332,6 +332,12 @@ permission must stay inside a real tap (the button), which Apple enforces.
 `Story` table (graded stories, 4 levels, ~30-50 per pair) under `/reading`; `StoryReader` makes every word
 tappable → `/api/dictionary?q=` backed by `lib/dictionary.ts` (one in-memory map per pair, over
 headwords + stored forms, falling back to `lemmaCandidates()` from `lib/morphology.ts`).
+Resolving a word is not enough — it must resolve to the *right* word: `lib/dictionary-overrides.ts`
+pins surface forms whose automatic reading lands on a look-alike ("era" → ser, not "la era"),
+and wins over everything. Names: `lib/proper-nouns.ts` flags words capitalised mid-sentence
+(story-wide in `StoryReader`), sent as `&name=1`, and then only a capitalised headword or an
+override may answer — otherwise "Ana" reads as "ano". After a new story batch, have an agent
+review the popover readings of every distinct token and add the misreadings to the overrides.
 
 Stories live only in the DB. A new batch is written as `stories-*.json` per pair (same plot
 localised in every pair's `term` language), checked with `scripts/check-story-json.ts <root>`

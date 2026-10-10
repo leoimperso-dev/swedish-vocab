@@ -5,6 +5,7 @@ import { db } from '@/lib/db'
 import { parseDetails } from '@/lib/word-display'
 import { headwordKey, isDerivationalTail, isSuffixShorthand, lemmaCandidates } from '@/lib/morphology'
 import { pairOf, type Lang, type PairId } from '@/lib/courses'
+import { DICTIONARY_OVERRIDES } from '@/lib/dictionary-overrides'
 
 export interface DictEntry {
   id: string // the Word row, so the popover can star it
@@ -28,6 +29,8 @@ interface Dict {
   primary: Map<string, DictEntry>
   /** Surface key -> every claimant, so a homograph can be offered as well. */
   all: Map<string, DictEntry[]>
+  /** Surface keys pinned by DICTIONARY_OVERRIDES. */
+  overridden: Set<string>
 }
 
 const caches = new Map<PairId, Dict>()
@@ -63,13 +66,14 @@ async function buildCache(pair: PairId): Promise<Dict> {
   const lang = pairOf(pair).term
   const words = await db.word.findMany({
     where: { pair },
-    select: { id: true, term: true, translation: true, forms: true, details: true, frequencyRank: true },
+    select: { id: true, term: true, translation: true, forms: true, details: true, frequencyRank: true, wordType: true },
     // Common words win when several entries share a surface form
     orderBy: [{ frequencyRank: { sort: 'asc', nulls: 'last' } }, { createdAt: 'asc' }],
   })
 
   const primary = new Map<string, DictEntry>()
   const all = new Map<string, DictEntry[]>()
+  const byHeadword = new Map<string, Array<{ entry: DictEntry; wordType: string }>>()
   const formOrder = [
     'present', 'preterit', 'supine',
     'past', 'pastParticiple',
@@ -93,7 +97,9 @@ async function buildCache(pair: PairId): Promise<Dict> {
         : null,
     }
 
-    const keys = new Set<string>([headwordKey(word.term, lang)])
+    const headword = headwordKey(word.term, lang)
+    byHeadword.set(headword, [...(byHeadword.get(headword) ?? []), { entry, wordType: word.wordType }])
+    const keys = new Set<string>([headword])
     if (formsRecord) {
       for (const v of Object.values(formsRecord)) {
         if (typeof v === 'string') {
@@ -110,7 +116,18 @@ async function buildCache(pair: PairId): Promise<Dict> {
       all.set(key, [...(all.get(key) ?? []), entry])
     }
   }
-  return { primary, all }
+
+  // Pinned readings beat both the exact match and the morphology
+  const overridden = new Set<string>()
+  for (const [token, target] of Object.entries(DICTIONARY_OVERRIDES[pair] ?? {})) {
+    const [headword, wordType] = target.split(':')
+    const match = byHeadword.get(headword)?.find(c => !wordType || c.wordType === wordType)
+    if (!match) continue // the headword was removed or renamed: fall back to the automatic reading
+    primary.set(token, match.entry)
+    all.set(token, [match.entry, ...(all.get(token) ?? []).filter(e => e.id !== match.entry.id)])
+    overridden.add(token)
+  }
+  return { primary, all, overridden }
 }
 
 function resolve(cache: Map<string, DictEntry>, token: string, lang: Lang): DictEntry | null {
@@ -173,7 +190,13 @@ function otherReadings(
   return out
 }
 
-export async function lookupWord(raw: string, pair: PairId): Promise<DictEntry | null> {
+/**
+ * `properNoun`: the reader saw the word capitalised mid-sentence. Names collide
+ * with common words ("Ana" read as "ano", "Molly" as MDMA), so only a pinned
+ * reading or a headword that is itself capitalised ("England", "la Navidad")
+ * may answer — anything else is a name the dictionary does not know.
+ */
+export async function lookupWord(raw: string, pair: PairId, { properNoun = false } = {}): Promise<DictEntry | null> {
   let dict = caches.get(pair)
   if (!dict) {
     dict = await buildCache(pair)
@@ -183,6 +206,11 @@ export async function lookupWord(raw: string, pair: PairId): Promise<DictEntry |
 
   const token = raw.toLowerCase().replace(/[.,!?¿¡;:"«»()[\]…'’„“”–—]/g, '').trim()
   if (!token) return null
+
+  if (properNoun) {
+    const direct = cache.get(token)
+    return direct && (dict.overridden.has(token) || direct.term !== direct.term.toLowerCase()) ? direct : null
+  }
 
   const lang = pairOf(pair).term
   const hit = resolve(cache, token, lang) ?? resolveCompound(cache, token, lang)

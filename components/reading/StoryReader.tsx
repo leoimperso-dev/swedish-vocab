@@ -11,6 +11,7 @@ import { SpeakButton } from '@/components/SpeakButton'
 import { Card } from '@/components/ui/primitives'
 import TappableText from '@/components/TappableText'
 import { cn } from '@/lib/utils'
+import { storyProperNouns } from '@/lib/proper-nouns'
 import type { Story } from '@prisma/client'
 
 // Sentence-sized chunks: they read better, keep the highlight precise, and stay
@@ -41,6 +42,7 @@ export default function StoryReader({ story }: { story: Story }) {
     )
     return { paragraphs: paragraphsWithIds, sentences: flat }
   }, [story.body])
+  const properNouns = useMemo(() => storyProperNouns(story.body), [story.body])
 
   // Bilingual sources carry their own translation, paragraph for paragraph —
   // see scripts/add-story.ts. Hidden by default: reading it first is reading
@@ -101,7 +103,7 @@ export default function StoryReader({ story }: { story: Story }) {
                       index === sentence.id && 'bg-warning-soft',
                     )}
                   >
-                    <TappableText text={sentence.text} locale={locale} t={t} />{' '}
+                    <TappableText text={sentence.text} locale={locale} t={t} properNouns={properNouns} />{' '}
                   </span>
                 ))}
               </p>

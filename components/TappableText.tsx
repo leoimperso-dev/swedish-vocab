@@ -1,12 +1,13 @@
 'use client'
 
-import { useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { Volume2 } from 'lucide-react'
 import { speak, unlock } from '@/lib/tts'
 import { FavoriteStar } from '@/components/FavoriteStar'
 import { ReportButton } from '@/components/ReportButton'
 import type { Strings } from '@/lib/i18n'
 import { cn } from '@/lib/utils'
+import { cleanToken, midSentenceCapitals } from '@/lib/proper-nouns'
 
 interface DictResult {
   found: boolean
@@ -165,12 +166,15 @@ function WordPopover({ entry, token, locale, t }: {
 
 // Renders text whose every word can be tapped to look it up in the course
 // dictionary — the mechanism of the story reader, reusable on any sentence.
-export default function TappableText({ text, locale, t, className }: {
+export default function TappableText({ text, locale, t, className, properNouns }: {
   text: string
   locale: string
   t: Strings
   className?: string
+  /** Names found across the whole text, so one opening a sentence is caught too */
+  properNouns?: Set<string>
 }) {
+  const localNames = useMemo(() => midSentenceCapitals(text), [text])
   const [active, setActive] = useState<string | null>(null) // token position key
   const [entry, setEntry] = useState<DictResult | null>(null)
   // Guards against out-of-order responses when tapping several words quickly
@@ -212,16 +216,18 @@ export default function TappableText({ text, locale, t, className }: {
     setActive(positionKey)
     setEntry(null)
 
-    const token = rawToken.toLowerCase().replace(/[.,!?¿¡;:"«»()[\]…'’„“”–—]/g, '').trim()
+    const token = cleanToken(rawToken)
     if (!token) { activeRef.current = null; setActive(null); return }
 
-    const cached = dictCache.get(token)
+    const isName = localNames.has(token) || !!properNouns?.has(token)
+    const cacheKey = isName ? `${token}|name` : token
+    const cached = dictCache.get(cacheKey)
     if (cached) { setEntry(cached); return }
 
     try {
-      const res = await fetch(`/api/dictionary?q=${encodeURIComponent(token)}`)
+      const res = await fetch(`/api/dictionary?q=${encodeURIComponent(token)}${isName ? '&name=1' : ''}`)
       const data: DictResult = await res.json()
-      dictCache.set(token, data)
+      dictCache.set(cacheKey, data)
       // Only display if this word is still the active one
       if (activeRef.current === positionKey) setEntry(data)
     } catch {
