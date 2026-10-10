@@ -300,8 +300,8 @@ const fr = {
   reportsNone: 'Aucun signalement envoyé.',
   reportPending: 'à traiter',
   reportResolved: 'corrigé',
-  freezeInfo: (count: number, max: number, every: number) =>
-    `Streak freezes : ${count} / ${max} — un freeze protège ta série si tu rates un jour ; tu en regagnes un tous les ${every} jours de suite.`,
+  freezeInfo: (count: number, max: number) =>
+    `Streak freezes : ${count} / ${max} — un freeze protège ta série si tu rates un jour ; tu les récupères tous au début de chaque semaine.`,
   badges: 'Badges',
   signOut: 'Se déconnecter',
   // Words list
@@ -745,8 +745,8 @@ const sv: typeof fr = {
   reportsNone: 'Inga rapporter skickade.',
   reportPending: 'väntar',
   reportResolved: 'åtgärdad',
-  freezeInfo: (count, max, every) =>
-    `Streak freezes: ${count} / ${max} — en freeze skyddar din svit om du missar en dag; du får tillbaka en var ${every}:e dag i rad.`,
+  freezeInfo: (count, max) =>
+    `Streak freezes: ${count} / ${max} — en freeze skyddar din svit om du missar en dag; du får tillbaka alla i början av varje vecka.`,
   badges: 'Utmärkelser',
   signOut: 'Logga ut',
   // Words list
@@ -1188,8 +1188,8 @@ const en: typeof fr = {
   reportsNone: 'No report sent.',
   reportPending: 'pending',
   reportResolved: 'fixed',
-  freezeInfo: (count, max, every) =>
-    `Streak freezes: ${count} / ${max} — a freeze protects your streak if you miss a day; you earn one back every ${every} days in a row.`,
+  freezeInfo: (count, max) =>
+    `Streak freezes: ${count} / ${max} — a freeze protects your streak if you miss a day; they all refill at the start of each week.`,
   badges: 'Badges',
   signOut: 'Sign out',
   // Words list
@@ -1614,8 +1614,8 @@ const de: typeof fr = {
   reportsNone: 'Keine Meldungen gesendet.',
   reportPending: 'ausstehend',
   reportResolved: 'behoben',
-  freezeInfo: (count, max, every) =>
-    `Streak Freezes: ${count} / ${max} — ein Freeze schützt deine Serie, wenn du einen Tag verpasst; du verdienst alle ${every} Tage in Folge einen zurück.`,
+  freezeInfo: (count, max) =>
+    `Streak Freezes: ${count} / ${max} — ein Freeze schützt deine Serie, wenn du einen Tag verpasst; zu Wochenbeginn bekommst du alle zurück.`,
   badges: 'Abzeichen',
   signOut: 'Abmelden',
   vocabularyTitle: 'Vokabular',
@@ -2059,8 +2059,8 @@ const es: typeof fr = {
   reportsNone: 'No has enviado ningún aviso.',
   reportPending: 'pendiente',
   reportResolved: 'corregido',
-  freezeInfo: (count: number, max: number, every: number) =>
-    `Streak freezes: ${count} / ${max} — un freeze protege tu racha si fallas un día; ganas uno cada ${every} días seguidos.`,
+  freezeInfo: (count: number, max: number) =>
+    `Streak freezes: ${count} / ${max} — un freeze protege tu racha si fallas un día; se recargan todos al empezar cada semana.`,
   badges: 'Insignias',
   signOut: 'Cerrar sesión',
   // Words list
@@ -2510,8 +2510,8 @@ const nl: typeof fr = {
   reportsNone: 'Geen meldingen verzonden.',
   reportPending: 'te behandelen',
   reportResolved: 'verbeterd',
-  freezeInfo: (count: number, max: number, every: number) =>
-    `Streak freezes: ${count} / ${max} — een freeze beschermt je reeks als je een dag mist; je verdient er elke ${every} dagen op rij een bij.`,
+  freezeInfo: (count: number, max: number) =>
+    `Streak freezes: ${count} / ${max} — een freeze beschermt je reeks als je een dag mist; ze worden aan het begin van elke week allemaal aangevuld.`,
   badges: 'Badges',
   signOut: 'Uitloggen',
   // Words list

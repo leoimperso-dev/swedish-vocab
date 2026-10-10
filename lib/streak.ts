@@ -6,8 +6,6 @@
 // `lastSeenAt`, and a session no longer touches it.
 
 export const MAX_FREEZES = 2
-/** Freezes are handed back in full this often — one week. */
-export const FREEZE_REFILL_DAYS = 7
 
 export function toLocalDateString(date: Date, timezone: string): string {
   return date.toLocaleDateString('sv-SE', { timeZone: timezone }) // 'sv-SE' gives YYYY-MM-DD

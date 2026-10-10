@@ -5,7 +5,7 @@ import {
   getLevelForXp, levelLadder, levelTitle, xpToNextLevel,
 } from '@/lib/xp'
 import { ACHIEVEMENTS } from '@/lib/achievements'
-import { MAX_FREEZES, FREEZE_REFILL_DAYS } from '@/lib/streak'
+import { MAX_FREEZES } from '@/lib/streak'
 import { asLang, getStrings } from '@/lib/i18n'
 import { cn } from '@/lib/utils'
 import { revalidatePath } from 'next/cache'
@@ -277,7 +277,7 @@ export default async function ProfilePage() {
           </form>
           <div className="mt-3 flex items-start gap-2 rounded-xl bg-freeze-soft p-3">
             <Snowflake size={16} className="mt-0.5 shrink-0 text-freeze" />
-            <p className="text-xs text-freeze">{t.freezeInfo(user.freezeCount, MAX_FREEZES, FREEZE_REFILL_DAYS)}</p>
+            <p className="text-xs text-freeze">{t.freezeInfo(user.freezeCount, MAX_FREEZES)}</p>
           </div>
         </Card>
 
