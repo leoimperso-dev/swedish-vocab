@@ -22,6 +22,7 @@ const ENGLISH_NAME: Record<Lang, string> = {
   en: 'English',
   nl: 'Dutch',
   es: 'Spanish',
+  de: 'German',
 }
 
 // What each band may hear, in the model's own terms. Without this a model

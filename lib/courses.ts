@@ -8,12 +8,12 @@
 //   speaks (native) and which one is being learned. It is derived from
 //   User.nativeLanguage + User.learningLanguage, not stored as its own entity.
 
-export type Lang = 'fr' | 'sv' | 'en' | 'nl' | 'es'
+export type Lang = 'fr' | 'sv' | 'en' | 'nl' | 'es' | 'de'
 
 // Every language the app touches, for the settings that are not course-scoped
-export const LANGS: readonly Lang[] = ['fr', 'sv', 'en', 'nl', 'es']
+export const LANGS: readonly Lang[] = ['fr', 'sv', 'en', 'nl', 'es', 'de']
 
-export type PairId = 'sv-fr' | 'en-fr' | 'nl-fr' | 'es-fr'
+export type PairId = 'sv-fr' | 'en-fr' | 'nl-fr' | 'es-fr' | 'de-fr'
 
 export interface Pair {
   term: Lang // language of Word.term / Story.title
@@ -25,13 +25,14 @@ export const PAIRS: Record<PairId, Pair> = {
   'en-fr': { term: 'en', translation: 'fr' },
   'nl-fr': { term: 'nl', translation: 'fr' },
   'es-fr': { term: 'es', translation: 'fr' },
+  'de-fr': { term: 'de', translation: 'fr' },
 }
 
 export const DEFAULT_PAIR: PairId = 'sv-fr'
 
 // Rows carry `pair` as a plain string, so narrow it before use
 export function asPairId(value: string | null | undefined): PairId {
-  return value === 'sv-fr' || value === 'en-fr' || value === 'nl-fr' || value === 'es-fr' ? value : DEFAULT_PAIR
+  return value === 'sv-fr' || value === 'en-fr' || value === 'nl-fr' || value === 'es-fr' || value === 'de-fr' ? value : DEFAULT_PAIR
 }
 
 export function pairOf(value: string | null | undefined): Pair {
@@ -50,8 +51,10 @@ export const COURSES: Course[] = [
   { native: 'fr', learned: 'en', pair: 'en-fr' },
   { native: 'fr', learned: 'nl', pair: 'nl-fr' },
   { native: 'fr', learned: 'es', pair: 'es-fr' },
+  { native: 'fr', learned: 'de', pair: 'de-fr' },
   { native: 'sv', learned: 'fr', pair: 'sv-fr' },
   { native: 'en', learned: 'fr', pair: 'en-fr' },
+  { native: 'de', learned: 'fr', pair: 'de-fr' },
 ]
 
 export const DEFAULT_COURSE: Course = COURSES[0]
@@ -63,7 +66,7 @@ export function asLangOrDefault(value: string | null | undefined): Lang {
 
 // Translation direction of an exercise — absolute, so each keeps its own SM-2
 // progression regardless of which side the user reads the interface in.
-export type Direction = 'SV_FR' | 'FR_SV' | 'EN_FR' | 'FR_EN'
+export type Direction = 'SV_FR' | 'FR_SV' | 'EN_FR' | 'FR_EN' | 'DE_FR' | 'FR_DE'
 
 // What the learner asked a session to drill. 'MIXED' is not a direction: it
 // draws each card in the direction it is actually scheduled in, so one session
@@ -137,6 +140,7 @@ const LOCALES: Record<Lang, string> = {
   en: 'en-GB',
   nl: 'nl-NL',
   es: 'es-ES',
+  de: 'de-DE',
 }
 
 export function localeOf(lang: Lang): string {
@@ -151,6 +155,7 @@ const FLAGS: Record<Lang, string> = {
   en: '🇬🇧',
   nl: '🇳🇱',
   es: '🇪🇸',
+  de: '🇩🇪',
 }
 
 export function flagOf(lang: Lang): string {
@@ -164,6 +169,7 @@ const VERB_FORMS: Partial<Record<Lang, readonly string[]>> = {
   en: ['past', 'pastParticiple'],
   nl: ['past', 'pastParticiple'],
   es: ['past', 'pastParticiple'],
+  de: ['past', 'pastParticiple'],
 }
 
 export function verbFormsFor(lang: Lang): readonly string[] {

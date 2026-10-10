@@ -37,6 +37,10 @@ export const SERVER_VOICES: Record<string, readonly ServerVoice[]> = {
     { id: 'es-ES-ElviraNeural', label: 'Elvira', gender: 'female' },
     { id: 'es-ES-AlvaroNeural', label: 'Álvaro', gender: 'male' },
   ],
+  de: [
+    { id: 'de-DE-KatjaNeural', label: 'Katja', gender: 'female' },
+    { id: 'de-DE-ConradNeural', label: 'Conrad', gender: 'male' },
+  ],
 }
 
 export function langOf(locale: string): string {

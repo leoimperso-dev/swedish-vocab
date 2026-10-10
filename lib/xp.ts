@@ -20,6 +20,7 @@ const TITLES: Record<Lang, readonly string[]> = {
   nl: ['Beginner', 'Leerling', 'Student', 'Spreker', 'Gevorderd', 'Expert', 'Meester'],
   es: ['Principiante', 'Aprendiz', 'Estudiante', 'Hablante', 'Avanzado', 'Experto', 'Maestro'],
   fr: ['Débutant', 'Apprenti', 'Étudiant', 'Locuteur', 'Avancé', 'Expert', 'Maître'],
+  de: ['Anfänger', 'Lernender', 'Student', 'Sprecher', 'Fortgeschritten', 'Experte', 'Meister'],
 }
 
 // A full session is worth ~20 XP, so anything under 15 is reached before the

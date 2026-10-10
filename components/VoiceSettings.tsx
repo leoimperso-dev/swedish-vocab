@@ -22,6 +22,7 @@ const SAMPLE: Record<Lang, string> = {
   en: 'Hello, this is what I sound like.',
   nl: 'Hallo, zo klink ik.',
   es: 'Hola, así es como sueno.',
+  de: 'Hallo, so klinge ich.',
 }
 
 /** "Google svenska — sv-SE, en ligne" — enough to tell two voices apart. */

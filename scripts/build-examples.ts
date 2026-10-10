@@ -15,7 +15,7 @@ const MIN_LEN = 12
 const MAX_LEN = 140
 
 // Tatoeba uses ISO 639-3 codes in its file names
-const TATOEBA_CODE: Record<Lang, string> = { sv: 'swe', fr: 'fra', en: 'eng', nl: 'nld', es: 'spa' }
+const TATOEBA_CODE: Record<Lang, string> = { sv: 'swe', fr: 'fra', en: 'eng', nl: 'nld', es: 'spa', de: 'deu' }
 
 // `manual` marks a sentence added by hand (scripts/add-example.ts). This script
 // rewrites the whole array for a word, so those have to be carried over or a

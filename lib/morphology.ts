@@ -535,6 +535,216 @@ function spanishCandidates(token: string, depth = 0): string[] {
   return out
 }
 
+const DE_IRREGULARS: Record<string, string> = {
+  // sein
+  bin: 'sein', bist: 'sein', ist: 'sein', sind: 'sein', seid: 'sein',
+  war: 'sein', warst: 'sein', waren: 'sein', wart: 'sein', gewesen: 'sein',
+  sei: 'sein', wäre: 'sein', wären: 'sein', wärst: 'sein',
+  // haben
+  hast: 'haben', hat: 'haben', habt: 'haben',
+  hatte: 'haben', hattest: 'haben', hatten: 'haben', hattet: 'haben', gehabt: 'haben',
+  hätte: 'haben', hätten: 'haben', hättest: 'haben',
+  // werden
+  wirst: 'werden', wird: 'werden', werdet: 'werden',
+  wurde: 'werden', wurdest: 'werden', wurden: 'werden', wurdet: 'werden', geworden: 'werden',
+  // können
+  kann: 'können', kannst: 'können', könnt: 'können',
+  konnte: 'können', konntest: 'können', konnten: 'können', konntet: 'können', gekonnt: 'können',
+  könnte: 'können', könntest: 'können', könnten: 'können',
+  // müssen
+  muss: 'müssen', musst: 'müssen', müsst: 'müssen',
+  musste: 'müssen', musstest: 'müssen', mussten: 'müssen', gemusst: 'müssen',
+  müsste: 'müssen', müsstest: 'müssen', müssten: 'müssen',
+  // wollen
+  will: 'wollen', willst: 'wollen', wollt: 'wollen',
+  wollte: 'wollen', wolltest: 'wollen', wollten: 'wollen', gewollt: 'wollen',
+  // sollen
+  soll: 'sollen', sollst: 'sollen', sollt: 'sollen',
+  sollte: 'sollen', solltest: 'sollen', sollten: 'sollen', gesollt: 'sollen',
+  // dürfen
+  darf: 'dürfen', darfst: 'dürfen', dürft: 'dürfen',
+  durfte: 'dürfen', durftest: 'dürfen', durften: 'dürfen', gedurft: 'dürfen',
+  dürfte: 'dürfen', dürftest: 'dürfen', dürften: 'dürfen',
+  // mögen
+  mag: 'mögen', magst: 'mögen', mögt: 'mögen',
+  mochte: 'mögen', mochtest: 'mögen', mochten: 'mögen', gemocht: 'mögen',
+  möchte: 'mögen', möchtest: 'mögen', möchten: 'mögen',
+  // gehen
+  gehst: 'gehen', geht: 'gehen',
+  ging: 'gehen', gingst: 'gehen', gingen: 'gehen', gegangen: 'gehen',
+  // kommen
+  kommst: 'kommen', kommt: 'kommen',
+  kam: 'kommen', kamst: 'kommen', kamen: 'kommen', gekommen: 'kommen',
+  // geben
+  gibst: 'geben', gibt: 'geben',
+  gab: 'geben', gabst: 'geben', gaben: 'geben', gegeben: 'geben',
+  // sehen
+  siehst: 'sehen', sieht: 'sehen',
+  sah: 'sehen', sahst: 'sehen', sahen: 'sehen', gesehen: 'sehen',
+  // stehen
+  stehst: 'stehen', steht: 'stehen',
+  stand: 'stehen', standst: 'stehen', standen: 'stehen', gestanden: 'stehen',
+  // wissen
+  weiß: 'wissen', weißt: 'wissen', wisst: 'wissen',
+  wusste: 'wissen', wusstest: 'wissen', wussten: 'wissen', gewusst: 'wissen',
+  // lassen
+  lässt: 'lassen', ließ: 'lassen', ließt: 'lassen', ließen: 'lassen', gelassen: 'lassen',
+  // nehmen
+  nimmst: 'nehmen', nimmt: 'nehmen',
+  nahm: 'nehmen', nahmst: 'nehmen', nahmen: 'nehmen', genommen: 'nehmen',
+  // fahren
+  fährst: 'fahren', fährt: 'fahren',
+  fuhr: 'fahren', fuhrst: 'fahren', fuhren: 'fahren', gefahren: 'fahren',
+  // tragen
+  trägst: 'tragen', trägt: 'tragen',
+  trug: 'tragen', trugst: 'tragen', trugen: 'tragen', getragen: 'tragen',
+  // schlagen
+  schlägst: 'schlagen', schlägt: 'schlagen',
+  schlug: 'schlagen', schlugst: 'schlagen', schlugen: 'schlagen', geschlagen: 'schlagen',
+  // laufen
+  läufst: 'laufen', läuft: 'laufen',
+  lief: 'laufen', liefst: 'laufen', liefen: 'laufen', gelaufen: 'laufen',
+  // halten
+  hältst: 'halten', hält: 'halten',
+  hielt: 'halten', hieltest: 'halten', hielten: 'halten', gehalten: 'halten',
+  // fallen
+  fällst: 'fallen', fällt: 'fallen',
+  fiel: 'fallen', fielst: 'fallen', fielen: 'fallen', gefallen: 'fallen',
+  // rufen
+  rief: 'rufen', riefst: 'rufen', riefen: 'rufen', gerufen: 'rufen',
+  // schreiben
+  schrieb: 'schreiben', schriebst: 'schreiben', schrieben: 'schreiben', geschrieben: 'schreiben',
+  // bleiben
+  blieb: 'bleiben', bliebst: 'bleiben', blieben: 'bleiben', geblieben: 'bleiben',
+  // treffen
+  triffst: 'treffen', trifft: 'treffen',
+  traf: 'treffen', trafst: 'treffen', trafen: 'treffen', getroffen: 'treffen',
+  // sprechen
+  sprichst: 'sprechen', spricht: 'sprechen',
+  sprach: 'sprechen', sprachst: 'sprechen', sprachen: 'sprechen', gesprochen: 'sprechen',
+  // helfen
+  hilfst: 'helfen', hilft: 'helfen',
+  half: 'helfen', halfst: 'helfen', halfen: 'helfen', geholfen: 'helfen',
+  // sterben
+  stirbst: 'sterben', stirbt: 'sterben',
+  starb: 'sterben', starbst: 'sterben', starben: 'sterben', gestorben: 'sterben',
+  // werfen
+  wirfst: 'werfen', wirft: 'werfen',
+  warf: 'werfen', warfst: 'werfen', warfen: 'werfen', geworfen: 'werfen',
+  // essen
+  isst: 'essen', esst: 'essen',
+  aß: 'essen', aßt: 'essen', aßen: 'essen', gegessen: 'essen',
+  // lesen
+  liest: 'lesen', lest: 'lesen',
+  las: 'lesen', last: 'lesen', lasen: 'lesen', gelesen: 'lesen',
+  // sitzen
+  sitzt: 'sitzen', saß: 'sitzen', saßt: 'sitzen', saßen: 'sitzen', gesessen: 'sitzen',
+  // liegen
+  liegt: 'liegen', lag: 'liegen', lagt: 'liegen', lagen: 'liegen', gelegen: 'liegen',
+  // finden
+  fand: 'finden', fandst: 'finden', fanden: 'finden', gefunden: 'finden',
+  // trinken
+  trank: 'trinken', trankst: 'trinken', tranken: 'trinken', getrunken: 'trinken',
+  // beginnen
+  begann: 'beginnen', begannen: 'beginnen', begonnen: 'beginnen',
+  // gewinnen
+  gewann: 'gewinnen', gewannen: 'gewinnen', gewonnen: 'gewinnen',
+  // fliegen
+  flog: 'fliegen', flogst: 'fliegen', flogen: 'fliegen', geflogen: 'fliegen',
+  // ziehen
+  zog: 'ziehen', zogst: 'ziehen', zogen: 'ziehen', gezogen: 'ziehen',
+  // stoßen
+  stößt: 'stoßen', stieß: 'stoßen', stießen: 'stoßen', gestoßen: 'stoßen',
+  // fließen
+  fließt: 'fließen', floss: 'fließen', flossen: 'fließen', geflossen: 'fließen',
+  // heißen
+  heißt: 'heißen', hieß: 'heißen', hießen: 'heißen', geheißen: 'heißen',
+  // hängen
+  hängt: 'hängen', hing: 'hängen', hingen: 'hängen', gehangen: 'hängen',
+  // bringen
+  brachte: 'bringen', brachtest: 'bringen', brachten: 'bringen', gebracht: 'bringen',
+  // denken
+  dachte: 'denken', dachtest: 'denken', dachten: 'denken', gedacht: 'denken',
+  // kennen
+  kannte: 'kennen', kanntest: 'kennen', kannten: 'kennen', gekannt: 'kennen',
+  // nennen
+  nannte: 'nennen', nanntest: 'nennen', nannten: 'nennen', genannt: 'nennen',
+  // rennen
+  rannte: 'rennen', ranntest: 'rennen', rannten: 'rennen', gerannt: 'rennen',
+  // tun
+  tust: 'tun', tut: 'tun', tat: 'tun', tatst: 'tun', taten: 'tun', getan: 'tun',
+  // stehlen
+  stiehlst: 'stehlen', stiehlt: 'stehlen',
+  stahl: 'stehlen', stahlst: 'stehlen', stahlen: 'stehlen', gestohlen: 'stehlen',
+  // empfehlen
+  empfiehlst: 'empfehlen', empfiehlt: 'empfehlen',
+  empfahl: 'empfehlen', empfahlst: 'empfehlen', empfahlen: 'empfehlen', empfohlen: 'empfehlen',
+  // singen
+  sang: 'singen', sangen: 'singen', gesungen: 'singen',
+  // springen
+  sprang: 'springen', sprangen: 'springen', gesprungen: 'springen',
+  // schwimmen
+  schwamm: 'schwimmen', schwammen: 'schwimmen', geschwommen: 'schwimmen',
+  // heben
+  hob: 'heben', hobst: 'heben', hoben: 'heben', gehoben: 'heben',
+  // bitten
+  bat: 'bitten', batst: 'bitten', baten: 'bitten', gebeten: 'bitten',
+  // schießen
+  schoss: 'schießen', schossen: 'schießen', geschossen: 'schießen',
+}
+
+const DE_DERIVATIONS: Array<[suffix: string, base: (stem: string) => string[]]> = [
+  ['igkeiten', stem => [stem + 'igkeit', stem + 'ig']],
+  ['igkeit', stem => [stem + 'ig', stem]],
+  ['heiten', stem => [stem + 'heit', stem]],
+  ['heit', stem => [stem]],
+  ['keiten', stem => [stem + 'keit', stem]],
+  ['keit', stem => [stem]],
+  ['schaften', stem => [stem + 'schaft']],
+  ['schaft', stem => [stem]],
+  ['ungen', stem => [stem + 'ung', stem + 'en']],
+  ['ung', stem => [stem + 'en', stem]],
+  ['lichen', stem => [stem + 'lich']],
+  ['lichem', stem => [stem + 'lich']],
+  ['licher', stem => [stem + 'lich']],
+  ['liches', stem => [stem + 'lich']],
+  ['liche', stem => [stem + 'lich', stem]],
+  ['lich', stem => [stem]],
+  ['baren', stem => [stem + 'bar']],
+  ['barem', stem => [stem + 'bar']],
+  ['barer', stem => [stem + 'bar']],
+  ['bares', stem => [stem + 'bar']],
+  ['bare', stem => [stem + 'bar', stem]],
+  ['bar', stem => [stem]],
+]
+
+const DE_STRIP_SUFFIXES = [
+  'igkeiten', 'ischsten', 'lichsten', 'heiten', 'keiten', 'schaften', 'ungen',
+  'enden', 'endem', 'ender', 'endes', 'ende',
+  'esten', 'stem', 'sten', 'ster', 'stes', 'ste',
+  'test', 'tet', 'ten', 'est', 'em', 'en', 'er', 'es',
+  'te', 'st', 't', 'e', 'n', 's',
+]
+
+function germanCandidates(token: string): string[] {
+  const out: string[] = []
+  if (DE_IRREGULARS[token]) out.push(DE_IRREGULARS[token])
+  for (const [suffix, base] of DE_DERIVATIONS) {
+    if (!token.endsWith(suffix)) continue
+    const stem = token.slice(0, -suffix.length)
+    if (stem.length >= 3) out.push(...base(stem))
+  }
+  // Try infinitive directly (imperative / bare stem)
+  out.push(token + 'en', token + 'n')
+  for (const suffix of DE_STRIP_SUFFIXES) {
+    if (!token.endsWith(suffix)) continue
+    const stem = token.slice(0, -suffix.length)
+    if (stem.length < 3) continue
+    out.push(stem, stem + 'en', stem + 'n', stem + 'e')
+  }
+  return out
+}
+
 // A compound's head is a real word; a derivational suffix is not, even when it
 // happens to spell one. Splitting "kortademigheid" into "kortademig" + "heid"
 // resolved "heid" to "heiden" and answered "un païen" — the tail of a derived
@@ -548,6 +758,11 @@ const DERIVATIONAL_TAILS: Partial<Record<Lang, Set<string>>> = {
     'het', 'heten', 'heter', 'ning', 'ningen', 'ningar', 'lig', 'ligt', 'liga',
     'lös', 'löst', 'skap', 'dom', 'else', 'ande', 'ende', 'are', 'eri', 'aktig',
   ]),
+  de: new Set([
+    'ung', 'ungen', 'heit', 'heiten', 'keit', 'keiten',
+    'schaft', 'schaften', 'lich', 'liche', 'bar', 'bare',
+    'ig', 'ige', 'isch', 'ische', 'nis', 'nisse',
+  ]),
 }
 
 export function isDerivationalTail(token: string, lang: Lang): boolean {
@@ -560,6 +775,7 @@ export function lemmaCandidates(token: string, lang: Lang): string[] {
   if (lang === 'en') return englishCandidates(token)
   if (lang === 'nl') return dutchCandidates(token)
   if (lang === 'es') return spanishCandidates(token)
+  if (lang === 'de') return germanCandidates(token)
   return []
 }
 
@@ -569,6 +785,7 @@ const HEADWORD_PREFIX: Partial<Record<Lang, RegExp>> = {
   en: /^to\s+/,
   nl: /^(de|het)\s+/,
   es: /^(el|la|los|las)\s+/,
+  de: /^(der|die|das)\s+/,
 }
 
 export function headwordKey(raw: string, lang: Lang): string {

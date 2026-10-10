@@ -45,6 +45,11 @@ const BLOCKED: Record<Lang, string[]> = {
     'erektion', 'penis', 'kuk', 'fitta', 'onanera', 'orgasm', 'porr', 'kondom',
     'knulla', 'hora', 'horan', 'våldtäkt', 'våldta', 'självmord',
   ],
+  de: [
+    'erektion', 'penis', 'vagina', 'masturbieren', 'orgasmus', 'porno', 'kondom',
+    'titten', 'ficken', 'scheiße', 'hure', 'nutte', 'vergewaltigung', 'vergewaltigen',
+    'selbstmord', 'suizid',
+  ],
 }
 
 const tokens = (s: string) => s.toLowerCase().split(/[^\p{L}\p{N}]+/u).filter(Boolean)
