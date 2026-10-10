@@ -143,17 +143,26 @@ async function nameOf(userId: string): Promise<string> {
   return user?.name ?? '?'
 }
 
-/** A notification is written in the recipient's interface language, not the sender's. */
-async function stringsFor(userId: string) {
-  const user = await db.user.findUnique({ where: { id: userId }, select: { nativeLanguage: true } })
-  return getStrings(user?.nativeLanguage)
+/**
+ * The recipient's interface language — a notification is written in theirs,
+ * not the sender's — and whether they still want duel pushes at all. Both in
+ * one read, since every duel notification needs the pair.
+ */
+async function duelRecipient(userId: string) {
+  const user = await db.user.findUnique({
+    where: { id: userId },
+    select: { nativeLanguage: true, duelNotifications: true },
+  })
+  return { t: getStrings(user?.nativeLanguage), wants: user?.duelNotifications ?? true }
 }
 
 async function notifyTurn(duelId: string, toUserId: string, fromUserId: string) {
   // The player who just moved may also be the one to move next (they open the
   // next round) — no point pinging someone about their own move.
   if (toUserId === fromUserId) return
-  const [t, name] = await Promise.all([stringsFor(toUserId), nameOf(fromUserId)])
+  const { t, wants } = await duelRecipient(toUserId)
+  if (!wants) return
+  const name = await nameOf(fromUserId)
   await notify(toUserId, {
     title: t.pushTurnTitle(name),
     body: t.pushTurnBody,
@@ -168,7 +177,9 @@ async function notifyFinished(
   fromUserId: string,
   winnerId: string | null,
 ) {
-  const [t, name] = await Promise.all([stringsFor(toUserId), nameOf(fromUserId)])
+  const { t, wants } = await duelRecipient(toUserId)
+  if (!wants) return
+  const name = await nameOf(fromUserId)
   await notify(toUserId, {
     title: t.pushDuelOverTitle(name),
     body: winnerId === null ? t.duelDraw : winnerId === toUserId ? t.duelWon : t.duelLost,

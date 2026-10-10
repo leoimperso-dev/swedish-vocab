@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useState, useSyncExternalStore } from 'react'
 import { Bell, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/primitives'
@@ -13,6 +13,19 @@ const SNOOZE_KEY = 'push-banner-snoozed-until'
 // no reminder and no duel turn at all, so the nudge has to come back.
 const SNOOZE_DAYS = 7
 
+// Nothing mutates the stored value behind our back — a dismissal re-renders
+// through its own state — so the subscription is a no-op
+const noSubscription = () => () => {}
+
+function snoozeStillRunning(): boolean {
+  try {
+    const until = Number(window.localStorage.getItem(SNOOZE_KEY))
+    return Number.isFinite(until) && until > Date.now()
+  } catch {
+    return false
+  }
+}
+
 /**
  * Asks for Web Push where it will actually be seen.
  *
@@ -23,20 +36,13 @@ const SNOOZE_DAYS = 7
 export function PushBanner() {
   const t = getStrings(useLang())
   const { state, busy, enable } = usePush()
-  // Starts hidden so the first client render matches the server's
-  const [snoozed, setSnoozed] = useState(true)
-
-  useEffect(() => {
-    try {
-      const until = Number(window.localStorage.getItem(SNOOZE_KEY))
-      setSnoozed(Number.isFinite(until) && until > Date.now())
-    } catch {
-      setSnoozed(false)
-    }
-  }, [])
+  // Local storage is not React state, and the server has none to read: the
+  // third argument keeps the banner hidden there, so the markup matches
+  const snoozed = useSyncExternalStore(noSubscription, snoozeStillRunning, () => true)
+  const [dismissed, setDismissed] = useState(false)
 
   const dismiss = () => {
-    setSnoozed(true)
+    setDismissed(true)
     try {
       window.localStorage.setItem(SNOOZE_KEY, String(Date.now() + SNOOZE_DAYS * 86_400_000))
     } catch {}
@@ -44,7 +50,7 @@ export function PushBanner() {
 
   // Only shown where tapping changes something: already on, blocked in the
   // browser settings or plainly unsupported all have nothing to offer here
-  if (snoozed || (state !== 'off' && state !== 'ios-install')) return null
+  if (snoozed || dismissed || (state !== 'off' && state !== 'ios-install')) return null
 
   return (
     <Card className="border-info/30 bg-info-soft">

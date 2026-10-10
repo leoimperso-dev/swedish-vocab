@@ -18,6 +18,7 @@ import { LevelSettings } from '@/components/LevelSettings'
 import { VoiceSettings } from '@/components/VoiceSettings'
 import { MyReports, MyReportsTitle } from '@/components/MyReports'
 import { PushToggle } from '@/components/duel/PushToggle'
+import { DuelNotificationToggle } from '@/components/DuelNotificationToggle'
 import { ReminderSettings } from '@/components/ReminderSettings'
 import { pushEnabled } from '@/lib/push'
 import { asLangOrDefault, resolveCourse } from '@/lib/courses'
@@ -188,8 +189,12 @@ export default async function ProfilePage() {
           <>
             <Card>
               <CardTitle>{t.pushTitle}</CardTitle>
-              <div className="mt-3">
+              <div className="mt-3 space-y-3">
                 <PushToggle />
+                <div className="space-y-1.5 border-t border-border pt-3">
+                  <DuelNotificationToggle enabled={user.duelNotifications} />
+                  <p className="text-[11px] text-muted-foreground">{t.duelNotificationsHint}</p>
+                </div>
               </div>
             </Card>
             <Card>

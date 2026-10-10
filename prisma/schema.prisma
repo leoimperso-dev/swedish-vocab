@@ -49,6 +49,10 @@ model User {
   // one nobody ever turns on.
   reminderEnabled Boolean @default(true)
   reminderHour    Int     @default(21) // 0-23, in the user's own timezone
+  // Duel pushes (your turn, duel over). Separate from the daily nudge: wanting
+  // one is no reason to want the other. Dropping the device subscription
+  // silences both, this silences only duels.
+  duelNotifications Boolean @default(true)
   lastStudiedAt DateTime?
   // Last time the app was opened, study or not — shown on a public profile
   lastSeenAt    DateTime?
