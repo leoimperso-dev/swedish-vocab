@@ -1,0 +1,40 @@
+# Hourly trigger for the daily study reminder.
+#
+# The endpoint nudges each learner in the hour that matches their own
+# timezone and reminderHour, so it has to be called every hour — a single
+# daily call at a fixed UTC hour cannot serve a per-user local hour, and
+# would stop matching altogether at every daylight-saving change.
+#
+# Needs a CRON_SECRET repository secret (Settings > Secrets and variables >
+# Actions), the same value as the CRON_SECRET env var on Vercel.
+name: Study reminder
+
+on:
+  schedule:
+    - cron: '0 * * * *'
+  # Lets the job be run by hand from the Actions tab, to verify it works
+  workflow_dispatch:
+
+# Nothing here touches the repository
+permissions: {}
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Call the reminder endpoint
+        env:
+          # Read from the environment rather than interpolated into the
+          # command, so the value never lands in a log or an argument list
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+          APP_URL: https://swedish-vocab-chi.vercel.app
+        run: |
+          code=$(curl -sS -o body.txt -w '%{http_code}' \
+            -H "Authorization: Bearer $CRON_SECRET" \
+            "$APP_URL/api/cron/reminder")
+          # The body says how many learners were considered and notified —
+          # worth printing, it is the only trace of a run that sent nothing
+          echo "HTTP $code"
+          cat body.txt
+          [ "$code" = "200" ]
