@@ -30,6 +30,7 @@ const SOURCES: Array<{ file: string; pair: PairId }> = [
   { file: 'Dutch_wiki.txt', pair: 'nl-fr' },
   { file: 'Spanish_core.txt', pair: 'es-fr' },
   { file: 'Spanish_wiki.txt', pair: 'es-fr' },
+  { file: 'German_core.txt', pair: 'de-fr' },
 ]
 
 function parenthesised(term: string): string[] | null {

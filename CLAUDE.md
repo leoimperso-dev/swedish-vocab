@@ -444,6 +444,9 @@ the UI. Parenthesised forms are the verb's `(past, pastParticiple)`, the adjecti
 `(comparative, superlative)`, or a noun plural worth noting (`city (cities)`) — a plain `+s` is
 left out. `pnpm db:seed` is idempotent: `[pair, term, wordType, source]` is unique, so re-running it
 only inserts what's new (which also means two senses of one word must share a single entry).
+**But it re-inserts every row a DB-side fix removed or renamed** (`dedupe-words`, `fix-dutch-articles`,
+review deletions) since the raw files still carry them: a full seed on 2026-10-10 resurrected 3 309
+rows across sv/nl/es/en. To add one language, seed only its file, not `pnpm db:seed`.
 
 ## Error reports
 `ErrorReport` collects what learners flag as wrong, from the session header (every exercise
