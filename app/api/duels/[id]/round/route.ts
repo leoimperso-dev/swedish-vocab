@@ -6,8 +6,8 @@ import { buildExercises } from '@/lib/study/build'
 import { recordAnswer } from '@/lib/study/answer'
 import { finalizeSession } from '@/lib/study/finalize'
 import { courseDirections, defaultDirection, type Course, type Direction } from '@/lib/courses'
-import { BLITZ_SECONDS, DUEL_XP, ROUND_SIZE, scoreAnswer, type DuelMode } from '@/lib/duel/rules'
-import { isParticipant, submitRound } from '@/lib/duel/service'
+import { BLITZ_SECONDS, DUEL_MESSAGE_MAX, DUEL_XP, ROUND_SIZE, scoreAnswer, type DuelMode } from '@/lib/duel/rules'
+import { isParticipant, opponentOf, submitRound } from '@/lib/duel/service'
 import type { AnswerResult, ExerciseType } from '@/types'
 
 interface Ctx {
@@ -68,6 +68,11 @@ export async function POST(_req: NextRequest, { params }: Ctx) {
   })
 
   const studySession = await db.studySession.create({ data: { userId } })
+  // Named here so the summary screen can address the note to someone
+  const opponent = await db.user.findUnique({
+    where: { id: opponentOf(duel, userId) },
+    select: { name: true },
+  })
 
   return NextResponse.json({
     sessionId: studySession.id,
@@ -75,6 +80,7 @@ export async function POST(_req: NextRequest, { params }: Ctx) {
     mode: duel.mode as DuelMode,
     direction,
     exercises,
+    opponentName: opponent?.name ?? null,
   })
 }
 
@@ -167,4 +173,33 @@ export async function PUT(req: NextRequest, { params }: Ctx) {
   })
 
   return NextResponse.json({ ...duelResult, session: outcome })
+}
+
+/**
+ * Attaches a note to a round the caller has played.
+ *
+ * Separate from the submission on purpose: the round is banked first, so
+ * closing the tab at the summary screen costs the note and never the score.
+ */
+export async function PATCH(req: NextRequest, { params }: Ctx) {
+  const session = await auth()
+  if (!session?.user?.id) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  const userId = session.user.id
+  const { id } = await params
+
+  const body = (await req.json()) as { round?: unknown; message?: unknown }
+  if (typeof body.round !== 'number' || !Number.isInteger(body.round)) {
+    return NextResponse.json({ error: 'round must be an integer' }, { status: 400 })
+  }
+  const text = typeof body.message === 'string' ? body.message.trim().slice(0, DUEL_MESSAGE_MAX) : ''
+
+  // updateMany rather than update: the caller's id is part of the filter, so a
+  // round belonging to anyone else simply matches nothing
+  const { count } = await db.duelRound.updateMany({
+    where: { duelId: id, userId, round: body.round },
+    data: { message: text || null },
+  })
+  if (count === 0) return NextResponse.json({ error: 'Not found' }, { status: 404 })
+
+  return NextResponse.json({ ok: true })
 }

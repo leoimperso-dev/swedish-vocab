@@ -3,18 +3,18 @@
 import { use, useCallback, useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { Loader2, Swords, Timer } from 'lucide-react'
+import { Loader2, Send, Swords, Timer } from 'lucide-react'
 import MultipleChoice from '@/components/study/MultipleChoice'
 import TypingExercise from '@/components/study/TypingExercise'
 import ConjugationExercise from '@/components/study/ConjugationExercise'
 import ClozeExercise from '@/components/study/ClozeExercise'
 import ListeningExercise from '@/components/study/ListeningExercise'
 import { AppShell } from '@/components/AppShell'
-import { Card, ProgressBar } from '@/components/ui/primitives'
+import { Card, ProgressBar, SectionLabel, TextField } from '@/components/ui/primitives'
 import { Button, buttonClasses } from '@/components/ui/button'
 import { getStrings } from '@/lib/i18n'
 import { useLang } from '@/components/CourseProvider'
-import { blitzSeconds, scoreAnswer, type DuelMode } from '@/lib/duel/rules'
+import { blitzSeconds, scoreAnswer, DUEL_MESSAGE_MAX, type DuelMode } from '@/lib/duel/rules'
 import { cn } from '@/lib/utils'
 import type { AnswerResult, ExerciseType, ExerciseWord } from '@/types'
 import type { Direction } from '@/lib/courses'
@@ -25,6 +25,7 @@ interface RoundData {
   mode: DuelMode
   direction: Direction
   exercises: ExerciseWord[]
+  opponentName: string | null
 }
 
 interface SubmittedAnswer {
@@ -103,9 +104,10 @@ export default function PlayRoundPage({ params }: { params: Promise<{ id: string
   // costs points — and the score is shown right away.
   const settled = useRef<{ points: number; msLeft: number } | null>(null)
   const [earned, setEarned] = useState<number | null>(null)
-  const [pendingResult, setPendingResult] = useState<AnswerResult | null>(null)
-  // Reset when moving to the next exercise
-  useEffect(() => { setPendingResult(null) }, [index])
+  // Tagged with the exercise it was given on, so moving to the next one
+  // retires it without a reset: a stale result is simply not the current one
+  const [pending, setPending] = useState<{ index: number; result: AnswerResult } | null>(null)
+  const pendingResult = pending?.index === index ? pending.result : null
 
   const handleSubmitted = useCallback(
     (result: AnswerResult, msLeft: number) => {
@@ -185,7 +187,14 @@ export default function PlayRoundPage({ params }: { params: Promise<{ id: string
   }
 
   if (outcome || sending) {
-    return <RoundSummary duelId={id} outcome={outcome} />
+    return (
+      <RoundSummary
+        duelId={id}
+        outcome={outcome}
+        round={data.round}
+        opponentName={data.opponentName}
+      />
+    )
   }
 
   const current = data.exercises[index]
@@ -240,7 +249,7 @@ export default function PlayRoundPage({ params }: { params: Promise<{ id: string
             <Exercise
               exercise={current}
               fallbackDirection={data.direction}
-              onSubmitted={r => { handleSubmitted(r, 0); setPendingResult(r) }}
+              onSubmitted={r => { handleSubmitted(r, 0); setPending({ index, result: r }) }}
               onAnswer={r => handleAnswer(r, 0)}
               manualNext
             />
@@ -387,7 +396,17 @@ function BlitzTimer({
   )
 }
 
-function RoundSummary({ duelId, outcome }: { duelId: string; outcome: RoundResult | null }) {
+function RoundSummary({
+  duelId,
+  outcome,
+  round,
+  opponentName,
+}: {
+  duelId: string
+  outcome: RoundResult | null
+  round: number
+  opponentName: string | null
+}) {
   const t = getStrings(useLang())
 
   if (!outcome) {
@@ -423,10 +442,59 @@ function RoundSummary({ duelId, outcome }: { duelId: string; outcome: RoundResul
           )}
         </Card>
 
+        {/* The duel is over for good once it is finished — no one left to answer */}
+        {!outcome.duelFinished && <RoundMessage duelId={duelId} round={round} name={opponentName} />}
+
         <Link href={`/duels/${duelId}`} className={buttonClasses({ size: 'lg', className: 'w-full' })}>
           {t.duelBack}
         </Link>
       </div>
     </AppShell>
+  )
+}
+
+/**
+ * A word for the opponent, written once the round is already banked.
+ *
+ * Fire and forget: the round is safe either way, so a failed note is not worth
+ * dragging the player back into an error state over.
+ */
+function RoundMessage({ duelId, round, name }: { duelId: string; round: number; name: string | null }) {
+  const t = getStrings(useLang())
+  const [text, setText] = useState('')
+  const [sent, setSent] = useState(false)
+
+  if (sent) {
+    return (
+      <Card className="py-3 text-center">
+        <p className="text-xs text-muted-foreground">{t.duelMessageSent}</p>
+      </Card>
+    )
+  }
+
+  const send = () => {
+    if (!text.trim()) return
+    setSent(true)
+    void fetch(`/api/duels/${duelId}/round`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ round, message: text }),
+    }).catch(() => {})
+  }
+
+  return (
+    <Card className="space-y-3">
+      <SectionLabel>{t.duelLeaveMessage(name ?? '?')}</SectionLabel>
+      <TextField
+        value={text}
+        onChange={e => setText(e.target.value)}
+        onKeyDown={e => e.key === 'Enter' && send()}
+        placeholder={t.duelMessagePlaceholder}
+        maxLength={DUEL_MESSAGE_MAX}
+      />
+      <Button className="w-full" disabled={!text.trim()} onClick={send}>
+        <Send size={16} /> {t.duelMessageSend}
+      </Button>
+    </Card>
   )
 }

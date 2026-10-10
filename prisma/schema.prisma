@@ -388,6 +388,9 @@ model DuelRound {
   wrong    Int    @default(0)
   // The solo session this round was played as — its XP is the round's XP
   sessionId String?
+  // A short note for the opponent, written after playing. Capped at
+  // DUEL_MESSAGE_MAX (lib/duel/rules.ts); null when none was left.
+  message  String?
   playedAt DateTime @default(now())
 
   duel Duel @relation(fields: [duelId], references: [id], onDelete: Cascade)

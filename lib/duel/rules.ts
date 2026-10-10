@@ -145,3 +145,9 @@ export function maxRoundScore(mode: DuelMode): number {
 export function winsNeeded(rounds: number): number {
   return Math.floor(rounds / 2) + 1
 }
+
+/**
+ * Longest note a player can leave with a round. Short on purpose: this is a
+ * word across the table between rounds, not a conversation.
+ */
+export const DUEL_MESSAGE_MAX = 140

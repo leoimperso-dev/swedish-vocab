@@ -20,8 +20,18 @@ export interface DuelDetail {
   theirWins: number
   youWon: boolean | null
   opponent: { id: string; name: string | null; image: string | null }
-  /** One entry per round played by either side, oldest first. */
-  scoreboard: Array<{ round: number; yours: number | null; theirs: number | null }>
+  /**
+   * One entry per round played by either side, oldest first. Notes are not
+   * held back the way scores are: a word left after playing is meant to be
+   * read before the other side answers.
+   */
+  scoreboard: Array<{
+    round: number
+    yours: number | null
+    theirs: number | null
+    yourMessage: string | null
+    theirMessage: string | null
+  }>
 }
 
 export async function GET(_req: Request, { params }: Ctx) {
@@ -57,11 +67,17 @@ export async function GET(_req: Request, { params }: Ctx) {
     theirWins: youAreChallenger ? duel.opponentWins : duel.challengerWins,
     youWon: duel.status !== 'FINISHED' ? null : duel.winnerId === null ? null : duel.winnerId === userId,
     opponent: youAreChallenger ? duel.opponent : duel.challenger,
-    scoreboard: played.map(round => ({
-      round,
-      yours: duel.duelRounds.find(r => r.round === round && r.userId === userId)?.score ?? null,
-      theirs: duel.duelRounds.find(r => r.round === round && r.userId !== userId)?.score ?? null,
-    })),
+    scoreboard: played.map(round => {
+      const mine = duel.duelRounds.find(r => r.round === round && r.userId === userId)
+      const theirs = duel.duelRounds.find(r => r.round === round && r.userId !== userId)
+      return {
+        round,
+        yours: mine?.score ?? null,
+        theirs: theirs?.score ?? null,
+        yourMessage: mine?.message ?? null,
+        theirMessage: theirs?.message ?? null,
+      }
+    }),
   }
 
   return NextResponse.json(detail)

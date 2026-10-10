@@ -2,7 +2,7 @@
 
 import { use, useEffect, useState } from 'react'
 import Link from 'next/link'
-import { ChevronLeft, Loader2, Minus, Swords } from 'lucide-react'
+import { ChevronLeft, Loader2, MessageCircle, Minus, Swords } from 'lucide-react'
 import { AppShell } from '@/components/AppShell'
 import { Avatar } from '@/components/ui/avatar'
 import { Card, Chip, SectionLabel } from '@/components/ui/primitives'
@@ -47,6 +47,8 @@ export default function DuelPage({ params }: { params: Promise<{ id: string }> }
   const name = duel.opponent.name ?? '?'
   const over = duel.status !== 'ACTIVE'
   const verdict = duel.youWon === null ? t.duelDraw : duel.youWon ? t.duelWon : t.duelLost
+  // The scoreboard is oldest first, so the latest word is the last one in it
+  const lastWordFromThem = duel.scoreboard.findLast(r => r.theirMessage)?.theirMessage ?? null
 
   return (
     <AppShell
@@ -87,6 +89,17 @@ export default function DuelPage({ params }: { params: Promise<{ id: string }> }
           )}
         </Card>
 
+        {/* The last word they left, surfaced where it is read before playing
+            rather than only down in the scoreboard */}
+        {!over && duel.yourTurn && lastWordFromThem && (
+          <Card className="space-y-1.5 border-accent/30 bg-accent-soft">
+            <p className="flex items-center gap-1.5 text-[11px] font-semibold text-accent">
+              <MessageCircle size={12} /> {t.duelMessageFrom(name)}
+            </p>
+            <p className="text-sm italic">{lastWordFromThem}</p>
+          </Card>
+        )}
+
         {!over && duel.yourTurn && (
           <Link
             href={`/duels/${id}/play`}
@@ -108,27 +121,37 @@ export default function DuelPage({ params }: { params: Promise<{ id: string }> }
               const youWonRound = settled && row.yours! > row.theirs!
               const tied = settled && row.yours === row.theirs
               return (
-                <Card key={row.round} className="flex items-center gap-3 p-3">
-                  <span className="w-16 shrink-0 text-xs text-muted-foreground">
-                    {t.duelRoundOf(row.round, duel.rounds)}
-                  </span>
-                  <span
-                    className={cn(
-                      'flex-1 text-right font-display text-sm font-semibold tabular-nums',
-                      settled && (youWonRound ? 'text-success' : tied ? '' : 'text-muted-foreground'),
-                    )}
-                  >
-                    {row.yours === null ? '—' : settled ? t.duelPoints(row.yours) : '···'}
-                  </span>
-                  <Minus size={12} className="text-muted-foreground" />
-                  <span
-                    className={cn(
-                      'flex-1 font-display text-sm font-semibold tabular-nums',
-                      settled && (!youWonRound && !tied ? 'text-success' : 'text-muted-foreground'),
-                    )}
-                  >
-                    {row.theirs === null ? '—' : settled ? t.duelPoints(row.theirs) : '···'}
-                  </span>
+                <Card key={row.round} className="space-y-2 p-3">
+                  <div className="flex items-center gap-3">
+                    <span className="w-16 shrink-0 text-xs text-muted-foreground">
+                      {t.duelRoundOf(row.round, duel.rounds)}
+                    </span>
+                    <span
+                      className={cn(
+                        'flex-1 text-right font-display text-sm font-semibold tabular-nums',
+                        settled && (youWonRound ? 'text-success' : tied ? '' : 'text-muted-foreground'),
+                      )}
+                    >
+                      {row.yours === null ? '—' : settled ? t.duelPoints(row.yours) : '···'}
+                    </span>
+                    <Minus size={12} className="text-muted-foreground" />
+                    <span
+                      className={cn(
+                        'flex-1 font-display text-sm font-semibold tabular-nums',
+                        settled && (!youWonRound && !tied ? 'text-success' : 'text-muted-foreground'),
+                      )}
+                    >
+                      {row.theirs === null ? '—' : settled ? t.duelPoints(row.theirs) : '···'}
+                    </span>
+                  </div>
+                  {(row.yourMessage || row.theirMessage) && (
+                    <div className="space-y-1 border-t border-border pt-2">
+                      {row.yourMessage && (
+                        <RoundWord who={t.duelYourScore} text={row.yourMessage} />
+                      )}
+                      {row.theirMessage && <RoundWord who={name} text={row.theirMessage} />}
+                    </div>
+                  )}
                 </Card>
               )
             })
@@ -137,5 +160,17 @@ export default function DuelPage({ params }: { params: Promise<{ id: string }> }
 
       </div>
     </AppShell>
+  )
+}
+
+function RoundWord({ who, text }: { who: string; text: string }) {
+  return (
+    <p className="flex items-start gap-1.5 text-xs">
+      <MessageCircle size={12} className="mt-0.5 shrink-0 text-muted-foreground" />
+      <span className="min-w-0 break-words">
+        <span className="font-semibold">{who}</span>
+        <span className="text-muted-foreground"> · {text}</span>
+      </span>
+    </p>
   )
 }
