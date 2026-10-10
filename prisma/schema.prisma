@@ -42,7 +42,7 @@ model User {
   level         Int       @default(1)
   streakCurrent Int       @default(0)
   streakBest    Int       @default(0)
-  freezeCount   Int       @default(2) // streak freezes available (max 2, +1 every 7-day milestone)
+  freezeCount   Int       @default(2) // streak freezes left this week (refilled to MAX_FREEZES each week)
   dailyGoalXp   Int       @default(15)
   // Daily nudge, sent by the hourly cron to everyone whose local hour matches
   // and who has not studied yet that day. On by default: an opt-in reminder is

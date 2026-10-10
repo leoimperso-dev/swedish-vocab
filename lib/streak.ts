@@ -1,7 +1,13 @@
-// Streak logic — all comparisons in user's local timezone
+// Streak logic — all comparisons in the user's local timezone.
+//
+// The streak counts days the learner *showed up*, not days they finished a
+// session: revising a word list or reading a story is studying too, and none
+// of it closes a StudySession. It is therefore driven from the app layout, on
+// `lastSeenAt`, and a session no longer touches it.
 
 export const MAX_FREEZES = 2
-export const FREEZE_EARN_EVERY = 7 // regain 1 freeze at each 7-day streak milestone
+/** Freezes are handed back in full this often — one week. */
+export const FREEZE_REFILL_DAYS = 7
 
 export function toLocalDateString(date: Date, timezone: string): string {
   return date.toLocaleDateString('sv-SE', { timeZone: timezone }) // 'sv-SE' gives YYYY-MM-DD
@@ -12,16 +18,29 @@ function daysBetween(fromDay: string, toDay: string): number {
   return Math.round((Date.parse(toDay) - Date.parse(fromDay)) / 86400000)
 }
 
+/** Monday of the week a YYYY-MM-DD day falls in. */
+function weekOf(day: string): string {
+  const daysSinceMonday = (new Date(day).getUTCDay() + 6) % 7
+  return new Date(Date.parse(day) - daysSinceMonday * 86400000).toISOString().slice(0, 10)
+}
+
 export interface StreakUpdate {
   streakCurrent: number
   streakBest: number
   freezeCount: number
   freezesUsed: number
-  isFirstStudyOfDay: boolean
+  isFirstVisitOfDay: boolean
 }
 
+/**
+ * Advances the streak for a visit happening now.
+ *
+ * Freezes refill to MAX_FREEZES at the start of each week rather than being
+ * earned by milestones: a bad week used to leave someone defenceless for the
+ * next one, which punished exactly the person already struggling to come back.
+ */
 export function updateStreak(
-  lastStudiedAt: Date | null,
+  lastSeenAt: Date | null,
   streakCurrent: number,
   streakBest: number,
   timezone: string,
@@ -29,38 +48,39 @@ export function updateStreak(
 ): StreakUpdate {
   const today = toLocalDateString(new Date(), timezone)
 
-  if (!lastStudiedAt) {
+  if (!lastSeenAt) {
     return {
       streakCurrent: 1,
       streakBest: Math.max(1, streakBest),
-      freezeCount,
+      freezeCount: MAX_FREEZES,
       freezesUsed: 0,
-      isFirstStudyOfDay: true,
+      isFirstVisitOfDay: true,
     }
   }
 
-  const lastDay = toLocalDateString(lastStudiedAt, timezone)
+  const lastDay = toLocalDateString(lastSeenAt, timezone)
+  // A new week hands back the full allowance before any of it is spent
+  const freezes = weekOf(lastDay) === weekOf(today) ? freezeCount : MAX_FREEZES
+
   if (lastDay === today) {
-    // Already studied today — no change
-    return { streakCurrent, streakBest, freezeCount, freezesUsed: 0, isFirstStudyOfDay: false }
+    // Already seen today — the day is banked, nothing to advance
+    return { streakCurrent, streakBest, freezeCount: freezes, freezesUsed: 0, isFirstVisitOfDay: false }
   }
 
   const missedDays = daysBetween(lastDay, today) - 1
 
-  if (missedDays <= freezeCount) {
-    // Streak continues — consume one freeze per missed day (0 if studied yesterday)
+  if (missedDays <= freezes) {
+    // Streak continues — one freeze per missed day (none if seen yesterday)
     const newStreak = streakCurrent + 1
-    let newFreezes = freezeCount - missedDays
-    if (newStreak % FREEZE_EARN_EVERY === 0) newFreezes = Math.min(newFreezes + 1, MAX_FREEZES)
     return {
       streakCurrent: newStreak,
       streakBest: Math.max(newStreak, streakBest),
-      freezeCount: newFreezes,
+      freezeCount: freezes - missedDays,
       freezesUsed: missedDays,
-      isFirstStudyOfDay: true,
+      isFirstVisitOfDay: true,
     }
   }
 
-  // Too many missed days — reset (freezes are kept)
-  return { streakCurrent: 1, streakBest, freezeCount, freezesUsed: 0, isFirstStudyOfDay: true }
+  // Too many missed days — start again (the week's freezes are kept)
+  return { streakCurrent: 1, streakBest, freezeCount: freezes, freezesUsed: 0, isFirstVisitOfDay: true }
 }

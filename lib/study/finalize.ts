@@ -3,7 +3,7 @@
 // difference is the extra XP a duel can add on top.
 import { db } from '@/lib/db'
 import { calculateSessionXp, getLevelForXp } from '@/lib/xp'
-import { updateStreak, toLocalDateString } from '@/lib/streak'
+import { toLocalDateString } from '@/lib/streak'
 import { checkNewAchievements } from '@/lib/achievements'
 import type { AnswerResult } from '@/types'
 
@@ -33,13 +33,15 @@ export async function finalizeSession(
   })
   if (!user) return null
 
-  // Streak (freezes can absorb missed days)
-  const streakUpdate = updateStreak(
-    user.lastStudiedAt, user.streakCurrent, user.streakBest, user.timezone, user.freezeCount
-  )
+  // The streak belongs to the app layout now — it counts days the learner
+  // showed up, which a session cannot know about. Still needed here: whether
+  // this is the day's first session, which is what carries the XP bonus.
+  const isFirstStudyOfDay =
+    !user.lastStudiedAt ||
+    toLocalDateString(user.lastStudiedAt, user.timezone) !== toLocalDateString(new Date(), user.timezone)
 
   // XP
-  const { total: sessionXp, breakdown } = calculateSessionXp(results, streakUpdate.isFirstStudyOfDay)
+  const { total: sessionXp, breakdown } = calculateSessionXp(results, isFirstStudyOfDay)
   const xpGained = sessionXp + extraXp
   const newXp = user.xp + xpGained
   const oldLevel = user.level
@@ -64,7 +66,7 @@ export async function finalizeSession(
   const unlockedSlugs = user.achievements.map(ua => ua.achievement.slug)
   const newAchievements = checkNewAchievements(unlockedSlugs, {
     totalWordsStudied: studiedRows.length,
-    streakCurrent: streakUpdate.streakCurrent,
+    streakCurrent: user.streakCurrent,
     wordsStudiedToday: todayRows.length,
     masteredVerbCount: masteredVerbRows.length,
     sessionPerfect: results.every(r => r === 'correct') && results.length >= 15,
@@ -91,9 +93,6 @@ export async function finalizeSession(
       data: {
         xp: newXp + achievementXp,
         level: newLevel,
-        streakCurrent: streakUpdate.streakCurrent,
-        streakBest: streakUpdate.streakBest,
-        freezeCount: streakUpdate.freezeCount,
         lastStudiedAt: new Date(),
       },
     }),
@@ -111,9 +110,11 @@ export async function finalizeSession(
     xpGained: xpGained + achievementXp,
     xpBreakdown: breakdown,
     newAchievements: newAchievements.map(a => ({ slug: a.slug, name: a.name, icon: a.icon })),
-    streakCurrent: streakUpdate.streakCurrent,
-    freezesUsed: streakUpdate.freezesUsed,
-    freezeCount: streakUpdate.freezeCount,
+    // Settled when the app was opened, not here — reported so the results
+    // screen can show the day's standing
+    streakCurrent: user.streakCurrent,
+    freezesUsed: 0,
+    freezeCount: user.freezeCount,
     dailyGoal: { goal: user.dailyGoalXp, xpToday, reached: xpToday >= user.dailyGoalXp },
     leveledUp: newLevel > oldLevel,
     newLevel,
