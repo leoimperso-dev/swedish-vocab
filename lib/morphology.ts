@@ -337,6 +337,10 @@ const ES_IRREGULARS: Record<string, string> = {
   compuesto: 'componer', compuesta: 'componer', yendo: 'ir', sos: 'ser',
   // The clitic rule strips accents with the pronoun: "oírte" arrives as "oir"
   oir: 'oír', reir: 'reír', sonreir: 'sonreír', freir: 'freír',
+  // Imperatives losing their accent before a clitic: "mantente", "deshazte", "vámonos"
+  manten: 'mantener', deten: 'detener', obten: 'obtener', sosten: 'sostener', conten: 'contener',
+  compon: 'componer', propon: 'proponer', supon: 'suponer', dispon: 'disponer', deshaz: 'deshacer',
+  vámonos: 'ir', vamonos: 'ir',
 }
 
 // Irregular preterite and subjunctive stems: "tuvimos" → "tener", "hagas" → "hacer"
@@ -345,7 +349,7 @@ const ES_IRREGULAR_STEMS: Record<string, string> = {
   pud: 'poder', pus: 'poner', pong: 'poner', sup: 'saber', sep: 'saber', quis: 'querer',
   vin: 'venir', veng: 'venir', dij: 'decir', dig: 'decir', traj: 'traer', traig: 'traer',
   salg: 'salir', hub: 'haber', hay: 'haber', cup: 'caber', quep: 'caber', vay: 'ir',
-  fu: 'ser', oig: 'oír', caig: 'caer', produj: 'producir', conduj: 'conducir', traduj: 'traducir',
+  fu: 'ser', oig: 'oír', caig: 'caer', duj: 'ducir',
 }
 
 // Verb endings, longest first (present, pretérito, imperfecto, futuro,
@@ -374,6 +378,29 @@ function deaccent(s: string): string {
   return s.replace(/á/g, 'a').replace(/é/g, 'e').replace(/í/g, 'i').replace(/ó/g, 'o').replace(/ú/g, 'u')
 }
 
+// Spelling changes that keep the sound before the ending
+function spanishSpellingShifts(stem: string): string[] {
+  const out: string[] = []
+  if (stem.endsWith('qu')) out.push(stem.slice(0, -2) + 'c')
+  if (stem.endsWith('gu')) out.push(stem.slice(0, -1))
+  if (stem.endsWith('c')) out.push(stem.slice(0, -1) + 'z')
+  if (stem.endsWith('z')) out.push(stem.slice(0, -1) + 'c')
+  if (stem.endsWith('j')) out.push(stem.slice(0, -1) + 'g')
+  return out
+}
+
+// Stem vowel changes of radical-changing verbs: "piens-" → "pens-", "cuelg-" → "colg-"
+function spanishVowelShifts(stem: string): string[] {
+  const out: string[] = []
+  const ie = stem.lastIndexOf('ie')
+  if (ie >= 0) out.push(stem.slice(0, ie) + 'e' + stem.slice(ie + 2))
+  const ue = stem.lastIndexOf('ue')
+  if (ue >= 0) out.push(stem.slice(0, ue) + 'o' + stem.slice(ue + 2))
+  const i = stem.lastIndexOf('i')
+  if (i >= 1) out.push(stem.slice(0, i) + 'e' + stem.slice(i + 1))
+  return out
+}
+
 // Spelling/diphthong variants of a verb stem: "pued-" → "pod-", "piens-" →
 // "pens-", "pid-" → "ped-", "saqu-" → "sac-", "llegu-" → "lleg-", "vec-" → "vez"
 function spanishStemVariants(stem: string): string[] {
@@ -387,11 +414,7 @@ function spanishStemVariants(stem: string): string[] {
   }
   const i = stem.lastIndexOf('i')
   if (i >= 1) out.add(stem.slice(0, i) + 'e' + stem.slice(i + 1))
-  if (stem.endsWith('qu')) out.add(stem.slice(0, -2) + 'c')
-  if (stem.endsWith('gu')) out.add(stem.slice(0, -1))
-  if (stem.endsWith('c')) out.add(stem.slice(0, -1) + 'z')
-  if (stem.endsWith('z')) out.add(stem.slice(0, -1) + 'c')
-  if (stem.endsWith('j')) out.add(stem.slice(0, -1) + 'g')
+  for (const variant of spanishSpellingShifts(stem)) out.add(variant)
   // "-ción" nouns lose their accent in the plural stem: "construccion(es)"
   if (stem.endsWith('ion')) out.add(stem.slice(0, -3) + 'ión')
   return [...out]
@@ -421,7 +444,12 @@ function spanishExtraStemVariants(stem: string): string[] {
   if (plain.endsWith('y')) bases.push(plain.slice(0, -1))
   // Only dormir and morir turn o into u: "durmiendo", "murieron"
   if (/^(durm|mur)/.test(plain)) bases.push(plain.replace('u', 'o'))
-  return [...new Set(bases.flatMap(spanishStemVariants))]
+  // A vowel change and a spelling change together: "comienc-" → "comenz-", "elij-" → "eleg-"
+  const combined = bases.flatMap(base => [
+    ...spanishVowelShifts(base).flatMap(spanishSpellingShifts),
+    ...spanishSpellingShifts(base).flatMap(spanishVowelShifts),
+  ])
+  return [...new Set([...bases.flatMap(spanishStemVariants), ...combined])]
 }
 
 const ES_ACCENTED: Record<string, string> = { a: 'á', e: 'é', i: 'í', o: 'ó', u: 'ú' }
@@ -473,11 +501,16 @@ function spanishCandidates(token: string, depth = 0): string[] {
   // its accents ("están", "tenés", "ésta"), irregular stems and stem changes.
   // A final accent is a verb ending ("topó" is not "topo"), never dropped whole.
   if (plain !== token && plain.at(-1) === token.at(-1)) out.push(plain)
+  // Plural of an irregular participle: "compuestos" → "componer"
+  if (token.endsWith('s') && ES_IRREGULARS[token.slice(0, -1)]) out.push(ES_IRREGULARS[token.slice(0, -1)])
   // Without accents only where the stress sits on the stem of a verb ("confía",
   // "actúa") or a plural moved it ("jóvenes"): "célebre" is not "celebrar"
   const forms = plain !== token && (/[íú]/.test(token) || token.endsWith('es')) ? [token, plain] : [token]
   for (const form of forms) {
-    for (const suffix of ['án', 'én', 'és', 'ís', 'íais', 'yendo', 'iesen', 'ieses', 'iese', ...ES_STRIP_SUFFIXES]) {
+    for (const suffix of ['án', 'én', 'és', 'ís', 'íais', 'yendo', 'iesen', 'ieses', 'iese',
+      // Preterite and -ra/-se subjunctive after "j"/"y"/"fu" stems: "construyeron", "fueran"
+      'eron', 'eran', 'eras', 'era', 'ésemos', 'esen', 'eses', 'ese', 'ásemos', 'asen', 'ases', 'ase',
+      ...ES_STRIP_SUFFIXES]) {
       if (!form.endsWith(suffix)) continue
       const stem = form.slice(0, -suffix.length)
       const irregular = spanishIrregularStem(stem)
