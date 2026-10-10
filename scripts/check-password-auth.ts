@@ -15,8 +15,8 @@ function check(label: string, ok: boolean) {
 }
 
 async function main() {
-  check('a short password is rejected', passwordProblem('abc') !== null)
-  check('an 8-char password is accepted', passwordProblem('hemlighet') === null)
+  check('a short password is rejected', passwordProblem('abc', 'fr') !== null)
+  check('an 8-char password is accepted', passwordProblem('hemlighet', 'fr') === null)
 
   const hash = await hashPassword('hemlighet')
   check('the hash is not the password', hash !== 'hemlighet')

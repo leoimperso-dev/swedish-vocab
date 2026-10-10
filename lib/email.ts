@@ -1,4 +1,5 @@
 import nodemailer from 'nodemailer'
+import { getStrings } from '@/lib/i18n'
 
 // Transactional email through Brevo's SMTP relay — the same provider Carnet de
 // champs sends from. Kept on port 587 with STARTTLS: 465 is blocked on more
@@ -60,22 +61,23 @@ export async function sendEmail({ to, subject, html, text }: EmailMessage): Prom
   }
 }
 
-export function passwordResetEmail(url: string, minutes: number): Omit<EmailMessage, 'to'> {
-  const text = `Tu as demandé un nouveau mot de passe pour Svenska.
+export function passwordResetEmail(url: string, minutes: number, lang: string | null | undefined): Omit<EmailMessage, 'to'> {
+  const t = getStrings(lang).auth
+  const text = `${t.emailIntro}
 
-Choisis-en un ici : ${url}
+${t.emailChooseHere} ${url}
 
-Ce lien expire dans ${minutes} minutes. Si tu n'as rien demandé, ignore cet email : ton mot de passe reste inchangé.`
+${t.emailExpires(minutes)} ${t.emailIgnore}`
 
   const html = `<div style="font-family:system-ui,-apple-system,'Segoe UI',sans-serif;font-size:15px;line-height:1.6;color:#1a1a1a">
-  <h1 style="font-size:20px;margin:0 0 16px">Nouveau mot de passe</h1>
-  <p style="margin:0 0 20px">Tu as demandé un nouveau mot de passe pour Svenska.</p>
+  <h1 style="font-size:20px;margin:0 0 16px">${t.emailTitle}</h1>
+  <p style="margin:0 0 20px">${t.emailIntro}</p>
   <p style="margin:0 0 24px">
-    <a href="${url}" style="display:inline-block;background:#005293;color:#fff;text-decoration:none;padding:12px 22px;border-radius:10px;font-weight:600">Choisir mon mot de passe</a>
+    <a href="${url}" style="display:inline-block;background:#005293;color:#fff;text-decoration:none;padding:12px 22px;border-radius:10px;font-weight:600">${t.emailButton}</a>
   </p>
-  <p style="margin:0 0 8px;color:#666;font-size:13px">Ce lien expire dans ${minutes} minutes.</p>
-  <p style="margin:0;color:#666;font-size:13px">Si tu n'as rien demandé, ignore cet email : ton mot de passe reste inchangé.</p>
+  <p style="margin:0 0 8px;color:#666;font-size:13px">${t.emailExpires(minutes)}</p>
+  <p style="margin:0;color:#666;font-size:13px">${t.emailIgnore}</p>
 </div>`
 
-  return { subject: 'Réinitialiser ton mot de passe Svenska', html, text }
+  return { subject: t.emailSubject, html, text }
 }

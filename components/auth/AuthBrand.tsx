@@ -1,5 +1,5 @@
 // Logo + wordmark shared by every screen of the (auth) group.
-export function AuthBrand() {
+export function AuthBrand({ tagline }: { tagline: string }) {
   return (
     <>
       <span className="mx-auto grid size-20 place-items-center rounded-3xl bg-gradient-nordic shadow-[var(--shadow-glow)]">
@@ -7,7 +7,7 @@ export function AuthBrand() {
       </span>
       <h1 className="text-hero-word mt-7">Svenska</h1>
       <p className="mt-3 text-base text-muted-foreground">
-        Apprends le suédois par la répétition espacée
+        {tagline}
       </p>
     </>
   )

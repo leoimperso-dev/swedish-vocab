@@ -5,6 +5,7 @@ import { db } from '@/lib/db'
 import { COURSES } from '@/lib/courses'
 import { isCefrLevel, levelFor } from '@/lib/cefr'
 import { revalidatePath } from 'next/cache'
+import { rememberLang } from '@/lib/ui-lang'
 
 // Switches the signed-in user to another course. The (native, learned) couple is
 // validated against the registry, so an unknown combination is a no-op.
@@ -19,6 +20,8 @@ export async function setCourse(native: string, learned: string) {
     where: { id: session.user.id },
     data: { nativeLanguage: course.native, learningLanguage: course.learned },
   })
+  // The login screen and <html lang> follow the interface the user last chose
+  await rememberLang(course.native)
   revalidatePath('/', 'layout')
 }
 

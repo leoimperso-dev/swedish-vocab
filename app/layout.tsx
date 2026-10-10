@@ -4,13 +4,13 @@ import './globals.css'
 import { SessionProvider } from 'next-auth/react'
 import { auth } from '@/auth'
 import ServiceWorkerRegister from '@/components/ServiceWorkerRegister'
+import { getStrings } from '@/lib/i18n'
+import { requestLang } from '@/lib/ui-lang'
 
 const inter = Inter({ subsets: ['latin'], variable: '--font-inter' })
 const spaceGrotesk = Space_Grotesk({ subsets: ['latin'], variable: '--font-space-grotesk' })
 
-export const metadata: Metadata = {
-  title: 'Svenska — Apprends le suédois',
-  description: 'Application de vocabulaire suédois avec répétition espacée',
+const metadataBase: Metadata = {
   manifest: '/manifest.json',
   // iOS ignores the manifest icons for the home screen and screenshots the page
   // instead unless an apple-touch-icon is declared.
@@ -24,6 +24,11 @@ export const metadata: Metadata = {
   },
 }
 
+export async function generateMetadata(): Promise<Metadata> {
+  const { tagline } = getStrings(await requestLang()).auth
+  return { ...metadataBase, title: `Svenska — ${tagline}`, description: tagline }
+}
+
 export const viewport: Viewport = {
   themeColor: '#0b0f19',
   width: 'device-width',
@@ -32,9 +37,9 @@ export const viewport: Viewport = {
 }
 
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
-  const session = await auth()
+  const [session, lang] = await Promise.all([auth(), requestLang()])
   return (
-    <html lang="fr">
+    <html lang={lang}>
       <body className={`${inter.variable} ${spaceGrotesk.variable} font-sans antialiased`}>
         <SessionProvider session={session}>
           {children}

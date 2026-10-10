@@ -15,6 +15,7 @@ import { Card, CardTitle, Chip, ProgressBar, SectionLabel } from '@/components/u
 import { Flag } from '@/components/ui/flags'
 import { xpByLanguage } from '@/lib/profile-stats'
 import { LevelSettings } from '@/components/LevelSettings'
+import { InterfaceLanguageSettings } from '@/components/InterfaceLanguageSettings'
 import { VoiceSettings } from '@/components/VoiceSettings'
 import { MyReports, MyReportsTitle } from '@/components/MyReports'
 import { PushToggle } from '@/components/duel/PushToggle'
@@ -171,6 +172,14 @@ export default async function ProfilePage() {
           {languages.length > 0 && (
             <p className="text-[11px] text-muted-foreground">{t.xpByLanguageEstimate}</p>
           )}
+        </Card>
+
+        {/* Interface language — switches to that language's course */}
+        <Card>
+          <CardTitle>{t.interfaceLanguage}</CardTitle>
+          <div className="mt-3">
+            <InterfaceLanguageSettings course={course} />
+          </div>
         </Card>
 
         {/* CEFR level, one per language the user can study */}

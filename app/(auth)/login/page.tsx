@@ -8,9 +8,11 @@ import { Button } from '@/components/ui/button'
 import { TextField } from '@/components/ui/primitives'
 import { GoogleIcon } from '@/components/auth/AuthBrand'
 import { AuthError, AuthLinks } from '@/components/auth/AuthForm'
+import { useAuthStrings } from '@/components/auth/AuthLang'
 
 export default function LoginPage() {
   const router = useRouter()
+  const t = useAuthStrings()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState<string | null>(null)
@@ -24,7 +26,7 @@ export default function LoginPage() {
     setLoading(false)
 
     if (res?.error) {
-      setError('Email ou mot de passe incorrect.')
+      setError(t.wrongCredentials)
       return
     }
     router.push('/dashboard')
@@ -35,7 +37,7 @@ export default function LoginPage() {
     <>
       <form onSubmit={handleSubmit} className="mt-9 space-y-3 text-left">
         <TextField
-          label="Email"
+          label={t.email}
           type="email"
           autoComplete="email"
           required
@@ -43,7 +45,7 @@ export default function LoginPage() {
           onChange={e => setEmail(e.target.value)}
         />
         <TextField
-          label="Mot de passe"
+          label={t.password}
           type="password"
           autoComplete="current-password"
           required
@@ -51,7 +53,7 @@ export default function LoginPage() {
           onChange={e => setPassword(e.target.value)}
         />
         <Button type="submit" size="lg" className="w-full" disabled={loading}>
-          {loading ? 'Connexion…' : 'Se connecter'}
+          {loading ? t.signingIn : t.signIn}
         </Button>
       </form>
 
@@ -59,7 +61,7 @@ export default function LoginPage() {
 
       <div className="my-6 flex items-center gap-3 text-xs text-muted-foreground/70">
         <span className="h-px flex-1 bg-border" />
-        ou
+        {t.or}
         <span className="h-px flex-1 bg-border" />
       </div>
 
@@ -70,19 +72,19 @@ export default function LoginPage() {
         className="w-full"
       >
         <GoogleIcon />
-        Continuer avec Google
+        {t.continueWithGoogle}
       </Button>
 
       <AuthLinks>
         <p>
           <Link href="/forgot-password" className="text-muted-foreground hover:underline">
-            Mot de passe oublié ?
+            {t.forgotPassword}
           </Link>
         </p>
         <p className="text-muted-foreground">
-          Pas encore de compte ?{' '}
+          {t.noAccount}{' '}
           <Link href="/signup" className="text-primary underline">
-            Créer un compte
+            {t.signUp}
           </Link>
         </p>
       </AuthLinks>

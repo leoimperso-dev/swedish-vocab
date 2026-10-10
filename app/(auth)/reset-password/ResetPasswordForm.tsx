@@ -7,10 +7,13 @@ import { signIn } from 'next-auth/react'
 import { Button } from '@/components/ui/button'
 import { TextField } from '@/components/ui/primitives'
 import { AuthError, AuthLinks } from '@/components/auth/AuthForm'
+import { useAuthLang, useAuthStrings } from '@/components/auth/AuthLang'
 import { MIN_PASSWORD_LENGTH } from '@/lib/auth/password'
 
 export function ResetPasswordForm({ token }: { token: string }) {
   const router = useRouter()
+  const lang = useAuthLang()
+  const t = useAuthStrings()
   const [password, setPassword] = useState('')
   const [confirm, setConfirm] = useState('')
   const [error, setError] = useState<string | null>(null)
@@ -19,7 +22,7 @@ export function ResetPasswordForm({ token }: { token: string }) {
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     if (password !== confirm) {
-      setError('Les deux mots de passe ne correspondent pas.')
+      setError(t.passwordsMismatch)
       return
     }
     setError(null)
@@ -28,12 +31,12 @@ export function ResetPasswordForm({ token }: { token: string }) {
     const res = await fetch('/api/password/reset', {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ token, password }),
+      body: JSON.stringify({ token, password, lang }),
     })
     const body = await res.json().catch(() => null)
 
     if (!res.ok) {
-      setError(body?.error ?? 'La modification a échoué.')
+      setError(body?.error ?? t.resetFailed)
       setLoading(false)
       return
     }
@@ -57,10 +60,10 @@ export function ResetPasswordForm({ token }: { token: string }) {
   if (!token) {
     return (
       <>
-        <AuthError>Ce lien est invalide ou a expiré.</AuthError>
+        <AuthError>{t.invalidLink}</AuthError>
         <AuthLinks>
           <Link href="/forgot-password" className="text-primary underline">
-            Demander un nouveau lien
+            {t.requestNewLink}
           </Link>
         </AuthLinks>
       </>
@@ -71,17 +74,17 @@ export function ResetPasswordForm({ token }: { token: string }) {
     <>
       <form onSubmit={handleSubmit} className="mt-9 space-y-3 text-left">
         <TextField
-          label="Nouveau mot de passe"
+          label={t.newPassword}
           type="password"
           autoComplete="new-password"
           required
           minLength={MIN_PASSWORD_LENGTH}
-          hint={`${MIN_PASSWORD_LENGTH} caractères minimum.`}
+          hint={t.passwordHint(MIN_PASSWORD_LENGTH)}
           value={password}
           onChange={e => setPassword(e.target.value)}
         />
         <TextField
-          label="Confirmer le mot de passe"
+          label={t.confirmPassword}
           type="password"
           autoComplete="new-password"
           required
@@ -90,7 +93,7 @@ export function ResetPasswordForm({ token }: { token: string }) {
           onChange={e => setConfirm(e.target.value)}
         />
         <Button type="submit" size="lg" className="w-full" disabled={loading}>
-          {loading ? 'Enregistrement…' : 'Enregistrer'}
+          {loading ? t.saving : t.save}
         </Button>
       </form>
 
@@ -98,7 +101,7 @@ export function ResetPasswordForm({ token }: { token: string }) {
 
       <AuthLinks>
         <Link href="/forgot-password" className="text-muted-foreground hover:underline">
-          Demander un nouveau lien
+          {t.requestNewLink}
         </Link>
       </AuthLinks>
     </>

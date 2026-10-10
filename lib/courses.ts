@@ -45,7 +45,8 @@ export interface Course {
   pair: PairId
 }
 
-// Dutch has no interface strings yet, so no nl-native course
+// Every native language needs a UI block in lib/i18n.ts. Content is X-fr only,
+// so a non-French native can only learn French.
 export const COURSES: Course[] = [
   { native: 'fr', learned: 'sv', pair: 'sv-fr' },
   { native: 'fr', learned: 'en', pair: 'en-fr' },
@@ -54,6 +55,8 @@ export const COURSES: Course[] = [
   { native: 'fr', learned: 'de', pair: 'de-fr' },
   { native: 'sv', learned: 'fr', pair: 'sv-fr' },
   { native: 'en', learned: 'fr', pair: 'en-fr' },
+  { native: 'nl', learned: 'fr', pair: 'nl-fr' },
+  { native: 'es', learned: 'fr', pair: 'es-fr' },
   { native: 'de', learned: 'fr', pair: 'de-fr' },
 ]
 
@@ -66,7 +69,8 @@ export function asLangOrDefault(value: string | null | undefined): Lang {
 
 // Translation direction of an exercise — absolute, so each keeps its own SM-2
 // progression regardless of which side the user reads the interface in.
-export type Direction = 'SV_FR' | 'FR_SV' | 'EN_FR' | 'FR_EN' | 'DE_FR' | 'FR_DE'
+export type Direction =
+  | 'SV_FR' | 'FR_SV' | 'EN_FR' | 'FR_EN' | 'NL_FR' | 'FR_NL' | 'ES_FR' | 'FR_ES' | 'DE_FR' | 'FR_DE'
 
 // What the learner asked a session to drill. 'MIXED' is not a direction: it
 // draws each card in the direction it is actually scheduled in, so one session

@@ -5,8 +5,10 @@ import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import { TextField } from '@/components/ui/primitives'
 import { AuthLinks, AuthNotice } from '@/components/auth/AuthForm'
+import { useAuthStrings } from '@/components/auth/AuthLang'
 
 export default function ForgotPasswordPage() {
+  const t = useAuthStrings()
   const [email, setEmail] = useState('')
   const [loading, setLoading] = useState(false)
   const [sent, setSent] = useState(false)
@@ -28,13 +30,10 @@ export default function ForgotPasswordPage() {
   if (sent) {
     return (
       <>
-        <AuthNotice>
-          Si un compte existe pour {email}, un lien vient d&apos;être envoyé. Il expire dans une
-          heure.
-        </AuthNotice>
+        <AuthNotice>{t.linkSent(email)}</AuthNotice>
         <AuthLinks>
           <Link href="/login" className="text-primary underline">
-            Retour à la connexion
+            {t.backToLogin}
           </Link>
         </AuthLinks>
       </>
@@ -45,22 +44,22 @@ export default function ForgotPasswordPage() {
     <>
       <form onSubmit={handleSubmit} className="mt-9 space-y-3 text-left">
         <TextField
-          label="Email"
+          label={t.email}
           type="email"
           autoComplete="email"
           required
-          hint="Nous t'enverrons un lien pour choisir un nouveau mot de passe."
+          hint={t.forgotHint}
           value={email}
           onChange={e => setEmail(e.target.value)}
         />
         <Button type="submit" size="lg" className="w-full" disabled={loading}>
-          {loading ? 'Envoi…' : 'Envoyer le lien'}
+          {loading ? t.sending : t.sendLink}
         </Button>
       </form>
 
       <AuthLinks>
         <Link href="/login" className="text-muted-foreground hover:underline">
-          Retour à la connexion
+          {t.backToLogin}
         </Link>
       </AuthLinks>
     </>

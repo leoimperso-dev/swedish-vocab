@@ -13,7 +13,7 @@ async function main() {
 
   const sent = await sendEmail({
     to,
-    ...passwordResetEmail('https://example.com/reset-password?token=test', 60),
+    ...passwordResetEmail('https://example.com/reset-password?token=test', 60, 'fr'),
   })
   console.log(sent ? `✅ Sent to ${to}` : `❌ Not sent to ${to}`)
   process.exit(sent ? 0 : 1)

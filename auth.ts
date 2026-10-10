@@ -4,6 +4,8 @@ import Credentials from 'next-auth/providers/credentials'
 import { PrismaAdapter } from '@auth/prisma-adapter'
 import { db } from '@/lib/db'
 import { normalizeEmail, verifyPassword } from '@/lib/auth/password'
+import { asLangOrDefault, coursesFor } from '@/lib/courses'
+import { requestLang } from '@/lib/ui-lang'
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
   adapter: PrismaAdapter(db),
@@ -47,6 +49,18 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     session({ session, token }) {
       session.user.id = (token.id ?? token.sub) as string
       return session
+    },
+  },
+  events: {
+    // A Google signup skips /api/register: the language the login screen was
+    // read in becomes the interface here instead
+    async createUser({ user }) {
+      if (!user.id) return
+      const [course] = coursesFor(asLangOrDefault(await requestLang()))
+      await db.user.update({
+        where: { id: user.id },
+        data: { nativeLanguage: course.native, learningLanguage: course.learned },
+      })
     },
   },
   pages: {

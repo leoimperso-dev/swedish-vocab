@@ -107,6 +107,15 @@ The course drives UI strings (`lib/i18n.ts`, via `CourseProvider`/`useCourse`/`u
 `getCourse(userId)` from `lib/current-course.ts` server-side), exercise direction, TTS locale
 (`localeOf`), QCM distractor side, and which exercises exist.
 
+Interface language = `course.native`: the profile's "interface language" setting
+(`InterfaceLanguageSettings`) just switches to that native's course. Every language in
+`INTERFACE_LANGS` (= the keys of `STRINGS` in `lib/i18n.ts`) is an interface language; content is
+X-fr only, so non-French natives can only learn French. Before a user exists (auth screens, signup,
+`<html lang>`, metadata) the language comes from `lib/ui-lang.ts`: the `ui-lang` cookie (set by the
+auth-screen flags and by `setCourse`), else `Accept-Language`. Signup — `/api/register` and the
+Google `createUser` event — starts the account on that language's first course; the reset email
+uses `User.nativeLanguage`.
+
 **Every query on Word/Story/GrammarLesson must filter by `course.pair`.** Vocabulary stats are
 per course (`where: { userId, word: { pair } }`); XP, level, streak and achievements stay global.
 

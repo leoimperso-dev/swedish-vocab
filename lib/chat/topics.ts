@@ -16,7 +16,7 @@ export function bandOf(level: CefrLevel | null): Band {
   return 'easy'
 }
 
-const POOL: Record<'fr' | 'sv' | 'en', Record<Band, string[]>> = {
+const POOL: { fr: Record<Band, string[]> } & Partial<Record<Lang, Record<Band, string[]>>> = {
   fr: {
     easy: [
       'Ta journée d\'hier',
@@ -95,11 +95,63 @@ const POOL: Record<'fr' | 'sv' | 'en', Record<Band, string[]>> = {
       'Is it better to specialise or to stay broad?',
     ],
   },
+  es: {
+    easy: [
+      'Tu día de ayer',
+      'Tu desayuno favorito',
+      'El tiempo que hace hoy',
+      'Tu familia',
+      'Lo que haces el fin de semana',
+      'Tu animal favorito',
+    ],
+    medium: [
+      'Un viaje que te marcó',
+      'La última película que viste',
+      'Lo que cambiarías en tu ciudad',
+      'Un plato que sabes cocinar',
+      'Tu trabajo o tus estudios',
+      'Un hábito que te gustaría adquirir',
+    ],
+    hard: [
+      '¿Ha mejorado el teletrabajo nuestras vidas?',
+      '¿Hay que limitar las redes sociales a los menores?',
+      'Un libro que cambió tu forma de pensar',
+      'El lugar del coche en la ciudad',
+      'Lo que la inteligencia artificial cambiará en tu profesión',
+      '¿Es mejor especializarse o ser polivalente?',
+    ],
+  },
+  nl: {
+    easy: [
+      'Je dag gisteren',
+      'Je favoriete ontbijt',
+      'Het weer vandaag',
+      'Je gezin',
+      'Wat je in het weekend doet',
+      'Je favoriete dier',
+    ],
+    medium: [
+      'Een reis die indruk op je maakte',
+      'De laatste film die je zag',
+      'Wat je zou veranderen in je stad',
+      'Een gerecht dat je kunt koken',
+      'Je werk of je studie',
+      'Een gewoonte die je wilt aanleren',
+    ],
+    hard: [
+      'Heeft thuiswerken ons leven verbeterd?',
+      'Moeten sociale media beperkt worden voor minderjarigen?',
+      'Een boek dat je manier van denken veranderde',
+      'De plaats van de auto in de stad',
+      'Wat kunstmatige intelligentie aan je beroep gaat veranderen',
+      'Is het beter je te specialiseren of breed te blijven?',
+    ],
+  },
 }
 
 /** Three openers from the pool, varied per call. */
 export function fallbackTopics(native: Lang, level: CefrLevel | null): string[] {
-  const pool = POOL[native as 'fr' | 'sv' | 'en'] ?? POOL.fr
+  const pool = POOL[native] ?? POOL.fr
   const list = [...pool[bandOf(level)]]
   for (let i = list.length - 1; i > 0; i--) {
     const j = Math.floor(Math.random() * (i + 1))
