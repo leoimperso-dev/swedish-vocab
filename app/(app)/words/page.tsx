@@ -234,18 +234,6 @@ export default function WordsPage() {
     })
   }
 
-  // The rendered slice of the current view, in order — what "select all" ticks.
-  // The list renders in pages of PAGE_STEP, so this stops at the scroll
-  // boundary; reading aloud deliberately does not (see fullList).
-  const shownWords = useMemo(() => {
-    if (query.trim()) return searchResults.slice(0, searchVisible)
-    if (tab === 'favorites') return favoriteWords
-    if (tab === 'top') return topWords.slice(0, topVisible)
-    return groups
-      .filter(([label]) => openCategories.has(label))
-      .flatMap(([label, words]) => words.slice(0, catVisible[label] ?? PAGE_STEP))
-  }, [query, searchResults, searchVisible, tab, favoriteWords, topWords, topVisible, groups, openCategories, catVisible])
-
   // Everything the current view covers, pagination ignored — what the voice
   // reads. Stopping at PAGE_STEP made a long list fall silent after sixty
   // words for no reason the listener could see: scrolling is a property of
@@ -266,6 +254,24 @@ export default function WordsPage() {
   // and a single card's speaker.
   const [playlist, setPlaylist] = useState<string[]>([])
   const spokenWordId = spokenIndex === null ? null : playlist[Math.floor(spokenIndex / 2)]
+
+  // The rendered slice of the current view, in order — what "select all" ticks
+  // and what the DOM holds. The list renders in pages of PAGE_STEP, but the
+  // voice reads past them (see fullList), and a WordRow only scrolls itself
+  // into view while speaking if it exists at all — so the page grows to reach
+  // the spoken word, one word at a time rather than rendering everything.
+  const shownWords = useMemo(() => {
+    const upTo = (list: ApiWord[], visible: number) => {
+      const at = spokenWordId ? list.findIndex(w => w.id === spokenWordId) : -1
+      return list.slice(0, at >= visible ? at + 1 : visible)
+    }
+    if (query.trim()) return upTo(searchResults, searchVisible)
+    if (tab === 'favorites') return favoriteWords
+    if (tab === 'top') return upTo(topWords, topVisible)
+    return groups
+      .filter(([label]) => openCategories.has(label))
+      .flatMap(([label, words]) => upTo(words, catVisible[label] ?? PAGE_STEP))
+  }, [query, searchResults, searchVisible, tab, favoriteWords, topWords, topVisible, groups, openCategories, catVisible, spokenWordId])
 
   const speakWords = useCallback((list: ApiWord[]) => {
     const learnedLocale = localeOf(course.learned)
