@@ -1,8 +1,9 @@
 # Vocab App
 
 Next.js app for learning vocabulary with spaced repetition. Swedish↔French,
-English↔French, Dutch→French and Spanish→French today; see "Languages" below
-before adding another.
+English↔French, German↔French, Dutch→French and Spanish→French today; see
+"Languages" below before adding another. **`de-fr` is wired in code but has no
+content yet** (no vocabulary file in `SOURCES`, no stories/grammar/dialogues).
 
 ## Stack
 - Next.js 16 App Router, TypeScript, Tailwind CSS v4
@@ -111,7 +112,9 @@ per course (`where: { userId, word: { pair } }`); XP, level, streak and achievem
 
 Adding a language: add the pair + its courses to `PAIRS`/`COURSES`, a `languageName` entry and a
 UI block in `lib/i18n.ts` if it becomes an interface language, its verb forms to `VERB_FORMS`, its
-morphology to `lib/morphology.ts`, then the content (see Data sources).
+morphology to `lib/morphology.ts`, then the content (see Data sources). `tsc --noEmit` then lists
+every other `Record<Lang, …>` to complete (XP titles, chat prompt, voice sample, Tatoeba code,
+example blocklist, flags, TTS voices).
 
 ## Study directions
 `UserWord.direction` is absolute (`SV_FR` | `FR_SV` | `EN_FR` | `FR_EN`) — each word has one SM-2

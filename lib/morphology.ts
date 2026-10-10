@@ -741,7 +741,14 @@ function germanCandidates(token: string): string[] {
     const stem = token.slice(0, -suffix.length)
     if (stem.length < 3) continue
     out.push(stem, stem + 'en', stem + 'n', stem + 'e')
+    // Umlaut plurals: "häuser" → "haus", "bäume" → "baum"
+    const unumlauted = stem.replace(/ä(?=[^äöü]*$)/, 'a').replace(/ö(?=[^äöü]*$)/, 'o').replace(/ü(?=[^äöü]*$)/, 'u')
+    if (unumlauted !== stem) out.push(unumlauted)
   }
+  // Regular past participle: ge + stem + t ("gemacht" → "machen"), also inside
+  // separable verbs ("aufgemacht" → "aufmachen")
+  const participle = token.match(/^(.*?)ge(.{2,}?)(et|t|en)$/)
+  if (participle) out.push(participle[1] + participle[2] + 'en', participle[1] + participle[2] + 'n')
   return out
 }
 
