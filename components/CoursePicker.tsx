@@ -92,12 +92,15 @@ function Sheet({ course, knownByPair, pending, onPick, onClose }: {
           exit={{ y: '100%' }}
           transition={{ type: 'spring', damping: 30, stiffness: 320 }}
           onClick={e => e.stopPropagation()}
-          className="safe-bottom absolute inset-x-0 bottom-0 mx-auto max-w-[430px] rounded-t-3xl border-t border-border-strong bg-surface px-4 pb-5 pt-3"
+          // Capped and scrollable: the list grows with every course added, and
+          // anchored to the bottom it otherwise runs off the top of the screen
+          className="safe-bottom absolute inset-x-0 bottom-0 mx-auto flex max-h-[85dvh] max-w-[430px] flex-col rounded-t-3xl border-t border-border-strong bg-surface px-4 pb-5 pt-3"
         >
-          <span aria-hidden="true" className="mx-auto mb-4 block h-1 w-10 rounded-full bg-border-strong" />
-          <h2 className="mb-3 font-display text-lg font-semibold tracking-tight">{t.chooseCourse}</h2>
+          <span aria-hidden="true" className="mx-auto mb-4 block h-1 w-10 shrink-0 rounded-full bg-border-strong" />
+          <h2 className="mb-3 shrink-0 font-display text-lg font-semibold tracking-tight">{t.chooseCourse}</h2>
 
-          <div className="space-y-2">
+          {/* min-h-0 lets the flex child shrink below its content height */}
+          <div className="min-h-0 flex-1 space-y-2 overflow-y-auto overscroll-contain">
             {COURSES.map(option => {
               const active = sameCourse(option, course)
               // Each row speaks its own interface language, so switching to a
